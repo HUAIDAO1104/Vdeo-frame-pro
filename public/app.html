@@ -1210,7 +1210,7 @@ async function doCapture(){
     }
     try{
       const du = await seekCap(vPrev,cc,cx,t);
-      S.frames.push({dataUrl:du, time:t, idx:S.frames.length});
+      S.frames.push({dataUrl:du, time:t, idx:S.frames.length, w:vPrev.videoWidth||1920, h:vPrev.videoHeight||1080});
       addThumb(S.frames.length-1, frag);
       queued++;
       captured++;
@@ -1331,7 +1331,7 @@ async function doCaptureScene(){
       prevData=cur;
       if(isKey){
         lastKeptTime=t;
-        S.frames.push({dataUrl:du, time:t, idx:S.frames.length});
+        S.frames.push({dataUrl:du, time:t, idx:S.frames.length, w:vPrev.videoWidth||1920, h:vPrev.videoHeight||1080});
         addThumb(S.frames.length-1, frag);
         queued++; captured++;
         if(queued>=8){
@@ -2170,8 +2170,9 @@ function seekCapOnce(v,c,ctx,t,timeoutMs){
       v.removeEventListener('seeked', onSeeked);
       try{
         c.width=v.videoWidth||1920; c.height=v.videoHeight||1080;
+        ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
         ctx.drawImage(v,0,0,c.width,c.height);
-        const url=c.toDataURL('image/jpeg',.90);
+        const url=c.toDataURL('image/jpeg',.95);
         // 检测是否为空白/全黑帧（解码尚未就绪时偶发）
         if(url.length < 1200){ rej(new Error('empty frame at '+t)); return; }
         res(url);
@@ -3600,10 +3601,25 @@ async function generateBatch(bid){
   genBtn.innerHTML='<span class="spin"></span>生成中...'; genBtn.disabled=true;
   await sleep(20);
 
-  const W=1920, H=1080;
+  // 依据源帧真实分辨率动态决定画布尺寸，避免被写死成 1920×1080 导致放大模糊。
+  // 单格目标尺寸取本批已填充帧的最大原始分辨率（不缩小源像素），整张画布 = 单格 × 网格。
+  let srcW=0, srcH=0;
+  filledCells.forEach(fi=>{
+    const f=S.frames[fi];
+    if(f){ srcW=Math.max(srcW, f.w||0); srcH=Math.max(srcH, f.h||0); }
+  });
+  if(!srcW||!srcH){ srcW=1920; srcH=1080; }
+  // 每个格子保留源帧的完整像素密度
+  let cellW=srcW, cellH=srcH;
+  let W=cellW*b.cols, H=cellH*b.rows;
+  // 上限保护：最长边超过 8192 时整体等比缩小，防止内存/性能问题
+  const MAXEDGE=8192;
+  const longest=Math.max(W,H);
+  if(longest>MAXEDGE){ const k=MAXEDGE/longest; W=Math.round(W*k); H=Math.round(H*k); }
   const canvas=document.createElement('canvas');
   canvas.width=W; canvas.height=H;
   const ctx=canvas.getContext('2d');
+  ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
   ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
   const uniqFilled = [...new Set(filledCells)];
   await Promise.all(uniqFilled.map(fi=>loadImg(S.frames[fi].dataUrl)));
@@ -3664,9 +3680,10 @@ async function generateBatch(bid){
   const pcanvas=document.getElementById('pcanvas-'+bid);
   prevWrap.style.display='block';
   const pw=prevWrap.clientWidth||360;
-  const ph=Math.round(pw*9/16);
+  const ph=Math.round(pw*canvas.height/canvas.width);
   pcanvas.width=pw; pcanvas.height=ph;
-  pcanvas.getContext('2d').drawImage(canvas,0,0,pw,ph);
+  const pcx=pcanvas.getContext('2d'); pcx.imageSmoothingEnabled=true; pcx.imageSmoothingQuality='high';
+  pcx.drawImage(canvas,0,0,pw,ph);
 
   // Enable download buttons
   const dlBtn=document.getElementById('dl-'+bid);
@@ -3679,10 +3696,8 @@ async function generateBatch(bid){
   // Activate global download
   checkDlAllBtn();
   const hasBadge=badgeChk&&badgeChk.checked;
-  toast('批次 #'+bid+' 生成成功！'+(hasBadge?' ✦ 已叠加角标':'')+' — 点击预览图可全屏查看');
-
-  // 生成完成后自动弹出全屏预览，方便查看效果
-  setTimeout(()=>openPreviewModal(b), 300);
+  toast('批次 #'+bid+' 生成成功（'+W+'×'+H+'）'+(hasBadge?' ✦ 已叠加角标':'')+' — 点击预览图可全屏查看/替换');
+  // 不再自动弹出全屏预览，避免打断操作；用户点击预览缩略图即可全屏
 }
 
 function checkDlAllBtn(){
@@ -3712,10 +3727,11 @@ function openExportOptions(){
           '<input type="range" class="exp-range" id="expQ" min="50" max="100" value="'+Math.round(EXPORT.quality*100)+'">'+
           '<span class="exp-val" id="expQVal">'+Math.round(EXPORT.quality*100)+'%</span></div>'+
         '<div class="exp-row"><span class="exp-label">分辨率</span><div class="exp-seg" id="expScale">'+
-          '<button data-s="0.5"'+(EXPORT.scale===0.5?' class="active"':'')+'>960p</button>'+
-          '<button data-s="1"'+(EXPORT.scale===1?' class="active"':'')+'>1080p</button>'+
-          '<button data-s="2"'+(EXPORT.scale===2?' class="active"':'')+'>2160p</button>'+
+          '<button data-s="0.5"'+(EXPORT.scale===0.5?' class="active"':'')+'>0.5×</button>'+
+          '<button data-s="1"'+(EXPORT.scale===1?' class="active"':'')+'>原始(1×)</button>'+
+          '<button data-s="2"'+(EXPORT.scale===2?' class="active"':'')+'>2×</button>'+
         '</div></div>'+
+        '<div class="exp-tip" style="margin-top:10px;font-size:12px;color:var(--muted,#8aa);line-height:1.5;">拼图按视频原始分辨率合成，「原始(1×)」即无损尺寸；倍率以此为基准缩放。</div>'+
         '<div class="crop-btns" style="margin-top:6px;"><button class="btn-sm btn-primary-sm" onclick="applyExportOptions()">保存设置</button></div>'+
       '</div>'+
     '</div>';
@@ -3728,7 +3744,7 @@ function openExportOptions(){
     EXPORT.scale=parseFloat(b.dataset.s); m.querySelectorAll('#expScale button').forEach(x=>x.classList.toggle('active',x===b)); });
   m.querySelector('#expQ').addEventListener('input',e=>{ EXPORT.quality=parseInt(e.target.value)/100; document.getElementById('expQVal').textContent=e.target.value+'%'; });
 }
-function applyExportOptions(){ document.getElementById('exportModal')?.remove(); toast('导出设置已保存：'+EXPORT.format.toUpperCase()+' · '+(1080*EXPORT.scale)+'p'); }
+function applyExportOptions(){ document.getElementById('exportModal')?.remove(); toast('导出设置已保存：'+EXPORT.format.toUpperCase()+' · '+EXPORT.scale+'× 原始分辨率'); }
 
 // 根据 EXPORT 设置把画布转为 dataURL（含分辨率缩放）
 function exportCanvasURL(srcCanvas){
@@ -3749,12 +3765,13 @@ function exportExt(){ return EXPORT.format==='png'?'png':(EXPORT.format==='webp'
 function downloadBatch(bid){
   const b=S.batches.find(x=>x.id===bid);
   if(!b||!b.canvas){ toast('请先生成拼图','err'); return; }
-  const res=Math.round(1080*EXPORT.scale);
+  const outW=Math.round(b.canvas.width*EXPORT.scale);
+  const outH=Math.round(b.canvas.height*EXPORT.scale);
   const a=document.createElement('a');
   a.href=exportCanvasURL(b.canvas);
-  a.download='videoframe_'+b.cols+'x'+b.rows+'_batch'+bid+'_'+res+'p.'+exportExt();
+  a.download='videoframe_'+b.cols+'x'+b.rows+'_batch'+bid+'_'+outW+'x'+outH+'.'+exportExt();
   a.click();
-  toast('批次 #'+bid+' 已下载（'+EXPORT.format.toUpperCase()+' '+(res*16/9|0)+'×'+res+'）');
+  toast('批次 #'+bid+' 已下载（'+EXPORT.format.toUpperCase()+' '+outW+'×'+outH+'）');
 }
 
 async function generateAll(){
@@ -3808,15 +3825,17 @@ function openPreviewModal(b){
   const modal=document.getElementById('previewModal');
   const pmCanvas=document.getElementById('pmCanvas');
   document.getElementById('pmTitle').textContent=b.cols+'×'+b.rows+' 批次 #'+b.id+' 预览';
-  // Scale canvas to fit screen
+  // Scale canvas to fit screen（按画布真实宽高比，而非写死 16:9）
+  const cw=b.canvas.width, ch=b.canvas.height;
   const maxW=window.innerWidth-40;
   const maxH=window.innerHeight-80;
-  const scale=Math.min(maxW/1920, maxH/1080, 1);
-  pmCanvas.width=Math.round(1920*scale);
-  pmCanvas.height=Math.round(1080*scale);
+  const scale=Math.min(maxW/cw, maxH/ch, 1);
+  pmCanvas.width=Math.round(cw*scale);
+  pmCanvas.height=Math.round(ch*scale);
   pmCanvas.style.width=pmCanvas.width+'px';
   pmCanvas.style.height=pmCanvas.height+'px';
-  pmCanvas.getContext('2d').drawImage(b.canvas,0,0,pmCanvas.width,pmCanvas.height);
+  const pmcx=pmCanvas.getContext('2d'); pmcx.imageSmoothingEnabled=true; pmcx.imageSmoothingQuality='high';
+  pmcx.drawImage(b.canvas,0,0,pmCanvas.width,pmCanvas.height);
   buildPreviewCellOverlay(b);
   modal.classList.add('open');
 }
