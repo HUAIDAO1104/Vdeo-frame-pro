@@ -20,11 +20,15 @@
   <div class="pm-bar">
     <span class="pm-title" id="pmTitle">拼图预览</span>
     <div class="pm-actions">
-      <button class="pm-btn" id="pmDlBtn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>下载 1080P</button>
+      <span class="pm-hint" id="pmHint" style="font-size:12px;color:rgba(255,255,255,0.7);margin-right:6px;display:inline-flex;align-items:center;gap:5px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4"/></svg>点击任意格子可替换该帧</span>
+      <button class="pm-btn" id="pmDlBtn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>下载</button>
       <div class="pm-close" id="pmClose">×</div>
     </div>
   </div>
-  <canvas id="pmCanvas"></canvas>
+  <div id="pmCanvasWrap" style="position:relative;display:inline-block;">
+    <canvas id="pmCanvas"></canvas>
+    <div id="pmCellOverlay" style="position:absolute;inset:0;display:grid;"></div>
+  </div>
 </div>
 
 <!-- Lightbox -->
@@ -618,6 +622,9 @@
       </div>
         </div><!-- /panel left (view2) -->
 
+        <!-- 中：已选帧墙挂载点（拼图区也可见已选帧，便于拖拽/替换） -->
+        <div class="view-slot" id="frameSlot2"></div>
+
         <!-- 右：拼图批次面板 -->
   <!-- ===== RIGHT: BATCH PANEL ===== -->
   <div class="col-right">
@@ -714,6 +721,20 @@
             </button>
             <button class="btn-sm" onclick="switchTab(1)" style="display:inline-flex;align-items:center;gap:5px;color:var(--tm);"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>挑帧设置</button>
           </div>
+        </div>
+      </div>
+      <!-- 挑帧结果引导条：AI/手动选帧后提示，引导进入拼图 -->
+      <div id="pickResultBar" style="display:none;padding:10px 14px;margin-bottom:8px;background:var(--grad);border-radius:10px;flex-shrink:0;box-shadow:0 4px 16px var(--accent-glow-s);">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#fff;font-weight:700;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
+            已选中 <span id="pickResultN">0</span> 帧（高亮 + 编号即为选中）
+          </span>
+          <div style="flex:1;"></div>
+          <button class="btn-sm" onclick="proceedToCollage()" style="background:rgba(255,255,255,0.95);color:var(--accent-d,#1a6b4f);border:none;font-weight:700;display:inline-flex;align-items:center;gap:5px;">
+            进入拼图并填充 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+          <button class="btn-sm" onclick="document.getElementById('pickResultBar').style.display='none'" style="background:rgba(255,255,255,0.2);color:#fff;border:none;">关闭</button>
         </div>
       </div>
       <div class="frames-grid" id="fGrid">
@@ -1056,29 +1077,40 @@ vInput.addEventListener('change', e=>{ if(e.target.files[0]) loadVideo(e.target.
 
 const vPrev = document.getElementById('vPrev');
 function loadVideo(file){
-  // 判断：当前活动项目是否为空（无帧无拼图）→ 复用，否则新建独立项目
   const cur = PROJECTS.list.find(x=>x.id===PROJECTS.activeId);
-  const curEmpty = cur && (!cur.frames || cur.frames.length===0) && (!cur.batches || cur.batches.length===0)
-                   && (!S.frames || S.frames.length===0) && (!S.batches || S.batches.length===0);
   let p;
-  if(curEmpty){
-    // 复用当前空项目，仅替换视频
-    if(cur.videoUrl){ try{ URL.revokeObjectURL(cur.videoUrl); }catch(e){} }
-    cur.fileName=file.name; cur.fileSize=fmtSz(file.size); cur.fileFmt=file.name.split('.').pop().toUpperCase();
-    cur.videoUrl=URL.createObjectURL(file);
-    cur.name=file.name.replace(/\.[^.]+$/,'').slice(0,24)||cur.name;
-    p=cur;
+
+  if(PROJECTS.list.length===0){
+    // 首次加载：把当前全局状态（含初始默认批次）收编为首个项目，不清空
+    p = createProject(file);
+    PROJECTS.activeId = p.id;
+    saveActiveProject(); // 立即把当前 S（默认批次等）写入该项目
   } else {
-    // 保存当前 → 新建项目
-    saveActiveProject();
-    p=createProject(file);
-    PROJECTS.activeId=p.id;
-    // 重置全局状态为新项目空白
-    S.frames=[];S.selected=[];S.batches=[];S.aiScores=[];S.imgCache=new Map();S.captureMode='interval';batchIdCnt=0;
-    if(typeof HISTORY!=='undefined'){HISTORY.stack.length=0;HISTORY.future.length=0;if(typeof updateUndoRedoUI==='function')updateUndoRedoUI();}
-    renderAllFrames(); renderAllBatches();
-    updateSelBadge(); updateDlBtns(); updateAiBtns();
-    document.getElementById('totalN').textContent='0';
+    const curEmpty = cur && (!S.frames || S.frames.length===0)
+      && (!S.batches || S.batches.length===0 || !S.batches.some(b=>b.cells.some(c=>c!==null)));
+    if(curEmpty){
+      // 当前项目尚未真正使用（无帧、无已填充拼图）→ 复用，仅替换视频
+      if(cur.videoUrl){ try{ URL.revokeObjectURL(cur.videoUrl); }catch(e){} }
+      cur.fileName=file.name; cur.fileSize=fmtSz(file.size); cur.fileFmt=file.name.split('.').pop().toUpperCase();
+      cur.videoUrl=URL.createObjectURL(file);
+      cur.name=file.name.replace(/\.[^.]+$/,'').slice(0,24)||cur.name;
+      p=cur;
+    } else {
+      // 保存当前 → 新建独立项目（带默认批次，避免“请先添加批次”）
+      saveActiveProject();
+      p=createProject(file);
+      PROJECTS.activeId=p.id;
+      S.frames=[];S.selected=[];S.aiScores=[];S.imgCache=new Map();S.captureMode='interval';batchIdCnt=0;
+      // 清空旧批次 DOM，新项目预置默认批次
+      S.batches=[];
+      document.getElementById('batchList').querySelectorAll('.batch').forEach(el=>el.remove());
+      document.getElementById('batchEmpty').style.display='none';
+      addBatch(2,2); addBatch(3,3);
+      if(typeof HISTORY!=='undefined'){HISTORY.stack.length=0;HISTORY.future.length=0;if(typeof updateUndoRedoUI==='function')updateUndoRedoUI();}
+      renderAllFrames();
+      updateSelBadge(); updateDlBtns(); updateAiBtns();
+      document.getElementById('totalN').textContent='0';
+    }
   }
 
   vPrev.src = p.videoUrl;
@@ -1358,11 +1390,12 @@ function relocateFrameWall(idx){
   let slot=null;
   if(idx===0) slot=document.getElementById('frameSlot0');
   else if(idx===1) slot=document.getElementById('frameSlot1');
+  else if(idx===2) slot=document.getElementById('frameSlot2');
   if(slot){
     if(wall.parentElement!==slot) slot.appendChild(wall);
     wall.style.display='';
   } else {
-    // 视图2：帧墙回停到 wrap 末尾并隐藏（CSS 控制隐藏）
+    // 兜底：帧墙回停到 wrap 末尾并隐藏（CSS 控制隐藏）
     const wrap=document.querySelector('.wrap');
     if(wrap && wall.parentElement!==wrap) wrap.appendChild(wall);
   }
@@ -1914,7 +1947,8 @@ async function buildPrefPrompt(){
 // 快捷填充所有批次（顺序填充）
 function doFillAll(){
   if(S.selected.length===0){ toast('请先选择要填充的帧','err'); return; }
-  if(S.batches.length===0){ toast('请先添加拼图批次','err'); return; }
+  // 没有批次则按选中帧数自动创建合适批次
+  if(S.batches.length===0){ autoCreateBatchForSelection(S.selected.length); }
   pushHistory();
   let fi=0;
   S.batches.forEach(b=>{
@@ -2926,6 +2960,38 @@ function clearFrameScores(){
   document.querySelectorAll('.fitem.has-score').forEach(el=>el.classList.remove('has-score'));
 }
 
+// 显示挑帧结果引导条
+function showPickResultBar(n){
+  const bar=document.getElementById('pickResultBar');
+  if(!bar) return;
+  document.getElementById('pickResultN').textContent=n;
+  bar.style.display='block';
+}
+// 进入拼图区：确保有批次 → 填充已选帧 → 切到拼图工作区
+function proceedToCollage(){
+  document.getElementById('pickResultBar').style.display='none';
+  if(S.selected.length===0){ toast('请先选择帧','err'); switchTab(1); return; }
+  // 没有批次则自动按选中数量创建合适的批次
+  if(S.batches.length===0){
+    autoCreateBatchForSelection(S.selected.length);
+  }
+  // 顺序填充
+  doFillAll();
+  switchTab(2);
+  toast('已进入拼图区，已将选中帧填入批次');
+}
+// 根据选中帧数量智能创建一个合适尺寸的批次
+function autoCreateBatchForSelection(n){
+  let cols, rows;
+  if(n<=4){ cols=2; rows=2; }
+  else if(n<=6){ cols=3; rows=2; }
+  else if(n<=9){ cols=3; rows=3; }
+  else if(n<=12){ cols=4; rows=3; }
+  else if(n<=16){ cols=4; rows=4; }
+  else { cols=5; rows=Math.ceil(n/5); }
+  addBatch(cols, rows);
+}
+
 // -------- 主入口 --------
 async function runAIPick(autoFill=false){
   if(S.frames.length===0){ toast('请先截取视频帧','err'); return; }
@@ -3000,12 +3066,24 @@ async function runAIPick(autoFill=false){
     if(el) addFeedbackBtns(fi, el).catch(()=>{});
   });
 
-  // 自动切到填充拼图 Tab（除非已是 autoFill 或一键流程中）
+  // 不再自动跳转：停留在当前帧墙，让用户清楚看到「哪些帧被选中」
+  // 选中帧已通过 renderSel() 高亮 + #序号徽章标记
   if(!autoFill && !S._superFlowRunning){
-    setTimeout(()=>switchTab(2), 600);
+    // 滚动到第一个选中帧，确保可见
+    const firstSel = result.indices[0];
+    if(firstSel!==undefined){
+      const el=document.getElementById('fGrid')?.querySelector('[data-fi="'+firstSel+'"]');
+      if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
+    }
+    // 在帧墙顶部显示「进入拼图」引导条
+    showPickResultBar(result.indices.length);
   }
 
-  if(autoFill && S.batches.length>0){
+  if(autoFill){
+    // 没有批次则按选中帧数自动创建一个合适尺寸的批次
+    if(S.batches.length===0){
+      autoCreateBatchForSelection(S.selected.length);
+    }
     pushHistory();
     let fi=0;
     S.batches.forEach(b=>{
@@ -3014,6 +3092,8 @@ async function runAIPick(autoFill=false){
       });
     });
     refreshUsageTags();
+    // 一键流程中不切换（由 runSmartFlow 控制），否则进入拼图区查看
+    if(!S._superFlowRunning){ switchTab(2); }
     toast('AI 挑帧完成，已自动填入 '+fi+' 个格子');
   }
 }
@@ -3151,8 +3231,10 @@ function clearDropTargets(){
 // ===================================================================
 // FRAME PICKER (modal)
 // ===================================================================
-function pickFrame(b, ci){
+let _pmReplaceMode=false; // 标记帧选择器是否由全屏预览发起（替换后自动重新生成）
+function pickFrame(b, ci, fromPreview=false){
   if(S.frames.length===0){ toast('请先截取视频帧','err'); return; }
+  _pmReplaceMode = !!fromPreview;
   showFramePicker(b, ci);
 }
 
@@ -3162,7 +3244,7 @@ function showFramePicker(b, ci){
   const picker = document.createElement('div');
   picker.id='framePicker';
   Object.assign(picker.style,{
-    position:'fixed',inset:'0',zIndex:'888',
+    position:'fixed',inset:'0',zIndex:'1600',
     background:'rgba(0,0,0,0.7)',backdropFilter:'blur(6px)',
     display:'flex',alignItems:'center',justifyContent:'center',
   });
@@ -3259,8 +3341,16 @@ function pickDone(bid, ci, fi){
   document.getElementById('framePicker')?.remove();
   const b=S.batches.find(x=>x.id===bid); if(!b) return;
   pushHistory();
-  b.cells[ci]=fi; renderCell(b,ci); clearBatchCanvas(b);
+  b.cells[ci]=fi; renderCell(b,ci);
   refreshUsageTags();
+  if(_pmReplaceMode){
+    // 来自全屏预览的替换：保留旧裁剪不合适，清掉该格裁剪后重新生成
+    _pmReplaceMode=false;
+    generateBatch(b.id); // 重新生成并自动重开预览
+    toast('已替换格子 #'+(ci+1)+'，正在重新生成');
+  } else {
+    clearBatchCanvas(b);
+  }
 }
 
 function removeCell(bid, ci){
@@ -3668,7 +3758,18 @@ function downloadBatch(bid){
 }
 
 async function generateAll(){
-  if(S.batches.length===0){ toast('请先添加拼图批次','err'); return; }
+  if(S.batches.length===0){
+    // 有已选帧 → 自动创建批次并填充；否则提示
+    if(S.selected.length>0){
+      autoCreateBatchForSelection(S.selected.length);
+      doFillAll();
+    } else {
+      toast('请先选择帧或添加拼图批次','err'); return;
+    }
+  }
+  // 若批次全空但有选中帧，先自动填充
+  const anyFilled = S.batches.some(b=>b.cells.some(c=>c!==null));
+  if(!anyFilled && S.selected.length>0){ doFillAll(); }
   const btn=document.getElementById('genAllBtn');
   btn.innerHTML='<span class="spin"></span>生成中...'; btn.disabled=true;
   let ok=0;
@@ -3716,7 +3817,55 @@ function openPreviewModal(b){
   pmCanvas.style.width=pmCanvas.width+'px';
   pmCanvas.style.height=pmCanvas.height+'px';
   pmCanvas.getContext('2d').drawImage(b.canvas,0,0,pmCanvas.width,pmCanvas.height);
+  buildPreviewCellOverlay(b);
   modal.classList.add('open');
+}
+// 在预览图上构建可点击格子热区，点击即可替换该格
+function buildPreviewCellOverlay(b){
+  const ov=document.getElementById('pmCellOverlay');
+  if(!ov) return;
+  ov.style.gridTemplateColumns='repeat('+b.cols+',1fr)';
+  ov.style.gridTemplateRows='repeat('+b.rows+',1fr)';
+  ov.innerHTML='';
+  for(let i=0;i<b.cols*b.rows;i++){
+    const ci=i;
+    const cell=document.createElement('div');
+    cell.className='pm-cell';
+    const filled=b.cells[ci]!==null;
+    cell.innerHTML=
+      '<div class="pm-cell-actions">'+
+        '<button class="pm-cell-btn" data-act="replace" title="替换此格">'+
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 2v6h6"/><path d="M21 12A9 9 0 0 0 6 5.3L3 8"/><path d="M21 22v-6h-6"/><path d="M3 12a9 9 0 0 0 15 6.7l3-2.7"/></svg>替换'+
+        '</button>'+
+        (filled?'<button class="pm-cell-btn pm-cell-crop" data-act="crop" title="裁剪此格">'+
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2v14a2 2 0 0 0 2 2h14M18 22V8a2 2 0 0 0-2-2H2"/></svg>裁剪'+
+        '</button>':'')+
+        (filled?'<button class="pm-cell-btn pm-cell-clear" data-act="clear" title="清空此格">'+
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>清空'+
+        '</button>':'')+
+      '</div>';
+    cell.onclick=(e)=>{
+      const act=e.target.closest('[data-act]')?.dataset.act;
+      if(act==='crop'){ openCropEditor(b.id, ci); return; }
+      if(act==='clear'){ replaceCellAndRegen(b, ci, null); return; }
+      // 默认/替换：打开帧选择器
+      openPreviewCellPicker(b, ci);
+    };
+    ov.appendChild(cell);
+  }
+}
+// 预览中替换某格的帧选择器（复用 framePicker，但回调后自动重新生成）
+function openPreviewCellPicker(b, ci){
+  pickFrame(b, ci, true); // true = 预览替换模式
+}
+// 替换某格的帧并自动重新生成预览
+async function replaceCellAndRegen(b, ci, fi){
+  pushHistory();
+  b.cells[ci]=fi;
+  if(fi===null && b.crops) delete b.crops[ci];
+  renderCell(b, ci);
+  refreshUsageTags();
+  await generateBatch(b.id);  // 重新生成并刷新预览（会自动重开 modal）
 }
 function closePreviewModal(){
   document.getElementById('previewModal').classList.remove('open');

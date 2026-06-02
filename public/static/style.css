@@ -337,7 +337,7 @@ body::before {
 .view-body { flex:1; min-height:0; display:grid; gap:20px; }
 .view-body.split-capture { grid-template-columns:380px 1fr; }
 .view-body.split-ai      { grid-template-columns:400px 1fr; }
-.view-body.split-collage { grid-template-columns:360px 1fr; }
+.view-body.split-collage { grid-template-columns:300px minmax(280px,1fr) minmax(360px,1.1fr); }
 
 /* 大圆角玻璃面板（方案B核心容器） */
 .panel {
@@ -815,6 +815,18 @@ body::before {
 .pm-close { width:32px; height:32px; border-radius:8px; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); display:flex; align-items:center; justify-content:center; cursor:pointer; color:rgba(255,255,255,.7); font-size:20px; transition:var(--tr); }
 .pm-close:hover { background:rgba(255,60,60,.28); border-color:rgba(255,60,60,.5); color:#fff; }
 #pmCanvas { max-width:calc(100vw - 40px); max-height:calc(100vh - 80px); border-radius:var(--radius-sm); box-shadow:0 16px 80px rgba(0,0,0,.9); object-fit:contain; display:block; }
+#pmCanvasWrap { max-width:calc(100vw - 40px); max-height:calc(100vh - 80px); }
+/* 预览图上的可点击格子热区（用于替换/裁剪/清空单格） */
+#pmCellOverlay { border-radius:var(--radius-sm); overflow:hidden; }
+.pm-cell { position:relative; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s, box-shadow .15s; }
+.pm-cell:hover { background:rgba(62,180,137,0.22); box-shadow:inset 0 0 0 2px var(--accent); }
+.pm-cell-actions { display:none; gap:6px; flex-wrap:wrap; justify-content:center; }
+.pm-cell:hover .pm-cell-actions { display:flex; }
+.pm-cell-btn { display:inline-flex; align-items:center; gap:4px; padding:6px 10px; border-radius:7px; border:1px solid rgba(255,255,255,0.25); background:rgba(0,0,0,0.78); color:#fff; font-size:12px; font-weight:600; cursor:pointer; backdrop-filter:blur(4px); transition:all .15s; }
+.pm-cell-btn svg { width:12px; height:12px; stroke:currentColor; fill:none; stroke-width:2; }
+.pm-cell-btn:hover { background:var(--accent); border-color:var(--accent); }
+.pm-cell-crop:hover { background:var(--sapphire,#3b82f6); border-color:var(--sapphire,#3b82f6); }
+.pm-cell-clear:hover { background:rgba(220,60,60,0.9); border-color:rgba(220,60,60,0.9); }
 
 /* ===================================================================
    LIGHTBOX
@@ -890,13 +902,13 @@ body::before {
 @media(max-width:1440px) {
   .view-body.split-capture { grid-template-columns:340px 1fr; }
   .view-body.split-ai      { grid-template-columns:360px 1fr; }
-  .view-body.split-collage { grid-template-columns:320px 1fr; }
+  .view-body.split-collage { grid-template-columns:280px minmax(240px,1fr) minmax(320px,1fr); }
   .wrap { gap:18px; padding:20px 22px 20px 18px; }
 }
 @media(max-width:1240px) {
   .view-body.split-capture,
-  .view-body.split-ai,
-  .view-body.split-collage { grid-template-columns:300px 1fr; }
+  .view-body.split-ai { grid-template-columns:300px 1fr; }
+  .view-body.split-collage { grid-template-columns:260px minmax(220px,1fr) minmax(300px,1fr); }
 }
 @media(max-width:1024px) {
   /* 中窄屏：工作区改为可滚动单列堆叠 */

@@ -34,3 +34,6 @@ lerna-debug.log*
 shot.cjs
 *.bak
 *.bak2
+e2e*.cjs
+view2_*.png
+*.screenshot.png
