@@ -796,42 +796,59 @@ body::before {
   .view-body.split-collage { grid-template-columns:300px 1fr; }
 }
 @media(max-width:1024px) {
-  /* 窄屏：工作区改为可滚动单列堆叠 */
-  .wrap { height:auto; overflow:visible; flex-direction:row; align-items:flex-start; }
+  /* 中窄屏：工作区改为可滚动单列堆叠 */
+  html, body { overflow:auto; height:auto; }
+  .wrap { height:auto; min-height:100vh; overflow:visible; flex-direction:row; align-items:flex-start; }
   .rail { position:sticky; top:20px; }
-  .stage { min-height:calc(100vh - 140px); }
+  .stage { min-height:calc(100vh - 80px); }
   .view { position:relative; inset:auto; }
   .view.active { min-height:100%; }
-  .view-body { display:block; overflow-y:visible; }
+  .view-body,
+  .view-body.split-capture,
+  .view-body.split-ai,
+  .view-body.split-collage { display:flex; flex-direction:column; overflow-y:visible; gap:16px; }
   .view-body > .panel,
+  .view-body > .view-slot,
   .view-body > .col-mid,
-  .view-body > .col-right { margin-bottom:18px; }
-  .view-body .panel { max-height:none; }
-  .col-mid, .col-right { height:auto; }
-  .frames-card, .batches-card { min-height:420px; }
-  .frames-grid { max-height:62vh; }
+  .view-body > .col-right { margin-bottom:0; width:100%; }
+  .view-body .panel { max-height:none; overflow:visible; }
+  .view-slot, .col-mid, .col-right { height:auto; min-height:auto; }
+  .frames-card, .batches-card { min-height:380px; }
+  .frames-grid { max-height:none; }
 }
 @media(max-width:760px) {
   .wrap { flex-direction:column; padding:14px; gap:14px; }
   .rail {
     flex:0 0 auto; width:100%; flex-direction:row; justify-content:flex-start; flex-wrap:wrap;
-    gap:8px; padding:12px; align-self:auto; position:static;
+    gap:8px; padding:12px; align-self:auto; position:sticky; top:0; z-index:50;
   }
-  .rail-btn { width:auto; min-width:72px; height:48px; flex-direction:row; gap:8px; padding:0 14px; }
+  .rail-brand { padding:0; }
+  .rail-logo { width:42px; height:42px; }
+  .rail-btn { width:auto; min-width:68px; height:46px; flex-direction:row; gap:7px; padding:0 14px; }
+  .rail-btn svg { width:18px; height:18px; }
   .rail-btn.active::before { display:none; }
-  .rail-sep { width:1px; height:30px; margin:0 4px; }
-  .rail-spacer { display:none; }
+  .rail-btn.ghost { height:46px; min-width:auto; padding:0 12px; }
+  .rail-sep { width:1px; height:28px; margin:0 4px; }
+  .rail-spacer { flex:1; display:block; min-height:0; }
+  .stage { width:100%; min-height:auto; }
+  .view-head { flex-direction:column; align-items:flex-start; gap:10px; }
+  .view-head .vh-r { width:100%; }
   .view-title { font-size:var(--fs-xl); }
+  .theme-pop { left:14px; right:14px; bottom:14px; width:auto; }
 }
 @media(max-width:640px) {
-  .hdr { padding:12px 16px; }
-  .logo h1 { font-size:var(--fs-lg); }
+  .wrap { padding:10px; gap:10px; }
   .theme-pop { right:12px; left:12px; width:auto; }
   .help-grid { grid-template-columns:1fr; }
-  .frames-acts { gap:4px; }
-  .panel { padding:18px; }
-  .frames-card, .batches-card { padding:18px; }
+  .frames-acts { gap:4px; flex-wrap:wrap; }
+  .frames-header { flex-direction:column; align-items:flex-start; gap:10px; }
+  .panel { padding:16px; }
+  .frames-card, .batches-card { padding:16px; }
   .metric-row { grid-template-columns:1fr; }
+  .rail-btn .rail-lbl { display:none; }
+  .rail-btn { min-width:46px; padding:0; width:46px; justify-content:center; }
+  .rail-btn.ghost { width:46px; padding:0; }
+  .view-title { font-size:var(--fs-lg); }
 }
 
 /* 触摸设备：把 hover 才显示的控件常驻 */

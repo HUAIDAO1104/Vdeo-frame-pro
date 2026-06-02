@@ -482,6 +482,12 @@
           <p class="view-sub">将已选帧填入拼图批次，一键生成并导出成品图</p>
         </div>
         <div class="vh-r">
+          <button class="btn-sm" id="undoBtn" onclick="undo()" disabled title="撤销 (Ctrl+Z)" style="display:inline-flex;align-items:center;gap:5px;opacity:0.4;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>撤销
+          </button>
+          <button class="btn-sm" id="redoBtn" onclick="redo()" disabled title="重做 (Ctrl+Shift+Z)" style="display:inline-flex;align-items:center;gap:5px;opacity:0.4;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3L21 13"/></svg>重做
+          </button>
           <button class="btn-sm" onclick="switchTab(0)" style="border-color:var(--bs);color:var(--accent);">← 回到帧墙</button>
         </div>
       </div>
@@ -878,13 +884,22 @@ async function doCapture(){
   let queued = 0;
   let captured = 0;
   let failed = 0;
+  const startTs = performance.now();
 
   for(let i=0;i<times.length;i++){
     const t=times[i];
     if(i%2===0 || i===times.length-1){
       const pct=Math.round(i/times.length*100);
       pFill.style.width=pct+'%'; pNum.textContent=pct+'%';
-      pLbl.textContent='截取 '+(i+1)+'/'+times.length+' ('+t.toFixed(1)+'s)';
+      // 基于已用时间推算剩余时间(ETA)
+      let etaTxt='';
+      if(i>=3){
+        const elapsed=(performance.now()-startTs)/1000;
+        const perFrame=elapsed/i;
+        const remain=perFrame*(times.length-i);
+        etaTxt=' · 剩余约 '+fmtETA(remain);
+      }
+      pLbl.textContent='截取 '+(i+1)+'/'+times.length+' ('+t.toFixed(1)+'s)'+etaTxt;
     }
     try{
       const du = await seekCap(vPrev,cc,cx,t);
@@ -900,13 +915,24 @@ async function doCapture(){
       }
     }catch(e){
       failed++;
+      console.warn('截帧失败 @'+t.toFixed(2)+'s:', e.message);
     }
     if(i%6===0) await sleep(0);
   }
 
   pFill.style.width='100%'; pNum.textContent='100%';
-  pLbl.textContent='截取完成！';
-  setTimeout(()=>{ prog.style.display='none'; },1200);
+  const elapsedTotal=((performance.now()-startTs)/1000).toFixed(1);
+  if(captured===0){
+    pLbl.textContent='截取失败';
+    toast('未能截取到任何帧，请检查视频是否可正常播放或更换格式','err');
+  }else if(failed>0){
+    pLbl.textContent='完成（'+captured+' 成功 / '+failed+' 失败）';
+    toast('截取完成：成功 '+captured+' 帧，'+failed+' 帧跳过（已自动重试），用时 '+elapsedTotal+'s');
+  }else{
+    pLbl.textContent='截取完成！用时 '+elapsedTotal+'s';
+    toast('截取完成：共 '+captured+' 帧，用时 '+elapsedTotal+'s');
+  }
+  setTimeout(()=>{ prog.style.display='none'; },1600);
   capBtn.disabled=false; capBtn.innerHTML='截取视频帧';
   updateFillBtn();
   updateDlBtns();
@@ -1035,6 +1061,7 @@ async function runSuperFlow(){
 
     // Step 3: 填充
     setSuperStep(steps, 2);
+    pushHistory();
     let fi=0;
     S.batches.forEach(b=>{
       b.cells.forEach((_,ci)=>{
@@ -1502,6 +1529,7 @@ async function buildPrefPrompt(){
 function doFillAll(){
   if(S.selected.length===0){ toast('请先选择要填充的帧','err'); return; }
   if(S.batches.length===0){ toast('请先添加拼图批次','err'); return; }
+  pushHistory();
   let fi=0;
   S.batches.forEach(b=>{
     b.cells.forEach((_,ci)=>{
@@ -1563,6 +1591,7 @@ async function aiSmartLayoutLocal(){
   const pixCache = await buildPixCache(analyses.map(a=>a.fi), idx=>thumbMap[idx]);
 
   let filled = 0;
+  pushHistory();
   for(const b of S.batches){
     const total = b.cols * b.rows;
 
@@ -1633,6 +1662,7 @@ async function aiSmartLayoutWithVision(apiKey){
   if(compressed.length===0) throw new Error('帧压缩失败');
 
   let filled = 0;
+  pushHistory();
   for(const b of S.batches){
     const total = b.cols * b.rows;
     const need = Math.min(total, compressed.length);
@@ -1711,26 +1741,60 @@ function clearBatchCanvasAll(){
 }
 
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
-function seekCap(v,c,ctx,t){
+
+// 单次 seek+截帧（带超时）
+function seekCapOnce(v,c,ctx,t,timeoutMs){
   return new Promise((res,rej)=>{
     const onSeeked=()=>{
       clearTimeout(timer);
-      c.width=v.videoWidth||1920; c.height=v.videoHeight||1080;
-      ctx.drawImage(v,0,0,c.width,c.height);
-      res(c.toDataURL('image/jpeg',.90));
+      v.removeEventListener('seeked', onSeeked);
+      try{
+        c.width=v.videoWidth||1920; c.height=v.videoHeight||1080;
+        ctx.drawImage(v,0,0,c.width,c.height);
+        const url=c.toDataURL('image/jpeg',.90);
+        // 检测是否为空白/全黑帧（解码尚未就绪时偶发）
+        if(url.length < 1200){ rej(new Error('empty frame at '+t)); return; }
+        res(url);
+      }catch(err){ rej(err); }
     };
     v.addEventListener('seeked', onSeeked, { once:true });
     try{
-      // 直接 currentTime 在多数浏览器下比 fastSeek + 额外回调更快更稳定
       v.currentTime=t;
     }catch(_){
-      v.currentTime=t;
+      try{ v.currentTime=t; }catch(e2){ rej(e2); return; }
     }
     const timer=setTimeout(()=>{
       v.removeEventListener('seeked', onSeeked);
       rej(new Error('seek timeout at '+t));
-    },5000);
+    }, timeoutMs||5000);
   });
+}
+
+// 带自动重试的 seek+截帧：失败后退避重试，并对目标时间做微小抖动以绕过卡住的关键帧
+async function seekCap(v,c,ctx,t,maxRetries=2){
+  let lastErr=null;
+  for(let attempt=0; attempt<=maxRetries; attempt++){
+    try{
+      // 重试时对时间点加入 ±30ms 抖动，避开恰好失败的时间戳
+      const jitter = attempt===0 ? 0 : (attempt%2===0?1:-1)*0.03*Math.ceil(attempt/2);
+      const target = Math.max(0, Math.min((v.duration||t)-0.001, t+jitter));
+      const timeout = 5000 + attempt*2000; // 重试逐步放宽超时
+      return await seekCapOnce(v,c,ctx,target,timeout);
+    }catch(err){
+      lastErr=err;
+      if(attempt<maxRetries) await sleep(120*(attempt+1)); // 退避后再试
+    }
+  }
+  throw lastErr || new Error('seek failed at '+t);
+}
+
+// 格式化秒数为「Xm Ys / Ys」便于 ETA 展示
+function fmtETA(sec){
+  if(!Number.isFinite(sec)||sec<0) return '--';
+  sec=Math.ceil(sec);
+  if(sec<60) return sec+'s';
+  const m=Math.floor(sec/60), s=sec%60;
+  return m+'m'+(s<10?'0':'')+s+'s';
 }
 
 // ===================================================================
@@ -1910,6 +1974,7 @@ function downloadAllFrames(){
 // ===================================================================
 document.getElementById('fillAllBtn').addEventListener('click', ()=>{
   if(S.selected.length===0){ toast('请先选择帧','err'); return; }
+  pushHistory();
   let fi=0;
   S.batches.forEach(b=>{
     b.cells.forEach((_,ci)=>{
@@ -1921,9 +1986,69 @@ document.getElementById('fillAllBtn').addEventListener('click', ()=>{
   updateFillBtn();
 });
 function clearAllCells(){
+  if(S.batches.every(b=>b.cells.every(c=>c===null))){ toast('拼图格子已经是空的','err'); return; }
+  pushHistory();
   S.batches.forEach(b=>{ b.cells=b.cells.map(()=>null); renderAllCells(b); });
   refreshUsageTags();
   toast('已清空所有拼图格子');
+}
+
+// ===================================================================
+// 撤销 / 重做 —— 基于拼图格子(cells)的快照历史栈
+//   覆盖：填充、清空、拖拽放置、单格增删、AI 智能排版
+// ===================================================================
+const HISTORY = { stack: [], future: [], max: 50 };
+
+// 抓取当前所有批次 cells 的深拷贝快照
+function snapshotCells(){
+  return S.batches.map(b => ({ id: b.id, cells: b.cells.slice() }));
+}
+
+// 在「修改发生前」调用：把当前状态压入历史，清空 redo 栈
+function pushHistory(){
+  HISTORY.stack.push(snapshotCells());
+  if(HISTORY.stack.length > HISTORY.max) HISTORY.stack.shift();
+  HISTORY.future.length = 0;
+  updateUndoRedoUI();
+}
+
+// 把一份快照应用回当前批次（仅恢复仍存在的批次）
+function applySnapshot(snap){
+  snap.forEach(s => {
+    const b = S.batches.find(x => x.id === s.id);
+    if(b && b.cells.length === s.cells.length){
+      b.cells = s.cells.slice();
+      renderAllCells(b);
+      clearBatchCanvas(b);
+    }
+  });
+  refreshUsageTags();
+}
+
+function undo(){
+  if(HISTORY.stack.length === 0){ toast('没有可撤销的操作','err'); return; }
+  HISTORY.future.push(snapshotCells());
+  const snap = HISTORY.stack.pop();
+  applySnapshot(snap);
+  updateUndoRedoUI();
+  toast('已撤销');
+}
+
+function redo(){
+  if(HISTORY.future.length === 0){ toast('没有可重做的操作','err'); return; }
+  HISTORY.stack.push(snapshotCells());
+  const snap = HISTORY.future.pop();
+  applySnapshot(snap);
+  updateUndoRedoUI();
+  toast('已重做');
+}
+
+// 同步撤销/重做按钮的可用状态
+function updateUndoRedoUI(){
+  const u = document.getElementById('undoBtn');
+  const r = document.getElementById('redoBtn');
+  if(u){ u.disabled = HISTORY.stack.length === 0; u.style.opacity = u.disabled ? '0.4' : '1'; }
+  if(r){ r.disabled = HISTORY.future.length === 0; r.style.opacity = r.disabled ? '0.4' : '1'; }
 }
 
 // ===================================================================
@@ -2316,8 +2441,16 @@ async function runVisionPick(N, apiKey, model, hintText){
   const batches = [];
   for(let i=0; i<compressed.length; i+=BATCH) batches.push(compressed.slice(i, i+BATCH));
 
+  const scoreStartTs = performance.now();
   for(let bi=0; bi<batches.length; bi++){
-    setAiProgress(28 + (bi/batches.length)*62, 'AI 评分 '+(bi+1)+'/'+batches.length+' 批...');
+    let etaTxt='';
+    if(bi>=1){
+      const elapsed=(performance.now()-scoreStartTs)/1000;
+      const perBatch=elapsed/bi;
+      const remain=perBatch*(batches.length-bi);
+      etaTxt=' · 剩余约 '+fmtETA(remain);
+    }
+    setAiProgress(28 + (bi/batches.length)*62, 'AI 评分 '+(bi+1)+'/'+batches.length+' 批'+etaTxt);
     try {
       // 仅第一批次传入参考图（避免每批都带大量图片增加 token）
       const refGood = bi===0 ? goodRefImages : [];
@@ -2435,6 +2568,7 @@ async function runAIPick(autoFill=false){
   }
 
   if(autoFill && S.batches.length>0){
+    pushHistory();
     let fi=0;
     S.batches.forEach(b=>{
       b.cells.forEach((_,ci)=>{
@@ -2564,6 +2698,7 @@ function bindDropEvents(cell, b, ci){
   cell.ondrop = e=>{
     e.preventDefault(); cell.classList.remove('drop-target');
     if(S.dragFrameIdx!==null){
+      pushHistory();
       b.cells[ci]=S.dragFrameIdx; renderCell(b,ci); clearBatchCanvas(b);
       refreshUsageTags();
     }
@@ -2684,12 +2819,15 @@ function renderFramePickerGrid(grid, b, ci){
 function pickDone(bid, ci, fi){
   document.getElementById('framePicker')?.remove();
   const b=S.batches.find(x=>x.id===bid); if(!b) return;
+  pushHistory();
   b.cells[ci]=fi; renderCell(b,ci); clearBatchCanvas(b);
   refreshUsageTags();
 }
 
 function removeCell(bid, ci){
   const b=S.batches.find(x=>x.id===bid); if(!b) return;
+  if(b.cells[ci]===null) return;
+  pushHistory();
   b.cells[ci]=null; renderCell(b,ci); clearBatchCanvas(b);
   refreshUsageTags();
 }
