@@ -1,0 +1,3189 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="aurora" data-mode="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VideoFrame Pro — 视频帧截取拼接工具</title>
+  <link rel="icon" href="/favicon.ico" type="image/x-icon"/>
+  <meta name="theme-color" content="#0C0818" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="/static/style.css" rel="stylesheet" />
+</head>
+<body>
+
+<!-- Drag Ghost -->
+<div class="drag-ghost" id="dragGhost"><img id="dragGhostImg" /></div>
+
+<!-- Full Preview Modal -->
+<div id="previewModal">
+  <div class="pm-bar">
+    <span class="pm-title" id="pmTitle">拼图预览</span>
+    <div class="pm-actions">
+      <button class="pm-btn" id="pmDlBtn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>下载 1080P</button>
+      <div class="pm-close" id="pmClose">×</div>
+    </div>
+  </div>
+  <canvas id="pmCanvas"></canvas>
+</div>
+
+<!-- Lightbox -->
+<div id="lb" tabindex="0">
+  <div id="lbBar">
+    <div id="lbInfo">
+      <span id="lbTitle">帧 1</span>
+      <span id="lbSub">0.0s · 1/1</span>
+      <span id="lbZoomVal">100%</span>
+    </div>
+    <div id="lbActions">
+      <button class="lb-btn" id="lbBtnZoomIn"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/></svg>放大</button>
+      <button class="lb-btn" id="lbBtnZoomOut"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M8 11h6"/></svg>缩小</button>
+      <button class="lb-btn" id="lbBtnFit"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>适应</button>
+      <button class="lb-btn" id="lbBtnOrig"><svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>原始</button>
+      <button class="lb-btn" id="lbBtnDl"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>下载</button>
+      <div id="lbClose">×</div>
+    </div>
+  </div>
+  <div id="lbViewport">
+    <img id="lbImg" />
+    <div class="lb-arrow" id="lbPrev"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></div>
+    <div class="lb-arrow" id="lbNext"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+  </div>
+  <div id="lbZoomBar">
+    <div class="lbz-btn" id="lbzIn"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div>
+    <div class="lbz-btn" id="lbzOut"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></div>
+    <div class="lbz-btn" id="lbzReset"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1018 0 9 9 0 00-18 0M12 8v4l3 3"/></svg></div>
+  </div>
+  <div id="lbStrip"></div>
+</div>
+
+<!-- Header -->
+<header class="hdr">
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+    </div>
+    <div>
+      <h1>VideoFrame Pro</h1>
+      <p>视频帧截取 · 智能拼接</p>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div class="kbd-hint">
+      <span class="kbd">A</span>全选
+      <span class="kbd">D</span>清除
+      <span class="kbd">G</span>生成
+      <span class="kbd">?</span>帮助
+    </div>
+    <div class="badge-pill"><div class="dot"></div><span>全本地处理 · 隐私安全</span></div>
+    <button class="hdr-icon-btn" id="helpBtn" title="快捷键帮助 (?)" onclick="openHelp()">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </button>
+    <button class="hdr-icon-btn" id="themeBtn" title="主题与外观" onclick="toggleThemePop(event)">
+      <svg viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="10.5" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/><path d="M12 2a10 10 0 100 20c.55 0 1-.45 1-1 0-.6-.4-1-.5-1.5-.1-.5.3-1 .9-1H15a5 5 0 005-5c0-5-4.5-9-8-9z"/></svg>
+    </button>
+  </div>
+
+  <!-- 主题切换弹层 -->
+  <div class="theme-pop" id="themePop">
+    <div>
+      <div class="tp-section-label">主题配色</div>
+      <div class="theme-grid">
+        <div class="theme-chip" data-theme-pick="aurora" onclick="setTheme('aurora')">
+          <div class="theme-swatch sw-aurora"></div><span>Aurora 紫</span>
+        </div>
+        <div class="theme-chip" data-theme-pick="mint" onclick="setTheme('mint')">
+          <div class="theme-swatch sw-mint"></div><span>Mint 绿</span>
+        </div>
+        <div class="theme-chip" data-theme-pick="sapphire" onclick="setTheme('sapphire')">
+          <div class="theme-swatch sw-sapphire"></div><span>Sapphire 蓝</span>
+        </div>
+        <div class="theme-chip" data-theme-pick="amber" onclick="setTheme('amber')">
+          <div class="theme-swatch sw-amber"></div><span>Amber 橙</span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="tp-section-label">明暗模式</div>
+      <div class="mode-seg">
+        <button data-mode-pick="dark" onclick="setMode('dark')">
+          <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>暗色
+        </button>
+        <button data-mode-pick="light" onclick="setMode('light')">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.2" y1="4.2" x2="5.6" y2="5.6"/><line x1="18.4" y1="18.4" x2="19.8" y2="19.8"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.2" y1="19.8" x2="5.6" y2="18.4"/><line x1="18.4" y1="5.6" x2="19.8" y2="4.2"/></svg>亮色
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ===== 竖向药丸导航 ===== -->
+  <nav class="rail" id="rail">
+    <button class="rail-btn active" id="railBtn0" onclick="switchTab(0)" title="导入截帧">
+      <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 9h20M8 4v5M16 4v5"/></svg>
+      <span class="rail-lbl">截帧</span>
+    </button>
+    <button class="rail-btn" id="railBtn1" onclick="switchTab(1)" title="AI 挑帧">
+      <svg viewBox="0 0 24 24"><path d="M12 2l2.4 5.2L20 8l-4 4 1 6-5-3-5 3 1-6-4-4 5.6-.8z"/></svg>
+      <span class="rail-lbl">AI</span>
+    </button>
+    <button class="rail-btn" id="railBtn2" onclick="switchTab(2)" title="填充拼图">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+      <span class="rail-lbl">拼图</span>
+    </button>
+    <div class="rail-sep"></div>
+    <button class="rail-btn" onclick="openHelp()" title="快捷键帮助">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span class="rail-lbl">帮助</span>
+    </button>
+    <button class="rail-btn" onclick="toggleThemePop(event)" title="主题">
+      <svg viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/><path d="M12 2a10 10 0 100 20c.55 0 1-.45 1-1 0-.6-.4-1-.5-1.5-.1-.5.3-1 .9-1H15a5 5 0 005-5c0-5-4.5-9-8-9z"/></svg>
+      <span class="rail-lbl">主题</span>
+    </button>
+  </nav>
+
+  <!-- ===== LEFT PANEL — Tab 分页 ===== -->
+  <div class="col-left">
+
+    <!-- Tab 导航 -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" id="tabBtn0" onclick="switchTab(0)">
+        <span class="tab-ico"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 9h20M8 4v5M16 4v5M8 15h.01M12 15h.01M16 15h.01"/></svg></span>
+        <span class="tab-lbl">导入截帧</span>
+      </button>
+      <button class="tab-btn" id="tabBtn1" onclick="switchTab(1)">
+        <span class="tab-ico"><svg viewBox="0 0 24 24"><path d="M12 2l2.4 5.2L20 8l-4 4 1 6-5-3-5 3 1-6-4-4 5.6-.8z"/></svg></span>
+        <span class="tab-lbl">AI 挑帧</span>
+      </button>
+      <button class="tab-btn" id="tabBtn2" onclick="switchTab(2)">
+        <span class="tab-ico"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg></span>
+        <span class="tab-lbl">填充拼图</span>
+      </button>
+    </nav>
+
+    <!-- Tab 内容区 -->
+    <div class="tab-body-wrap">
+
+      <!-- ── Tab 0: 导入 & 截帧 ── -->
+      <div class="tab-pane active" id="tabPane0">
+
+        <!-- Upload -->
+        <div class="card">
+          <div class="ct"><div class="ctd"></div>视频导入</div>
+          <div class="upzone" id="upzone">
+            <div class="up-icon">
+              <svg viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+            </div>
+            <div class="up-t">拖拽视频文件至此</div>
+            <div class="up-s">或点击选择文件</div>
+            <div class="fmts">
+              <span class="fmt">MP4</span><span class="fmt">MOV</span>
+              <span class="fmt">AVI</span><span class="fmt">MKV</span><span class="fmt">WEBM</span>
+            </div>
+            <input type="file" id="vInput" accept="video/*" style="display:none"/>
+          </div>
+          <div id="vCon">
+            <video id="vPrev" controls preload="metadata"></video>
+            <div class="vinfo">
+              <div class="vi"><div class="vi-l">时长</div><div class="vi-v" id="iDur">—</div></div>
+              <div class="vi"><div class="vi-l">分辨率</div><div class="vi-v" id="iRes">—</div></div>
+              <div class="vi"><div class="vi-l">文件大小</div><div class="vi-v" id="iSz">—</div></div>
+              <div class="vi"><div class="vi-l">格式</div><div class="vi-v" id="iFmt">—</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Capture Settings -->
+        <div class="card">
+          <div class="ct"><div class="ctd"></div>截帧参数</div>
+          <div class="crow"><span class="clabel">截取间隔（秒）</span><input type="number" id="itvl" class="cinput" value="1" min="0.1" max="60" step="0.1"/></div>
+          <div class="crow"><span class="clabel">开始时间（秒）</span><input type="number" id="stt" class="cinput" value="0" min="0" step="0.1"/></div>
+          <div class="crow"><span class="clabel">结束时间（秒）</span><input type="number" id="edt" class="cinput" placeholder="末尾"/></div>
+          <div class="crow" style="margin-bottom:0"><span class="clabel">最多截取帧数</span><input type="number" id="mxf" class="cinput" value="10000" min="1" max="99999"/></div>
+          <div class="sep"></div>
+          <button class="btn-p" id="capBtn" disabled>截取视频帧</button>
+
+          <!-- 一键到出图超级按钮 -->
+          <button class="btn-p" id="superBtn" disabled
+            style="margin-top:7px;background:linear-gradient(135deg,#1a4a6b,#2a7ab8,#3ea8d8);
+                   border:1px solid rgba(80,180,255,0.4);font-size:12px;font-weight:700;
+                   box-shadow:0 0 16px rgba(60,160,255,0.25);">
+            🚀 一键截帧 → AI挑帧 → 出图
+          </button>
+          <!-- 一键进度说明 -->
+          <div id="superSteps" style="display:none;margin-top:6px;padding:8px 10px;
+            background:rgba(60,160,255,0.07);border:1px solid rgba(60,160,255,0.2);border-radius:8px;">
+            <div style="font-size:9px;color:rgba(120,200,255,0.8);margin-bottom:5px;letter-spacing:1px;">当前步骤</div>
+            <div style="display:flex;flex-direction:column;gap:3px;" id="superStepList"></div>
+          </div>
+
+          <div class="prog" id="prog">
+            <div class="prog-bg"><div class="prog-fill" id="pFill"></div></div>
+            <div class="prog-t"><span id="pLbl">正在截取...</span><span id="pNum">0%</span></div>
+          </div>
+        </div>
+
+        <!-- 截帧完成后提示（保留但隐藏，逻辑改为自动跳转） -->
+        <div id="captureHint" style="display:none;"></div>
+
+      </div>
+
+      <!-- ── Tab 1: AI 挑帧 ── -->
+      <div class="tab-pane" id="tabPane1">
+
+        <div class="card">
+          <div class="ct">
+            <div class="ctd"></div>AI 智能挑帧
+            <span style="margin-left:4px;padding:1px 6px;border-radius:3px;background:rgba(62,180,137,0.12);border:1px solid var(--bs);font-size:8px;color:var(--mint);letter-spacing:.5px;">VISION AI</span>
+          </div>
+          <div style="font-size:10px;color:var(--tm);margin-bottom:12px;line-height:1.8;">
+            调用 <b style="color:var(--mint-light)">Vision 大模型</b> 对每帧构图、清晰度、吸引力综合打分，自动挑选最佳组合。
+            <br/><span style="color:var(--mint-darker);">无 Key 或失败时自动降级本地算法。</span>
+          </div>
+
+          <!-- API Key -->
+          <div style="margin-bottom:10px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-size:9px;color:var(--tm);letter-spacing:1px;">API KEY</span>
+              <span id="apiKeySavedBadge" style="display:none;font-size:8px;color:var(--mint-dark);
+                padding:1px 6px;border:1px solid rgba(62,180,137,0.3);border-radius:3px;
+                background:rgba(62,180,137,0.08);">✓ 已本地保存</span>
+            </div>
+            <div style="display:flex;gap:4px;align-items:center;">
+              <input type="password" id="aiApiKey"
+                value=""
+                autocomplete="off"
+                placeholder="粘贴你的 API Key..."
+                style="flex:1;min-width:0;background:var(--card3);border:1px solid var(--b);border-radius:6px;
+                       padding:6px 8px;font-size:10px;color:var(--ts);outline:none;font-family:monospace;
+                       transition:.2s;"
+                onfocus="this.style.borderColor='var(--bs)'" onblur="this.style.borderColor='var(--b)'"/>
+              <button onclick="toggleApiKeyVis()" title="显示/隐藏"
+                style="flex-shrink:0;padding:6px 8px;background:var(--card3);border:1px solid var(--b);
+                       border-radius:6px;color:var(--tm);cursor:pointer;font-size:11px;transition:.2s;"
+                onmouseover="this.style.borderColor='var(--bs)'" onmouseout="this.style.borderColor='var(--b)'">👁</button>
+              <button onclick="saveApiKey()" title="保存到本地"
+                style="flex-shrink:0;padding:6px 9px;background:linear-gradient(135deg,var(--mint-dark),var(--mint));
+                       border:none;border-radius:6px;color:white;cursor:pointer;font-size:10px;
+                       font-weight:600;transition:.2s;white-space:nowrap;">保存</button>
+            </div>
+            <!-- 已保存时显示清除入口 -->
+            <div id="apiKeyClearRow" style="display:none;margin-top:5px;display:none;">
+              <button onclick="clearApiKey()"
+                style="font-size:9px;color:var(--tm);background:none;border:none;cursor:pointer;
+                       padding:0;text-decoration:underline;opacity:.7;">清除已保存的 Key</button>
+            </div>
+          </div>
+
+          <!-- Model -->
+          <div style="margin-bottom:10px;">
+            <div style="font-size:9px;color:var(--tm);margin-bottom:4px;letter-spacing:1px;">模型</div>
+            <select id="aiModel"
+              style="width:100%;background:var(--card3);border:1px solid var(--b);border-radius:6px;
+                     padding:6px 8px;font-size:10px;color:var(--ts);outline:none;cursor:pointer;
+                     -webkit-appearance:none;transition:.2s;"
+              onfocus="this.style.borderColor='var(--bs)'" onblur="this.style.borderColor='var(--b)'">
+              <optgroup label="── Qwen VL（阿里）">
+                <option value="qwen3-vl-flash">qwen3-vl-flash ⚡ 最快</option>
+                <option value="qwen3-vl-plus">qwen3-vl-plus · 平衡</option>
+                <option value="qwen3-vl-plus-2025-12-19">qwen3-vl-plus-1219 · 新版</option>
+                <option value="qwen-vl-max-latest">qwen-vl-max-latest · 最强千问</option>
+                <option value="qwen-vl-max-2025-04-08">qwen-vl-max-0408 · 稳定版</option>
+                <option value="qwen-vl-plus-latest">qwen-vl-plus-latest · plus稳定</option>
+                <option value="qwen2.5-vl-32b-instruct">qwen2.5-vl-32b · 高精度</option>
+                <option value="qwen-vl-ocr-latest">qwen-vl-ocr · OCR增强</option>
+              </optgroup>
+              <optgroup label="── Claude（Anthropic）">
+                <option value="claude-haiku-4-5-20251001">claude-haiku-4-5 ⚡ 快速便宜</option>
+                <option value="claude-sonnet-4.6">claude-sonnet-4.6 · 均衡强力</option>
+                <option value="claude-sonnet-4-5-20250929">claude-sonnet-4-5 · 稳定版</option>
+                <option value="claude-sonnet-4-20250514">claude-sonnet-4 · 经典版</option>
+                <option value="claude-opus-4.6">claude-opus-4.6 · 旗舰</option>
+                <option value="claude-opus-4-6">claude-opus-4-6 · 旗舰稳定</option>
+                <option value="claude-opus-4-7">claude-opus-4-7 · 旗舰新版</option>
+              </optgroup>
+              <optgroup label="── GPT（OpenAI）">
+                <option value="gpt-5.5" selected>gpt-5.5 🏆 旗舰最强</option>
+                <option value="gpt-5.5-pro">gpt-5.5-pro · 旗舰Pro</option>
+                <option value="gpt-5.4-mini">gpt-5.4-mini ⚡ 轻量快速</option>
+                <option value="gpt-5.4-nano">gpt-5.4-nano · 最便宜</option>
+                <option value="gpt-5.4">gpt-5.4 · 标准版</option>
+                <option value="gpt-5.2">gpt-5.2 · 稳定版</option>
+                <option value="gpt-4.1">gpt-4.1 · 非推理强模型</option>
+                <option value="gpt-4.1-mini">gpt-4.1-mini · 均衡版</option>
+                <option value="gpt-4.1-nano">gpt-4.1-nano · 极速低价</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <!-- 推荐数量 + 关键词 同行 -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <div>
+              <div style="font-size:9px;color:var(--tm);margin-bottom:4px;letter-spacing:1px;">推荐帧数</div>
+              <input type="number" id="aiN" value="15" min="1" max="100"
+                style="width:100%;background:var(--card3);border:1px solid var(--b);border-radius:6px;
+                       padding:6px 8px;font-size:12px;color:var(--tp);text-align:center;outline:none;transition:.2s;"
+                onfocus="this.style.borderColor='var(--bs)'" onblur="this.style.borderColor='var(--b)'"/>
+            </div>
+            <div>
+              <div style="font-size:9px;color:var(--tm);margin-bottom:4px;letter-spacing:1px;">评分风格</div>
+              <input type="text" id="aiPromptHint"
+                value="画面清晰 构图精美 色彩丰富 适合封面"
+                maxlength="60"
+                style="width:100%;background:var(--card3);border:1px solid var(--b);border-radius:6px;
+                       padding:6px 8px;font-size:9px;color:var(--ts);outline:none;transition:.2s;"
+                onfocus="this.style.borderColor='var(--bs)'" onblur="this.style.borderColor='var(--b)'"/>
+            </div>
+          </div>
+
+          <!-- 操作按钮 -->
+          <div style="display:flex;flex-direction:column;gap:7px;">
+            <button class="btn-p" id="aiPickBtn" disabled>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:middle;margin-right:5px;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              AI 自动挑帧
+            </button>
+            <button class="btn-p" id="aiAutoFillBtn" disabled
+              style="background:transparent;border:1px solid var(--bs);color:var(--mint-light);box-shadow:none;font-size:11px;">
+              ⚡ 挑帧并自动填入所有批次
+            </button>
+          </div>
+
+          <!-- Vision AI 进度条 -->
+          <div id="aiProgress" style="display:none;margin-top:10px;">
+            <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--tm);margin-bottom:4px;">
+              <span id="aiProgLabel">正在分析...</span>
+              <span id="aiProgNum">0%</span>
+            </div>
+            <div style="height:4px;background:var(--card3);border-radius:2px;overflow:hidden;">
+              <div id="aiProgFill" style="height:100%;width:0%;background:linear-gradient(to right,var(--mint-dark),var(--mint-light));transition:width .3s;border-radius:2px;"></div>
+            </div>
+          </div>
+
+          <!-- 评分结果 -->
+          <div class="ai-scores" id="aiScores">
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:9px;color:var(--tm);margin-bottom:8px;letter-spacing:1px;">
+              <span id="aiScoresTitle">最高分帧分析</span>
+              <span id="aiScoresMode" style="font-size:8px;color:var(--mint-dark);padding:1px 5px;border:1px solid var(--b);border-radius:3px;"></span>
+            </div>
+            <div class="ai-score-row">
+              <span class="ai-score-label" id="sl-sharp">清晰度</span>
+              <div class="ai-score-bar"><div class="ai-score-fill" id="sc-sharp" style="background:var(--mint);width:0%"></div></div>
+              <span id="sv-sharp" style="font-size:9px;color:var(--ts);min-width:24px;text-align:right;">—</span>
+            </div>
+            <div class="ai-score-row">
+              <span class="ai-score-label" id="sl-bright">亮度</span>
+              <div class="ai-score-bar"><div class="ai-score-fill" id="sc-bright" style="background:#6ECFAA;width:0%"></div></div>
+              <span id="sv-bright" style="font-size:9px;color:var(--ts);min-width:24px;text-align:right;">—</span>
+            </div>
+            <div class="ai-score-row">
+              <span class="ai-score-label" id="sl-sat">饱和度</span>
+              <div class="ai-score-bar"><div class="ai-score-fill" id="sc-sat" style="background:#A8E6CF;width:0%"></div></div>
+              <span id="sv-sat" style="font-size:9px;color:var(--ts);min-width:24px;text-align:right;">—</span>
+            </div>
+            <div class="ai-score-row">
+              <span class="ai-score-label" id="sl-diff">差异性</span>
+              <div class="ai-score-bar"><div class="ai-score-fill" id="sc-diff" style="background:#3EB489;width:0%"></div></div>
+              <span id="sv-diff" style="font-size:9px;color:var(--ts);min-width:24px;text-align:right;">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI挑帧完成后提示（保留但隐藏，逻辑改为自动跳转） -->
+        <div id="aiDoneHint" style="display:none;"></div>
+
+        <!-- ═══ 偏好记忆面板 ═══ -->
+        <div class="card" id="prefMemoryCard" style="margin-top:10px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div class="ct" style="margin:0;">
+              <div class="ctd"></div>
+              🧠 AI 审美记忆
+            </div>
+            <div style="display:flex;gap:5px;align-items:center;">
+              <span id="prefMemCount" style="font-size:9px;color:var(--tm);padding:2px 7px;background:var(--card3);border-radius:10px;border:1px solid var(--b);">0 张</span>
+              <button onclick="openPrefMemPanel()" style="font-size:10px;padding:3px 8px;background:rgba(62,180,137,0.12);border:1px solid rgba(62,180,137,0.35);color:var(--mint);border-radius:6px;cursor:pointer;">管理</button>
+            </div>
+          </div>
+          <div style="font-size:10px;color:var(--tm);line-height:1.7;margin-bottom:10px;">
+            给AI挑出的帧点 <b style="color:#6ECFAA;">👍</b> / <b style="color:#ff8080;">👎</b>，AI会<b style="color:var(--ts)">直接看</b>这些图来学习您的审美偏好，跨视频永久有效。
+          </div>
+          <!-- 好图预览条 -->
+          <div style="margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+              <span style="font-size:9px;color:#6ECFAA;letter-spacing:0.5px;">👍 喜欢的风格</span>
+              <span id="goodMemCount" style="font-size:9px;color:var(--tm);">0 张</span>
+            </div>
+            <div id="goodMemStrip" style="display:flex;gap:4px;overflow-x:auto;padding-bottom:3px;min-height:36px;align-items:center;">
+              <span style="font-size:9px;color:var(--b2);font-style:italic;">暂无，点赞帧后AI将记住此类风格</span>
+            </div>
+          </div>
+          <!-- 坏图预览条 -->
+          <div style="margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+              <span style="font-size:9px;color:#ff8080;letter-spacing:0.5px;">👎 不喜欢的风格</span>
+              <span id="badMemCount" style="font-size:9px;color:var(--tm);">0 张</span>
+            </div>
+            <div id="badMemStrip" style="display:flex;gap:4px;overflow-x:auto;padding-bottom:3px;min-height:36px;align-items:center;">
+              <span style="font-size:9px;color:var(--b2);font-style:italic;">暂无</span>
+            </div>
+          </div>
+          <!-- 动态权重显示 -->
+          <div id="adaptiveWeightRow" style="display:none;padding:8px 10px;background:var(--card3);border-radius:7px;border:1px solid var(--b);margin-bottom:10px;">
+            <div style="font-size:9px;color:var(--tm);margin-bottom:6px;letter-spacing:0.5px;">⚙️ 自适应评分权重（根据您的喜好自动调整）</div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span style="font-size:9px;color:var(--ts);width:40px;">清晰度</span>
+                <div style="flex:1;height:4px;background:var(--card2);border-radius:2px;overflow:hidden;"><div id="wBar-clarity" style="height:100%;background:var(--mint);transition:width .4s;width:20%"></div></div>
+                <span id="wVal-clarity" style="font-size:9px;color:var(--tm);width:28px;text-align:right;">20%</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span style="font-size:9px;color:var(--ts);width:40px;">构图</span>
+                <div style="flex:1;height:4px;background:var(--card2);border-radius:2px;overflow:hidden;"><div id="wBar-composition" style="height:100%;background:#6ECFAA;transition:width .4s;width:15%"></div></div>
+                <span id="wVal-composition" style="font-size:9px;color:var(--tm);width:28px;text-align:right;">15%</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span style="font-size:9px;color:var(--ts);width:40px;">吸引力</span>
+                <div style="flex:1;height:4px;background:var(--card2);border-radius:2px;overflow:hidden;"><div id="wBar-appeal" style="height:100%;background:#A8E6CF;transition:width .4s;width:15%"></div></div>
+                <span id="wVal-appeal" style="font-size:9px;color:var(--tm);width:28px;text-align:right;">15%</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span style="font-size:9px;color:var(--ts);width:40px;">综合</span>
+                <div style="flex:1;height:4px;background:var(--card2);border-radius:2px;overflow:hidden;"><div id="wBar-overall" style="height:100%;background:#3EB489;transition:width .4s;width:50%"></div></div>
+                <span id="wVal-overall" style="font-size:9px;color:var(--tm);width:28px;text-align:right;">50%</span>
+              </div>
+            </div>
+          </div>
+          <button onclick="clearPrefs()" style="width:100%;font-size:10px;padding:6px;background:transparent;border:1px solid rgba(255,80,80,0.25);color:rgba(255,100,100,0.7);border-radius:6px;cursor:pointer;">🗑 清除所有审美记忆</button>
+        </div>
+
+      </div>
+
+      <!-- ── Tab 2: 填充拼图 ── -->
+      <div class="tab-pane" id="tabPane2">
+
+        <div class="card">
+          <div class="ct"><div class="ctd"></div>快速填充</div>
+          <div style="font-size:10px;color:var(--tm);margin-bottom:12px;line-height:1.8;">
+            将 <b style="color:var(--ts)">已选帧</b> 按序填入右侧所有拼图批次，或直接 <b style="color:var(--ts)">拖拽</b> 单帧到指定格子。
+          </div>
+
+          <!-- 已选帧状态 -->
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--card3);border-radius:8px;border:1px solid var(--b);margin-bottom:10px;">
+            <div style="font-size:10px;color:var(--tm);">已选帧</div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span id="fillSelN" style="font-size:16px;font-weight:700;color:var(--mint);">0</span>
+              <span style="font-size:10px;color:var(--tm);">/ <span id="fillTotalN">0</span> 帧</span>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <button class="btn-p" id="fillAllBtn" disabled>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:middle;margin-right:4px;"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+              将已选帧填充到所有拼图
+            </button>
+            <button class="btn-p" id="clearAllCellsBtn"
+              style="background:transparent;border:1px solid rgba(255,80,80,0.3);color:rgba(255,120,120,0.8);box-shadow:none;font-size:11px;"
+              onclick="clearAllCells()">
+              🗑 清空所有拼图格子
+            </button>
+          </div>
+
+          <div class="sep" style="margin:14px 0;"></div>
+
+          <!-- 帧操作快捷 -->
+          <div style="font-size:9px;color:var(--tm);margin-bottom:8px;letter-spacing:1px;">帧选择</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px;">
+            <button id="fillSelAllBtn" class="btn-p" style="font-size:10px;padding:7px 8px;background:rgba(62,180,137,0.12);border:1px solid var(--bs);color:var(--mint-light);box-shadow:none;">全选所有帧</button>
+            <button id="fillClrSelBtn" class="btn-p" style="font-size:10px;padding:7px 8px;background:transparent;border:1px solid var(--b);color:var(--tm);box-shadow:none;">清除选择</button>
+          </div>
+        </div>
+
+        <!-- 键盘快捷键提示 -->
+        <div style="padding:10px 12px;background:var(--card2);border:1px solid var(--b);border-radius:10px;">
+          <div style="font-size:9px;color:var(--tm);margin-bottom:8px;letter-spacing:1px;">⌨ 键盘快捷键</div>
+          <div style="display:flex;flex-direction:column;gap:5px;">
+            <div style="display:flex;justify-content:space-between;font-size:9px;">
+              <span style="color:var(--tm);">全选帧</span>
+              <span style="background:var(--card3);border:1px solid var(--b);border-radius:3px;padding:1px 6px;color:var(--ts);font-family:monospace;">A</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:9px;">
+              <span style="color:var(--tm);">清除选择</span>
+              <span style="background:var(--card3);border:1px solid var(--b);border-radius:3px;padding:1px 6px;color:var(--ts);font-family:monospace;">D / Esc</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:9px;">
+              <span style="color:var(--tm);">生成所有批次</span>
+              <span style="background:var(--card3);border:1px solid var(--b);border-radius:3px;padding:1px 6px;color:var(--ts);font-family:monospace;">G</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:9px;">
+              <span style="color:var(--tm);">下载所有批次</span>
+              <span style="background:var(--card3);border:1px solid var(--b);border-radius:3px;padding:1px 6px;color:var(--ts);font-family:monospace;">Ctrl+S</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:9px;">
+              <span style="color:var(--tm);">切换到 Tab 1/2/3</span>
+              <span style="background:var(--card3);border:1px solid var(--b);border-radius:3px;padding:1px 6px;color:var(--ts);font-family:monospace;">1 / 2 / 3</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:9px;">
+              <span style="color:var(--tm);">按当前参数直接截帧</span>
+              <span style="background:var(--card3);border:1px solid var(--b);border-radius:3px;padding:1px 6px;color:var(--ts);font-family:monospace;">R</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:9px;">
+              <span style="color:var(--tm);">一键流程（挑帧+填充+生成）</span>
+              <span style="background:var(--card3);border:1px solid var(--b);border-radius:3px;padding:1px 6px;color:var(--ts);font-family:monospace;">Q</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:9px;">
+              <span style="color:var(--tm);">放大预览帧</span>
+              <span style="background:var(--card3);border:1px solid var(--b);border-radius:3px;padding:1px 6px;color:var(--ts);font-family:monospace;">双击</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div><!-- /tab-body-wrap -->
+  </div><!-- /col-left -->
+
+  <!-- ===== CENTER: FRAME WALL ===== -->
+  <div class="col-mid">
+    <div class="frames-card">
+      <div class="frames-header">
+        <div class="frames-title-row">
+          <div class="ct" style="margin-bottom:0"><div class="ctd"></div>视频帧预览</div>
+          <span style="color:var(--tm);font-size:9px;">点击选择 / 双击放大 / 拖拽到格子</span>
+        </div>
+        <div class="frames-acts">
+          <div class="sel-badge"><span id="selN">0</span> 已选 / <span id="totalN">0</span></div>
+          <button class="btn-sm" id="selAllBtn">全选</button>
+          <button class="btn-sm" id="clrSelBtn">清除</button>
+          <div class="vsep"></div>
+          <button class="btn-sm" id="dlSelBtn" style="display:none;border-color:rgba(62,180,137,0.5);color:var(--mint-light);" onclick="downloadSelected()">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>下载已选
+          </button>
+          <button class="btn-sm" id="dlAllFramesBtn" style="display:none;" onclick="downloadAllFrames()">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>下载全部
+          </button>
+          <div class="vsep"></div>
+          <!-- thumb size controls -->
+          <button class="btn-sm" id="thumbZoomOut" style="width:20px;height:20px;padding:0;display:flex;align-items:center;justify-content:center;font-size:13px;">−</button>
+          <input type="range" id="thumbSizeSlider" min="60" max="320" value="130" step="10"
+            style="width:70px;height:3px;appearance:none;-webkit-appearance:none;
+                   background:linear-gradient(to right,var(--mint-dark) 0%,var(--mint-dark) var(--pct,16%),var(--card3) var(--pct,16%));
+                   border-radius:2px;cursor:pointer;outline:none;"/>
+          <span id="thumbSizeLabel" style="font-size:9px;color:var(--tm);min-width:28px;">130px</span>
+          <button class="btn-sm" id="thumbZoomIn" style="width:20px;height:20px;padding:0;display:flex;align-items:center;justify-content:center;font-size:13px;">+</button>
+        </div>
+      </div>
+      <!-- 快捷操作栏：截帧完成后显示，减少Tab切换 -->
+      <div id="quickBar" style="display:none;padding:8px 12px;margin-bottom:8px;background:rgba(62,180,137,0.07);border:1px solid var(--bs);border-radius:10px;flex-shrink:0;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:10px;color:var(--mint-light);font-weight:600;white-space:nowrap;">⚡ 快捷操作</span>
+          <div style="flex:1;display:flex;gap:6px;flex-wrap:wrap;">
+            <button id="qAiPickBtn" class="btn-sm" style="border-color:var(--bs);color:var(--mint-light);background:rgba(62,180,137,0.1);" onclick="runAIPick(false)">
+              🤖 AI挑帧
+            </button>
+            <button id="qAiAutoFillBtn" class="btn-sm" style="border-color:var(--bs);color:var(--mint-light);background:rgba(62,180,137,0.1);" onclick="runAIPick(true)">
+              ⚡ AI挑帧并填充
+            </button>
+            <button id="qSmartFlowBtn" class="btn-sm" style="border-color:var(--bs);color:var(--mint-light);background:rgba(62,180,137,0.14);" onclick="runSmartFlow()">
+              🚀 一键到出图
+            </button>
+            <button id="qFillAllBtn" class="btn-sm" style="display:none;border-color:rgba(62,180,137,0.5);color:var(--mint);background:rgba(62,180,137,0.12);" onclick="doFillAll()">
+              🧩 顺序填充
+            </button>
+            <button id="aiSmartLayoutBtn" class="btn-sm" style="display:none;border-color:rgba(120,180,255,0.5);color:#90c8ff;background:rgba(80,140,255,0.1);" onclick="doAISmartLayout()">
+              🎨 AI智能排版
+            </button>
+            <button class="btn-sm" onclick="switchTab(1)" style="color:var(--tm);font-size:9px;">⚙ 挑帧设置</button>
+          </div>
+        </div>
+      </div>
+      <div class="frames-grid" id="fGrid">
+        <div class="empty">
+          <svg viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 20M6 8h.01" stroke-width="1.5"/></svg>
+          <p>上传视频并点击截取后<br/>帧缩略图将显示于此</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== RIGHT: BATCH PANEL ===== -->
+  <div class="col-right">
+    <div class="batches-card">
+      <div class="batches-header">
+        <div class="ct" style="margin-bottom:0"><div class="ctd"></div>拼图批次</div>
+        <div class="add-batch-btns">
+          <button class="btn-add" onclick="addBatch(2,2)">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>2×2
+          </button>
+          <button class="btn-add" onclick="addBatch(3,3)">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>3×3
+          </button>
+          <button class="btn-add" onclick="promptCustomBatch()">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>自定义
+          </button>
+        </div>
+      </div>
+      <!-- global actions -->
+      <div class="global-actions">
+        <button class="btn-global" onclick="generateAll()" id="genAllBtn">
+          <svg viewBox="0 0 24 24"><path d="M5 3l14 9-14 9V3z"/></svg>一键生成全部
+        </button>
+        <button class="btn-global" onclick="downloadAll()" id="dlAllBtn" disabled>
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>一键下载全部
+        </button>
+      </div>
+      <div class="batch-list" id="batchList">
+        <div class="empty" id="batchEmpty">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          <p>点击上方按钮添加拼图批次<br/>可同时创建多个不同尺寸的拼图</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"><span id="toastMsg"></span></div>
+
+<!-- 快捷键帮助浮层 -->
+<div id="helpOverlay" onclick="if(event.target===this)closeHelp()">
+  <div class="help-card">
+    <div class="help-head">
+      <h2>键盘快捷键</h2>
+      <div class="pm-close" onclick="closeHelp()">×</div>
+    </div>
+    <div class="help-grid">
+      <div class="help-row"><span>全选所有帧</span><div class="help-keys"><span class="kbd">A</span></div></div>
+      <div class="help-row"><span>清除选择</span><div class="help-keys"><span class="kbd">D</span><span class="kbd">Esc</span></div></div>
+      <div class="help-row"><span>生成所有批次</span><div class="help-keys"><span class="kbd">G</span></div></div>
+      <div class="help-row"><span>下载所有批次</span><div class="help-keys"><span class="kbd">Ctrl</span><span class="kbd">S</span></div></div>
+      <div class="help-row"><span>按当前参数截帧</span><div class="help-keys"><span class="kbd">R</span></div></div>
+      <div class="help-row"><span>一键到出图</span><div class="help-keys"><span class="kbd">Q</span></div></div>
+      <div class="help-row"><span>切换到面板 1/2/3</span><div class="help-keys"><span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span></div></div>
+      <div class="help-row"><span>放大预览帧</span><div class="help-keys"><span class="kbd">双击</span></div></div>
+      <div class="help-row"><span>撤销 / 重做</span><div class="help-keys"><span class="kbd">Ctrl</span><span class="kbd">Z</span> / <span class="kbd">Y</span></div></div>
+      <div class="help-row"><span>打开此帮助</span><div class="help-keys"><span class="kbd">?</span></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================================================================
+// 主题系统 + 帮助浮层
+// ===================================================================
+const THEME_KEY = 'vfp_theme', MODE_KEY = 'vfp_mode';
+function applyThemeUI(){
+  const root = document.documentElement;
+  const theme = root.getAttribute('data-theme');
+  const mode  = root.getAttribute('data-mode');
+  document.querySelectorAll('[data-theme-pick]').forEach(el=>{
+    el.classList.toggle('active', el.getAttribute('data-theme-pick')===theme);
+  });
+  document.querySelectorAll('[data-mode-pick]').forEach(el=>{
+    el.classList.toggle('active', el.getAttribute('data-mode-pick')===mode);
+  });
+  // 同步浏览器主题色
+  const tc = getComputedStyle(root).getPropertyValue('--bg').trim();
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if(meta && tc) meta.setAttribute('content', tc);
+}
+function setTheme(t){
+  document.documentElement.setAttribute('data-theme', t);
+  try{ localStorage.setItem(THEME_KEY, t); }catch(_){}
+  applyThemeUI();
+}
+function setMode(m){
+  document.documentElement.setAttribute('data-mode', m);
+  try{ localStorage.setItem(MODE_KEY, m); }catch(_){}
+  applyThemeUI();
+}
+function toggleThemePop(e){
+  if(e) e.stopPropagation();
+  const pop = document.getElementById('themePop');
+  pop.classList.toggle('open');
+}
+function openHelp(){ document.getElementById('helpOverlay').classList.add('open'); }
+function closeHelp(){ document.getElementById('helpOverlay').classList.remove('open'); }
+// 初始化：读取本地偏好
+(function initTheme(){
+  try{
+    const t = localStorage.getItem(THEME_KEY);
+    const m = localStorage.getItem(MODE_KEY);
+    if(t) document.documentElement.setAttribute('data-theme', t);
+    if(m) document.documentElement.setAttribute('data-mode', m);
+  }catch(_){}
+  applyThemeUI();
+  // 点击空白关闭主题弹层
+  document.addEventListener('click', (e)=>{
+    const pop = document.getElementById('themePop');
+    if(pop && pop.classList.contains('open')){
+      if(!pop.contains(e.target) && !e.target.closest('#themeBtn') && !e.target.closest('[onclick*="toggleThemePop"]')){
+        pop.classList.remove('open');
+      }
+    }
+  });
+})();
+</script>
+
+<script>
+// ===================================================================
+// STATE
+// ===================================================================
+const S = {
+  frames: [],       // {dataUrl, time, idx, score}
+  selected: [],     // selected frame indices
+  batches: [],      // batch objects
+  badgeImg: null,
+  dragFrameIdx: null,
+  aiScores: [],     // per-frame ai scores (populated on demand)
+  imgCache: new Map(),
+};
+let batchIdCnt = 0;
+
+// ===================================================================
+// BADGE
+// ===================================================================
+(function loadBadge(){
+  const img = new Image();
+  img.onload = () => { S.badgeImg = img; };
+  img.onerror = () => {};
+  img.src = '/badge_4k.png';
+})();
+
+// ===================================================================
+// TOAST
+// ===================================================================
+let toastTm;
+let lastToast = { msg:'', t:0 };
+function toast(msg, type='ok'){
+  const now = Date.now();
+  if(lastToast.msg===msg && now-lastToast.t<700) return;
+  lastToast = { msg, t: now };
+  const el = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  el.style.borderColor = type==='err' ? 'rgba(255,80,80,0.5)' : 'var(--bs)';
+  el.classList.add('show');
+  clearTimeout(toastTm);
+  toastTm = setTimeout(()=>el.classList.remove('show'), 3000);
+}
+
+// ===================================================================
+// UPLOAD & VIDEO LOAD
+// ===================================================================
+const upzone = document.getElementById('upzone');
+const vInput = document.getElementById('vInput');
+upzone.addEventListener('click', ()=>vInput.click());
+upzone.addEventListener('dragover', e=>{e.preventDefault();upzone.classList.add('drag');});
+upzone.addEventListener('dragleave', ()=>upzone.classList.remove('drag'));
+upzone.addEventListener('drop', e=>{
+  e.preventDefault(); upzone.classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if(f && f.type.startsWith('video/')) loadVideo(f);
+  else toast('请上传视频文件','err');
+});
+vInput.addEventListener('change', e=>{ if(e.target.files[0]) loadVideo(e.target.files[0]); });
+
+const vPrev = document.getElementById('vPrev');
+function loadVideo(file){
+  const url = URL.createObjectURL(file);
+  vPrev.src = url;
+  document.getElementById('vCon').style.display = 'block';
+  document.getElementById('iSz').textContent  = fmtSz(file.size);
+  document.getElementById('iFmt').textContent = file.name.split('.').pop().toUpperCase();
+  vPrev.onloadedmetadata = ()=>{
+    document.getElementById('iDur').textContent = fmtT(vPrev.duration);
+    document.getElementById('iRes').textContent = vPrev.videoWidth+'×'+vPrev.videoHeight;
+    document.getElementById('edt').placeholder  = Math.floor(vPrev.duration)+'s';
+    document.getElementById('capBtn').disabled  = false;
+    document.getElementById('superBtn').disabled = false;
+    toast('视频加载成功，可开始截帧');
+  };
+}
+function fmtSz(b){ return b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB'; }
+function fmtT(s){ return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'); }
+
+// ===================================================================
+// CAPTURE
+// ===================================================================
+document.getElementById('capBtn').addEventListener('click', doCapture);
+async function doCapture(){
+  if(!Number.isFinite(vPrev.duration) || vPrev.duration<=0){
+    toast('请先上传并加载视频','err');
+    return;
+  }
+  const iv  = parseFloat(document.getElementById('itvl').value)||1;
+  const st  = parseFloat(document.getElementById('stt').value)||0;
+  const edv = document.getElementById('edt').value;
+  const ed  = edv ? parseFloat(edv) : vPrev.duration;
+  const mx  = parseInt(document.getElementById('mxf').value)||10000;
+  if(iv<=0||st>=ed){ toast('参数有误','err'); return; }
+
+  const times=[];
+  for(let t=st; t<=ed&&times.length<mx; t=Math.round((t+iv)*1000)/1000) times.push(t);
+
+  S.frames=[]; S.selected=[]; S.aiScores=[]; S.imgCache = new Map();
+  updateSelBadge();
+  updateDlBtns();
+  const fGrid=document.getElementById('fGrid');
+  fGrid.innerHTML='';
+  document.getElementById('totalN').textContent='0';
+
+  const prog = document.getElementById('prog');
+  prog.style.display='block';
+  const pFill = document.getElementById('pFill');
+  const pLbl  = document.getElementById('pLbl');
+  const pNum  = document.getElementById('pNum');
+  const capBtn = document.getElementById('capBtn');
+  capBtn.disabled=true; capBtn.innerHTML='<span class="spin"></span>截取中...';
+
+  const cc = document.createElement('canvas');
+  const cx = cc.getContext('2d');
+  document.querySelector('#fGrid .empty')?.remove();
+  let frag = document.createDocumentFragment();
+  let queued = 0;
+  let captured = 0;
+  let failed = 0;
+
+  for(let i=0;i<times.length;i++){
+    const t=times[i];
+    if(i%2===0 || i===times.length-1){
+      const pct=Math.round(i/times.length*100);
+      pFill.style.width=pct+'%'; pNum.textContent=pct+'%';
+      pLbl.textContent='截取 '+(i+1)+'/'+times.length+' ('+t.toFixed(1)+'s)';
+    }
+    try{
+      const du = await seekCap(vPrev,cc,cx,t);
+      S.frames.push({dataUrl:du, time:t, idx:S.frames.length});
+      addThumb(S.frames.length-1, frag);
+      queued++;
+      captured++;
+      if(queued>=12 || i===times.length-1){
+        fGrid.appendChild(frag);
+        frag = document.createDocumentFragment();
+        queued = 0;
+        document.getElementById('totalN').textContent=S.frames.length;
+      }
+    }catch(e){
+      failed++;
+    }
+    if(i%6===0) await sleep(0);
+  }
+
+  pFill.style.width='100%'; pNum.textContent='100%';
+  pLbl.textContent='截取完成！';
+  setTimeout(()=>{ prog.style.display='none'; },1200);
+  capBtn.disabled=false; capBtn.innerHTML='截取视频帧';
+  updateFillBtn();
+  updateDlBtns();
+  updateAiBtns();
+  toast('截取完成：成功 '+captured+' 帧，失败 '+failed+' 帧 —— 已自动跳到 AI 挑帧');
+  // 显示快捷操作栏
+  const qb=document.getElementById('quickBar'); if(qb) qb.style.display='';
+  updateQuickBar();
+  // 自动切到 AI 挑帧 Tab（一键流程中跳过，避免打断）
+  if(!S._superFlowRunning){
+    setTimeout(()=>switchTab(1), 800);
+  }
+}
+// ===================================================================
+// TAB 切换
+// ===================================================================
+function switchTab(idx){
+  for(let i=0;i<3;i++){
+    document.getElementById('tabBtn'+i).classList.toggle('active', i===idx);
+    document.getElementById('tabPane'+i).classList.toggle('active', i===idx);
+    const rb=document.getElementById('railBtn'+i);
+    if(rb) rb.classList.toggle('active', i===idx);
+  }
+  if(idx===1){ updateAiBtns(); }
+  if(idx===2){ updateSelBadge(); }
+}
+
+// 快捷操作栏状态同步
+function updateQuickBar(){
+  const qAi=document.getElementById('qAiPickBtn');
+  const qFill=document.getElementById('qFillAllBtn');
+  const qAutoFill=document.getElementById('qAiAutoFillBtn');
+  const qFlow=document.getElementById('qSmartFlowBtn');
+  const qLayout=document.getElementById('aiSmartLayoutBtn');
+  const has=S.frames.length>0;
+  if(qAi){ qAi.disabled=!has; }
+  if(qAutoFill){ qAutoFill.disabled=!has; }
+  if(qFlow){ qFlow.disabled=!has; }
+  // 当有已选帧且有批次时，显示填充和AI排版按钮
+  const canFill=S.selected.length>0&&S.batches.length>0;
+  if(qFill){ qFill.style.display=canFill?'':'none'; }
+  if(qLayout){ qLayout.style.display=canFill?'':'none'; }
+}
+
+async function runSmartFlow(){
+  if(S.frames.length===0){ toast('请先截取视频帧','err'); return; }
+  const btn = document.getElementById('qSmartFlowBtn');
+  const old = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spin"></span>处理中...'; }
+  try{
+    await runAIPick(true);
+    await generateAll();
+    switchTab(2);
+    toast('🚀 一键流程完成：已挑帧、填充并生成拼图');
+  }finally{
+    if(btn){ btn.disabled = false; btn.innerHTML = old || '🚀 一键到出图'; }
+  }
+}
+
+// ===================================================================
+// 一键截帧 → AI挑帧 → 填充 → 生成 超级按钮
+// ===================================================================
+(function bindSuperBtn(){
+  const btn = document.getElementById('superBtn');
+  if(!btn) return;
+  btn.addEventListener('click', runSuperFlow);
+})();
+
+function setSuperStep(steps, activeIdx){
+  const list = document.getElementById('superStepList');
+  const wrap = document.getElementById('superSteps');
+  if(!list||!wrap) return;
+  wrap.style.display = '';
+  list.innerHTML = steps.map((s,i)=>{
+    const done  = i < activeIdx;
+    const cur   = i === activeIdx;
+    const color = done ? 'var(--mint)' : cur ? 'rgba(120,200,255,0.9)' : 'rgba(255,255,255,0.3)';
+    const icon  = done ? '✓' : cur ? '⟳' : '○';
+    return '<div style="display:flex;align-items:center;gap:5px;font-size:9px;color:'+color+';">'+
+           '<span style="font-size:10px;'+(cur?'animation:spin 1s linear infinite;display:inline-block;':'')+'">'+icon+'</span>'+
+           s+'</div>';
+  }).join('');
+}
+
+async function runSuperFlow(){
+  const btn = document.getElementById('superBtn');
+  const capBtn = document.getElementById('capBtn');
+  if(!btn) return;
+  const steps = ['截取视频帧', 'AI 智能挑帧', '填充到所有批次', '生成拼图'];
+  btn.disabled = true; capBtn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>一键流程进行中...';
+  S._superFlowRunning = true; // 标记一键流程中，阻止自动tab切换
+  try{
+    // Step 1: 截帧
+    setSuperStep(steps, 0);
+    await doCapture();
+    if(S.frames.length===0) throw new Error('截帧失败，无帧可用');
+
+    // Step 2: AI挑帧（不自动填充，手动控制流程）
+    setSuperStep(steps, 1);
+    await runAIPick(false);
+    if(S.selected.length===0) throw new Error('挑帧未选出任何帧');
+
+    // Step 3: 填充
+    setSuperStep(steps, 2);
+    let fi=0;
+    S.batches.forEach(b=>{
+      b.cells.forEach((_,ci)=>{
+        if(fi<S.selected.length){ b.cells[ci]=S.selected[fi++]; renderCell(b,ci); }
+      });
+    });
+    clearBatchCanvasAll(); refreshUsageTags();
+
+    // Step 4: 生成拼图
+    setSuperStep(steps, 3);
+    await generateAll();
+
+    // 完成：跳到拼图Tab
+    setSuperStep(steps, 4); // all done
+    switchTab(2);
+    toast('🎉 一键流程完成！已截帧→挑帧→填充→生成拼图');
+  }catch(e){
+    toast('一键流程中断：'+e.message, 'err');
+  }finally{
+    S._superFlowRunning = false;
+    btn.disabled = false; capBtn.disabled = false;
+    btn.innerHTML = '🚀 一键截帧 → AI挑帧 → 出图';
+    setTimeout(()=>{ const w=document.getElementById('superSteps'); if(w) w.style.display='none'; }, 4000);
+  }
+}
+
+// ===================================================================
+// ██████╗  Agent 级审美记忆系统 v2.0
+// ──────────────────────────────────────────────────────────────────
+//  核心理念：存图片本身而非文字描述
+//  · 使用 IndexedDB 存储压缩后的图片 base64（约 8KB/张）
+//  · 点赞/点踩时把实际图片存入持久化 DB，跨视频永久有效
+//  · 挑帧时把历史好图/坏图直接发给 Vision AI —— AI 真正"看见"
+//  · 动态权重：从点赞图特征反推偏好，自动调整 clarity/composition/appeal 系数
+//  · 无容量限制（IndexedDB 可存数百张），可视化管理面板
+// ===================================================================
+
+// ── IndexedDB 初始化 ──
+const IDB_NAME   = 'vfp_aesthetic_memory';
+const IDB_VER    = 1;
+const IDB_STORE  = 'frames';
+let _idb = null;
+
+function openIDB(){
+  if(_idb) return Promise.resolve(_idb);
+  return new Promise((res, rej)=>{
+    const req = indexedDB.open(IDB_NAME, IDB_VER);
+    req.onupgradeneeded = e=>{
+      const db = e.target.result;
+      if(!db.objectStoreNames.contains(IDB_STORE)){
+        const st = db.createObjectStore(IDB_STORE, {keyPath:'id', autoIncrement:true});
+        st.createIndex('type','type',{unique:false});
+      }
+    };
+    req.onsuccess = e=>{ _idb=e.target.result; res(_idb); };
+    req.onerror   = e=>rej(e.target.error);
+  });
+}
+
+async function idbGetAll(type){
+  const db = await openIDB();
+  return new Promise((res,rej)=>{
+    const tx  = db.transaction(IDB_STORE,'readonly');
+    const idx = tx.objectStore(IDB_STORE).index('type');
+    const req = idx.getAll(type);
+    req.onsuccess = ()=>res(req.result||[]);
+    req.onerror   = e=>rej(e.target.error);
+  });
+}
+
+async function idbAdd(record){
+  const db = await openIDB();
+  return new Promise((res,rej)=>{
+    const tx  = db.transaction(IDB_STORE,'readwrite');
+    const req = tx.objectStore(IDB_STORE).add(record);
+    req.onsuccess = ()=>res(req.result);
+    req.onerror   = e=>rej(e.target.error);
+  });
+}
+
+async function idbDelete(id){
+  const db = await openIDB();
+  return new Promise((res,rej)=>{
+    const tx  = db.transaction(IDB_STORE,'readwrite');
+    const req = tx.objectStore(IDB_STORE).delete(id);
+    req.onsuccess = ()=>res();
+    req.onerror   = e=>rej(e.target.error);
+  });
+}
+
+async function idbClearAll(){
+  const db = await openIDB();
+  return new Promise((res,rej)=>{
+    const tx  = db.transaction(IDB_STORE,'readwrite');
+    const req = tx.objectStore(IDB_STORE).clear();
+    req.onsuccess = ()=>res();
+    req.onerror   = e=>rej(e.target.error);
+  });
+}
+
+// ── 压缩帧为小尺寸缩略图存储（120×68，约 3-5KB）──
+function compressForMemory(dataUrl){
+  return new Promise(res=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const c = document.createElement('canvas');
+      c.width=120; c.height=68;
+      const ctx = c.getContext('2d');
+      const ar = img.width/img.height;
+      let sx=0,sy=0,sw=img.width,sh=img.height;
+      if(ar>120/68){ sw=Math.round(img.height*(120/68)); sx=(img.width-sw)/2; }
+      else          { sh=Math.round(img.width/(120/68)); sy=(img.height-sh)/2; }
+      ctx.drawImage(img,sx,sy,sw,sh,0,0,120,68);
+      res(c.toDataURL('image/jpeg',0.6));
+    };
+    img.onerror = ()=>res(null);
+    img.src = dataUrl;
+  });
+}
+
+// ── 清除所有审美记忆 ──
+async function clearPrefs(){
+  await idbClearAll();
+  document.querySelectorAll('.fb-btn.fb-active').forEach(b=>{
+    b.classList.remove('fb-active');
+    b.style.borderColor='rgba(255,255,255,0.25)';
+    b.style.background='rgba(0,0,0,0.6)';
+  });
+  // 重置动态权重
+  _adaptiveWeights = {overall:0.50, clarity:0.20, composition:0.15, appeal:0.15};
+  updateWeightUI();
+  await refreshPrefMemPanel();
+  toast('🗑 已清除所有审美记忆');
+}
+
+// ── 动态权重（根据点赞图特征自动调整）──
+let _adaptiveWeights = {overall:0.50, clarity:0.20, composition:0.15, appeal:0.15};
+
+async function recalcAdaptiveWeights(){
+  const goods = await idbGetAll('good');
+  if(goods.length < 2){
+    // 数据不足时保持默认权重
+    _adaptiveWeights = {overall:0.50, clarity:0.20, composition:0.15, appeal:0.15};
+    updateWeightUI();
+    return;
+  }
+  // 分析点赞图片的像素特征
+  const analyses = [];
+  for(const g of goods){
+    if(!g.thumb) continue;
+    try{
+      const r = await aiAnalyzeFrame(g.thumb);
+      analyses.push(r);
+    }catch(_){}
+  }
+  if(analyses.length < 2){ updateWeightUI(); return; }
+
+  // 计算各维度均值与方差
+  const mean = k => analyses.reduce((s,a)=>s+a[k],0)/analyses.length;
+  const variance = k => {
+    const m = mean(k);
+    return analyses.reduce((s,a)=>s+Math.pow(a[k]-m,2),0)/analyses.length;
+  };
+
+  // 哪个维度方差越大 → 用户对该维度越敏感（选择更有区分度的图）
+  const maxSharp = Math.max(...analyses.map(a=>a.sharpness))||1;
+  const normAnalyses = analyses.map(a=>({
+    sharpNorm: a.sharpness/maxSharp,
+    brightScore: a.brightScore,
+    saturation: a.saturation,
+  }));
+
+  const vSharp  = normAnalyses.reduce((s,a)=>s+Math.pow(a.sharpNorm-mean('sharpness')/maxSharp,2),0)/normAnalyses.length;
+  const vBright = variance('brightScore');
+  const vSat    = variance('saturation');
+
+  // 均值越高 → 用户喜欢该特征高的图
+  const mSharp  = mean('sharpness')/maxSharp;
+  const mBright = mean('brightScore');
+  const mSat    = mean('saturation');
+
+  // 权重 = 均值 × (1 + 方差权重) 归一化
+  let wClarity     = mSharp  * (1 + vSharp*3);
+  let wComposition = mBright * (1 + vBright*2);
+  let wAppeal      = mSat    * (1 + vSat*2);
+  const base = 0.50; // overall 固定 50%
+  const rest = 0.50;
+  const total = wClarity + wComposition + wAppeal || 1;
+  wClarity     = (wClarity/total)     * rest;
+  wComposition = (wComposition/total) * rest;
+  wAppeal      = (wAppeal/total)      * rest;
+
+  _adaptiveWeights = {
+    overall:     parseFloat(base.toFixed(3)),
+    clarity:     parseFloat(wClarity.toFixed(3)),
+    composition: parseFloat(wComposition.toFixed(3)),
+    appeal:      parseFloat(wAppeal.toFixed(3))
+  };
+  updateWeightUI();
+}
+
+function updateWeightUI(){
+  const w = _adaptiveWeights;
+  const hasLearned = (w.clarity!==0.20||w.composition!==0.15||w.appeal!==0.15);
+  const row = document.getElementById('adaptiveWeightRow');
+  if(row) row.style.display = hasLearned?'block':'none';
+  const setW = (key, val)=>{
+    const bar = document.getElementById('wBar-'+key);
+    const txt = document.getElementById('wVal-'+key);
+    if(bar) bar.style.width = (val*100).toFixed(0)+'%';
+    if(txt) txt.textContent  = (val*100).toFixed(0)+'%';
+  };
+  setW('clarity',     w.clarity);
+  setW('composition', w.composition);
+  setW('appeal',      w.appeal);
+  setW('overall',     w.overall);
+}
+
+// ── 更新面板缩略图条 ──
+async function refreshPrefMemPanel(){
+  const goods = await idbGetAll('good');
+  const bads  = await idbGetAll('bad');
+  const total = goods.length + bads.length;
+
+  const countEl = document.getElementById('prefMemCount');
+  if(countEl) countEl.textContent = total+' 张';
+  const gCnt = document.getElementById('goodMemCount');
+  if(gCnt) gCnt.textContent = goods.length+' 张';
+  const bCnt = document.getElementById('badMemCount');
+  if(bCnt) bCnt.textContent = bads.length+' 张';
+
+  const renderStrip = (containerId, items, type)=>{
+    const strip = document.getElementById(containerId);
+    if(!strip) return;
+    strip.innerHTML = '';
+    if(!items.length){
+      strip.innerHTML = '<span style="font-size:9px;color:var(--b2);font-style:italic;">'+(type==='good'?'暂无，点赞帧后AI将记住此类风格':'暂无')+'</span>';
+      return;
+    }
+    items.slice(-12).forEach(item=>{ // 显示最近12张
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;flex-shrink:0;width:54px;height:30px;border-radius:4px;overflow:hidden;cursor:pointer;border:1px solid '+(type==='good'?'rgba(62,180,137,0.4)':'rgba(255,80,80,0.4)')+';';
+      wrap.title = '点击删除此记忆';
+      const img = document.createElement('img');
+      img.src = item.thumb;
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+      // 删除按钮
+      const del = document.createElement('div');
+      del.textContent='×';
+      del.style.cssText='position:absolute;top:-1px;right:1px;font-size:10px;color:rgba(255,255,255,0.9);line-height:1;cursor:pointer;text-shadow:0 1px 3px rgba(0,0,0,0.8);';
+      del.addEventListener('click', async e=>{
+        e.stopPropagation();
+        await idbDelete(item.id);
+        await recalcAdaptiveWeights();
+        await refreshPrefMemPanel();
+        toast('已删除该记忆');
+      });
+      wrap.appendChild(img);
+      wrap.appendChild(del);
+      strip.appendChild(wrap);
+    });
+  };
+  renderStrip('goodMemStrip', goods, 'good');
+  renderStrip('badMemStrip',  bads,  'bad');
+
+  // 重新计算动态权重
+  await recalcAdaptiveWeights();
+}
+
+// ── 偏好记忆管理弹窗 ──
+async function openPrefMemPanel(){
+  const goods = await idbGetAll('good');
+  const bads  = await idbGetAll('bad');
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:3000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);';
+
+  const box = document.createElement('div');
+  box.style.cssText='background:var(--card);border:1px solid var(--bs);border-radius:14px;width:min(92vw,520px);max-height:80vh;overflow-y:auto;padding:20px;';
+
+  const mkSection = (title, color, items, type)=>{
+    const h = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><span style="font-size:12px;font-weight:600;color:${color};">${title}</span><span style="font-size:10px;color:var(--tm);">${items.length} 张已记忆</span></div>`;
+    if(!items.length) return h+'<div style="font-size:10px;color:var(--b2);font-style:italic;margin-bottom:16px;">暂无记忆</div>';
+    const grid = items.map(item=>`
+      <div style="position:relative;aspect-ratio:16/9;border-radius:6px;overflow:hidden;border:1px solid ${type==='good'?'rgba(62,180,137,0.35)':'rgba(255,80,80,0.35)'};">
+        <img src="${item.thumb}" style="width:100%;height:100%;object-fit:cover;" loading="lazy">
+        <div onclick="idbDelete(${item.id}).then(()=>{openPrefMemPanel();recalcAdaptiveWeights();refreshPrefMemPanel();toast('已删除');})"
+          style="position:absolute;top:3px;right:3px;width:18px;height:18px;background:rgba(0,0,0,0.7);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:11px;color:#fff;line-height:1;">×</div>
+      </div>`).join('');
+    return h+`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;margin-bottom:20px;">${grid}</div>`;
+  };
+
+  box.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:700;color:var(--ts);">🧠 AI 审美记忆库</div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="clearPrefs().then(()=>{this.closest('[style*=fixed]').remove();})"
+          style="font-size:10px;padding:5px 10px;background:transparent;border:1px solid rgba(255,80,80,0.4);color:rgba(255,100,100,0.8);border-radius:6px;cursor:pointer;">🗑 清空全部</button>
+        <button onclick="this.closest('[style*=fixed]').remove()"
+          style="font-size:10px;padding:5px 10px;background:var(--card2);border:1px solid var(--bs);color:var(--ts);border-radius:6px;cursor:pointer;">关闭</button>
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--tm);padding:8px 12px;background:var(--card2);border-radius:8px;margin-bottom:16px;line-height:1.7;">
+      💡 这些图片会在下次 AI 挑帧时<b style="color:var(--ts)">直接发给 Vision AI</b>，让 AI 真正看见您的审美偏好。<br>
+      数据存储在本地浏览器 IndexedDB，跨视频永久有效，不上传任何服务器。
+    </div>
+    ${mkSection('👍 喜欢的风格（AI会优先挑选此类画面）','#6ECFAA', goods, 'good')}
+    ${mkSection('👎 不喜欢的风格（AI会主动回避此类画面）','#ff8080', bads, 'bad')}
+  `;
+
+  overlay.appendChild(box);
+  overlay.addEventListener('click', e=>{ if(e.target===overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+// ── 给帧缩略图添加反馈按钮 ──
+// 注意：此版本按钮状态通过 IDB 异步查询（不依赖 frame index）
+async function addFeedbackBtns(frameIdx, el){
+  if(el.querySelector('.fb-row')) return;
+
+  // 以图片 hash 为 key（取 dataUrl 前80字符作为轻量标识）
+  const dataUrl = S.frames[frameIdx]?.dataUrl;
+  if(!dataUrl) return;
+  const imgKey = dataUrl.slice(0,80);
+
+  // 检查是否已标记（通过遍历IDB查找匹配 key）
+  const goods = await idbGetAll('good');
+  const bads  = await idbGetAll('bad');
+  const existGood = goods.find(g=>g.key===imgKey);
+  const existBad  = bads.find(b=>b.key===imgKey);
+
+  const row = document.createElement('div');
+  row.className = 'fb-row';
+  row.style.cssText='position:absolute;bottom:20px;left:0;right:0;display:flex;justify-content:center;gap:4px;z-index:8;opacity:0;transition:opacity .2s;pointer-events:none;';
+
+  const mkBtn = (emoji, type, activeRecord)=>{
+    const b = document.createElement('button');
+    b.className = 'fb-btn'+(activeRecord?' fb-active':'');
+    b.dataset.fbType = type;
+    b.dataset.recordId = activeRecord ? activeRecord.id : '';
+    b.textContent = emoji;
+    const activeColor = type==='good'?'rgba(62,180,137,0.8)':'rgba(255,80,80,0.8)';
+    const activeBg    = type==='good'?'rgba(62,180,137,0.3)':'rgba(255,80,80,0.25)';
+    b.style.cssText='padding:2px 7px;border-radius:5px;font-size:12px;cursor:pointer;pointer-events:all;line-height:1.5;transition:all .15s;'+
+      'border:1px solid '+(activeRecord?activeColor:'rgba(255,255,255,0.25)')+';'+
+      'background:'+(activeRecord?activeBg:'rgba(0,0,0,0.65)')+';color:white;';
+    b.title = type==='good'?'👍 AI会直接看这张图来学习您喜欢的风格':'👎 AI会记住并回避这类画面';
+    b.addEventListener('click', async e=>{
+      e.stopPropagation();
+      await handleFeedback(frameIdx, imgKey, type, b, row);
+    });
+    return b;
+  };
+
+  row.appendChild(mkBtn('👍','good', existGood||null));
+  row.appendChild(mkBtn('👎','bad',  existBad||null));
+  el.appendChild(row);
+
+  el.addEventListener('mouseenter',()=>{ row.style.opacity='1'; row.style.pointerEvents='all'; });
+  el.addEventListener('mouseleave',()=>{ row.style.opacity='0'; row.style.pointerEvents='none'; });
+}
+
+async function handleFeedback(fi, imgKey, type, btn, row){
+  const dataUrl = S.frames[fi]?.dataUrl;
+  if(!dataUrl) return;
+
+  // 判断当前状态
+  const goods = await idbGetAll('good');
+  const bads  = await idbGetAll('bad');
+  const existGood = goods.find(g=>g.key===imgKey);
+  const existBad  = bads.find(b=>b.key===imgKey);
+  const existSame = type==='good'?existGood:existBad;
+
+  const resetBtns = ()=>{
+    row.querySelectorAll('.fb-btn').forEach(b=>{
+      b.classList.remove('fb-active');
+      b.style.borderColor='rgba(255,255,255,0.25)';
+      b.style.background='rgba(0,0,0,0.65)';
+    });
+  };
+
+  // 点同类型 = 取消标记
+  if(existSame){
+    await idbDelete(existSame.id);
+    resetBtns();
+    await recalcAdaptiveWeights();
+    await refreshPrefMemPanel();
+    toast('已取消标记');
+    return;
+  }
+
+  // 先删除对方标记（切换类型）
+  if(existGood) await idbDelete(existGood.id);
+  if(existBad)  await idbDelete(existBad.id);
+
+  // 压缩图片并存入 IDB
+  const thumb = await compressForMemory(dataUrl);
+  if(!thumb){ toast('压缩图片失败','err'); return; }
+
+  await idbAdd({ type, key:imgKey, thumb, ts:Date.now() });
+
+  // 更新按钮样式
+  resetBtns();
+  const activeColor = type==='good'?'rgba(62,180,137,0.8)':'rgba(255,80,80,0.8)';
+  const activeBg    = type==='good'?'rgba(62,180,137,0.3)':'rgba(255,80,80,0.25)';
+  btn.classList.add('fb-active');
+  btn.style.borderColor = activeColor;
+  btn.style.background  = activeBg;
+
+  await recalcAdaptiveWeights();
+  await refreshPrefMemPanel();
+
+  const msg = type==='good'
+    ? '👍 已记住！AI下次挑帧时会直接看这张图来学习您的审美'
+    : '👎 已记住！AI下次挑帧时会主动回避这类画面';
+  toast(msg);
+}
+
+// ── 构建 Vision AI 偏好引导（把历史好图/坏图直接传给 AI）──
+// 返回 { hintText, goodImages, badImages }
+// goodImages/badImages 是 base64 数组，会在 visionScoreBatch 中直接插入到 content
+async function buildPrefContext(){
+  const goods = await idbGetAll('good');
+  const bads  = await idbGetAll('bad');
+
+  // 最多取最近 4 张好图 + 2 张坏图，控制 token 消耗
+  const MAX_GOOD = 4, MAX_BAD = 2;
+  const goodImgs = goods.slice(-MAX_GOOD).filter(g=>g.thumb).map(g=>g.thumb.split(',')[1]);
+  const badImgs  = bads.slice(-MAX_BAD).filter(b=>b.thumb).map(b=>b.thumb.split(',')[1]);
+
+  const parts=[];
+  if(goodImgs.length) parts.push(`用户点赞了${goodImgs.length}张参考图（随后附上），请学习这些图的构图/色调/主题风格，在候选帧中优先选出同类型的帧。`);
+  if(badImgs.length)  parts.push(`用户点踩了${badImgs.length}张参考图（随后附上），请回避与这些图相似的候选帧。`);
+  if(goods.length+bads.length>0){
+    parts.push(`（用户历史反馈：共记忆 ${goods.length} 张偏好图、${bads.length} 张回避图）`);
+  }
+
+  return {
+    hintText:   parts.join(' '),
+    goodImages: goodImgs,
+    badImages:  badImgs
+  };
+}
+
+// 兼容旧调用：buildPrefPrompt 仅返回文字部分
+async function buildPrefPrompt(){
+  const ctx = await buildPrefContext();
+  return ctx.hintText;
+}
+
+// ── 页面加载时初始化偏好面板 ──
+(async ()=>{
+  try{
+    await openIDB(); // 预热 IDB
+    await refreshPrefMemPanel();
+  }catch(e){
+    console.warn('偏好记忆面板初始化失败:', e);
+  }
+})();
+
+// 快捷填充所有批次（顺序填充）
+function doFillAll(){
+  if(S.selected.length===0){ toast('请先选择要填充的帧','err'); return; }
+  if(S.batches.length===0){ toast('请先添加拼图批次','err'); return; }
+  let fi=0;
+  S.batches.forEach(b=>{
+    b.cells.forEach((_,ci)=>{
+      if(fi<S.selected.length){ b.cells[ci]=S.selected[fi++]; renderCell(b,ci); }
+    });
+  });
+  clearBatchCanvasAll();
+  refreshUsageTags();
+  toast('已填入 '+fi+' 个格子');
+}
+
+// ===================================================================
+// AI 智能布局填充 — 让 Vision AI 决定哪张图放哪个位置最好看
+// 分析每张候选帧的视觉特征，然后按最优视觉顺序排列到格子
+// ===================================================================
+async function doAISmartLayout(){
+  if(S.selected.length===0){ toast('请先 AI 挑帧或手动选择帧','err'); return; }
+  if(S.batches.length===0){ toast('请先添加拼图批次','err'); return; }
+
+  const apiKey = document.getElementById('aiApiKey').value.trim();
+  const btn = document.getElementById('aiSmartLayoutBtn');
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>AI排版中...'; }
+
+  try{
+    if(apiKey){
+      await aiSmartLayoutWithVision(apiKey);
+    } else {
+      aiSmartLayoutLocal();
+    }
+  }catch(e){
+    console.warn('AI排版失败，降级本地排版:', e.message);
+    aiSmartLayoutLocal();
+  }finally{
+    if(btn){ btn.disabled=false; btn.innerHTML='🎨 AI智能排版'; }
+  }
+}
+
+// 本地智能排版：分析视觉特征，按视觉重量/亮度均衡排布
+// 核心策略：只选最好的 N 张（N=格子数），再按视觉心理学排位
+async function aiSmartLayoutLocal(){
+  const indices = [...S.selected];
+  // 分析每帧特征
+  toast('📐 本地分析帧特征...');
+  const analyses = [];
+  for(const fi of indices){
+    const r = await aiAnalyzeFrame(S.frames[fi].dataUrl);
+    analyses.push({ fi, ...r });
+    await sleep(0);
+  }
+  // 综合评分：清晰度权重最高，亮度和饱和度辅助
+  const maxSharp = Math.max(...analyses.map(a=>a.sharpness))||1;
+  analyses.forEach(a=>{
+    a.score = (a.sharpness/maxSharp)*0.55 + a.brightScore*0.25 + a.saturation*0.20;
+  });
+
+  // 构建像素多样性缓存，避免相似帧
+  const thumbMap = {};
+  analyses.forEach(a=>{ thumbMap[a.fi] = a.thumbUrl; });
+  const pixCache = await buildPixCache(analyses.map(a=>a.fi), idx=>thumbMap[idx]);
+
+  let filled = 0;
+  for(const b of S.batches){
+    const total = b.cols * b.rows;
+
+    // 第一步：用贪心多样性算法从候选帧中挑选最好的 total 张
+    const allScored = analyses.map(a=>({ ...a, frameIdx:a.fi }));
+    const topN = greedyDiversePick(allScored, total, pixCache);
+    // topN 已按质量+多样性排序，topN[0] = 最强的帧
+
+    // 第二步：按视觉心理学分配位置
+    const posOrder = buildVisualOrder(b.cols, b.rows);
+    // posOrder[0] = 视觉最重要位置（通常是中央或左上黄金点）
+    // 将最强帧放在最重要位置，次强帧放次重要位置……
+    topN.forEach((frame, rank)=>{
+      if(rank < posOrder.length){
+        b.cells[posOrder[rank]] = frame.frameIdx;
+        renderCell(b, posOrder[rank]);
+        filled++;
+      }
+    });
+    clearBatchCanvas(b);
+  }
+  refreshUsageTags();
+  toast('✨ 本地智能排版完成，已从 '+indices.length+' 帧中精选最佳 '+filled+' 帧填入（贪心多样性+视觉黄金位）');
+}
+
+// 生成视觉优先级位置顺序
+// 视觉心理学规律：
+//   2×2: 左上(0)=黄金主角，右下(3)=补充，右上(1)=次要，左下(2)=填充
+//   3×3: 中心→四角→四边（九宫格黄金比例）
+//   其他: 按到黄金重心点(左上1/3处)距离排序
+function buildVisualOrder(cols, rows){
+  // 2×2 专属策略：经典视觉动线 Z 型，左上最震撼
+  if(cols===2 && rows===2){
+    // 顺序：左上(最强) → 右上(第二) → 左下(第三) → 右下(第四)
+    // 考虑Z字阅读动线，左上吸引眼球，右下收尾
+    return [0, 1, 2, 3];
+  }
+  // 3×3 专属策略：中心最突出，四角次之，四边最弱
+  if(cols===3 && rows===3){
+    return [4, 0, 2, 6, 8, 1, 3, 5, 7]; // 中心→四角→四边
+  }
+  // 通用策略：以左上1/3处为视觉黄金点，按距离排序
+  const cells = [];
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++) cells.push({ci:r*cols+c, r, c});
+  // 黄金重心：水平1/3处，垂直1/3处（视觉自然落点）
+  const goldenR = (rows-1)/3, goldenC = (cols-1)/3;
+  cells.sort((a,b_)=>{
+    const da = Math.hypot(a.r-goldenR, a.c-goldenC);
+    const db = Math.hypot(b_.r-goldenR, b_.c-goldenC);
+    return da - db;
+  });
+  return cells.map(x=>x.ci);
+}
+
+// Vision AI 智能排版：发送所有候选帧让 AI 决定最佳位置
+async function aiSmartLayoutWithVision(apiKey){
+  const indices = [...S.selected];
+  const model = document.getElementById('aiModel').value;
+
+  // 压缩候选帧
+  toast('🤖 AI分析排版布局中...');
+  const compressed = [];
+  for(const fi of indices){
+    const b64 = await compressFrameForVision(S.frames[fi].dataUrl);
+    if(b64) compressed.push({ fi, b64 });
+    await sleep(0);
+  }
+  if(compressed.length===0) throw new Error('帧压缩失败');
+
+  let filled = 0;
+  for(const b of S.batches){
+    const total = b.cols * b.rows;
+    const need = Math.min(total, compressed.length);
+    if(need===0) continue;
+
+    // 构建 prompt：给定 cols×rows 宫格，让 AI 选出最佳 N 张并决定位置
+    const contentParts = [];
+    contentParts.push({
+      type:'text',
+      text:'你是专业的视觉设计师兼视频封面制作专家。下面有'+compressed.length+'张视频截图（按序号标注），'+
+           '需要填入一个 '+b.cols+' 列 × '+b.rows+' 行 的拼图网格（共'+total+'格，编号从左到右、从上到下为 1~'+total+'）。\n\n'+
+           '【核心任务】从这些图中精选最佳 '+need+' 张，使整体拼图最震撼、最吸引人。\n\n'+
+           '【选图要求】\n'+
+           '· 优先选：画面清晰、色彩鲜艳、有视觉冲击力、主体突出的帧\n'+
+           '· 避免选：模糊、过曝/过暗、画面内容高度相似的帧\n'+
+           '· 所选帧之间内容要有差异，不能挑选连续相似画面\n\n'+
+           (b.cols===2&&b.rows===2
+             ? '【位置策略-2×2】人眼Z型扫描规律：格子1(左上)=最震撼主角图；格子2(右上)=第二强；格子3(左下)=第三强；格子4(右下)=收尾图与左上呼应\n\n'
+             : b.cols===3&&b.rows===3
+             ? '【位置策略-3×3】九宫格规律：格子5(正中)=最强冲击；格子1/3/7/9(四角)=次强；格子2/4/6/8(四边)=过渡\n\n'
+             : '【位置策略】最震撼图放左上黄金点；相邻格色调互补，亮暗交错\n\n')+
+           '严格只输出纯JSON（cell为格子编号1~'+total+'，img为图片序号1~'+compressed.length+'）：\n'+
+           '{"layout":[{"cell":1,"img":3},{"cell":2,"img":1},...]}  禁止输出任何其他文字。'
+    });
+    compressed.forEach((f,i)=>{
+      contentParts.push({type:'text', text:'【图'+(i+1)+'】'});
+      contentParts.push({type:'image_url', image_url:{url:'data:image/jpeg;base64,'+f.b64, detail:'low'}});
+    });
+
+    const resp = await fetch('https://llm-api.mcisaas.com/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
+      body: JSON.stringify({ model, messages:[{role:'user', content:contentParts}], max_tokens:500, temperature:0 })
+    });
+    if(!resp.ok) throw new Error('API错误 '+resp.status);
+    const json = await resp.json();
+    const raw = (json.choices?.[0]?.message?.content||'').trim();
+
+    // 解析 AI 返回的布局
+    let parsed = null;
+    try{ parsed = JSON.parse(raw); }catch(_){}
+    if(!parsed){
+      const s=raw.indexOf('{'), e=raw.lastIndexOf('}');
+      if(s>=0&&e>s){ try{ parsed=JSON.parse(raw.slice(s,e+1)); }catch(_){} }
+    }
+
+    if(parsed && Array.isArray(parsed.layout)){
+      parsed.layout.forEach(item=>{
+        const ci = parseInt(item.cell)-1; // 转0-based
+        const imgIdx = parseInt(item.img)-1;
+        if(ci>=0 && ci<total && imgIdx>=0 && imgIdx<compressed.length){
+          b.cells[ci] = compressed[imgIdx].fi;
+          renderCell(b, ci);
+          filled++;
+        }
+      });
+    } else {
+      // AI返回解析失败，降级本地排版
+      console.warn('AI排版返回解析失败，使用本地排版');
+      const order = buildVisualOrder(b.cols, b.rows);
+      const pool = compressed.slice(0, total);
+      order.forEach((ci, rank)=>{
+        if(rank < pool.length){ b.cells[ci]=pool[rank].fi; renderCell(b,ci); filled++; }
+      });
+    }
+    clearBatchCanvas(b);
+    await sleep(200);
+  }
+  refreshUsageTags();
+  const mode = apiKey ? '✨ Vision AI' : '📐 本地';
+  toast(mode+' 智能排版完成，已填入 '+filled+' 个格子');
+}
+
+function clearBatchCanvasAll(){
+  S.batches.forEach(b=>{ if(b.canvas){ b.canvas=null; } });
+}
+
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+function seekCap(v,c,ctx,t){
+  return new Promise((res,rej)=>{
+    const onSeeked=()=>{
+      clearTimeout(timer);
+      c.width=v.videoWidth||1920; c.height=v.videoHeight||1080;
+      ctx.drawImage(v,0,0,c.width,c.height);
+      res(c.toDataURL('image/jpeg',.90));
+    };
+    v.addEventListener('seeked', onSeeked, { once:true });
+    try{
+      // 直接 currentTime 在多数浏览器下比 fastSeek + 额外回调更快更稳定
+      v.currentTime=t;
+    }catch(_){
+      v.currentTime=t;
+    }
+    const timer=setTimeout(()=>{
+      v.removeEventListener('seeked', onSeeked);
+      rej(new Error('seek timeout at '+t));
+    },5000);
+  });
+}
+
+// ===================================================================
+// THUMBNAILS — 懒加载版本
+// 用 IntersectionObserver 监控，只在进入视口时才把 dataUrl 赋给 img.src
+// 避免数百帧同时解码导致内存/CPU 爆炸
+// ===================================================================
+
+// 全局唯一的 IntersectionObserver，复用
+const thumbIO = new IntersectionObserver((entries)=>{
+  entries.forEach(entry=>{
+    if(!entry.isIntersecting) return;
+    const img = entry.target;
+    const idx = parseInt(img.dataset.lazy);
+    if(!isNaN(idx) && S.frames[idx]){
+      img.src = S.frames[idx].dataUrl;
+      delete img.dataset.lazy;
+    }
+    thumbIO.unobserve(img);
+  });
+}, { rootMargin: '300px 0px' }); // 提前300px预加载
+
+function addThumb(i, parent){
+  const f = S.frames[i];
+  const el = document.createElement('div');
+  el.className='fitem'; el.dataset.fi=i; el.draggable=true;
+  // img 不直接赋 src，用 data-lazy 延迟加载
+  el.innerHTML=
+    '<img data-lazy="'+i+'" loading="lazy"/>'+
+    '<div class="fov"><div class="fcheck"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>'+
+    '<div class="fdl" title="下载此帧" data-dl="'+i+'"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></div>'+
+    '<div class="fzoom" title="放大查看"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/></svg></div>'+
+    '<div class="ftime">'+f.time.toFixed(1)+'s</div>'+
+    '<div class="fnum">'+(i+1)+'</div>'+
+    '<div class="fused-tag" id="fused-'+i+'"></div>';
+  // 注册懒加载观察
+  const img = el.querySelector('img');
+  thumbIO.observe(img);
+  // dragstart 时才按需取 dataUrl（不提前持有引用）
+  el.addEventListener('dragstart', e=>{
+    S.dragFrameIdx=i; el.classList.add('dragging');
+    const ghost=document.getElementById('dragGhost');
+    document.getElementById('dragGhostImg').src=f.dataUrl;
+    ghost.style.display='block';
+    e.dataTransfer.setDragImage(new Image(),0,0);
+    e.dataTransfer.effectAllowed='copy';
+  });
+  el.addEventListener('dragend', ()=>{
+    el.classList.remove('dragging');
+    document.getElementById('dragGhost').style.display='none';
+    S.dragFrameIdx=null; clearDropTargets();
+  });
+  if(parent) parent.appendChild(el);
+  else document.getElementById('fGrid').appendChild(el);
+}
+
+// 事件委托：所有 .fitem 的 click/dblclick/fdl/fzoom 统一在 fGrid 上处理
+// 避免数百个独立监听器占用内存
+(function initGridDelegation(){
+  const grid = document.getElementById('fGrid');
+  grid.addEventListener('click', e=>{
+    const item = e.target.closest('.fitem');
+    if(!item) return;
+    const i = parseInt(item.dataset.fi);
+    if(e.target.closest('.fdl')){ e.stopPropagation(); downloadFrame(i); return; }
+    if(e.target.closest('.fzoom')){ e.stopPropagation(); openLightbox(i); return; }
+    toggleSel(i);
+  });
+  grid.addEventListener('dblclick', e=>{
+    const item = e.target.closest('.fitem');
+    if(!item) return;
+    if(e.target.closest('.fdl')) return;
+    e.preventDefault();
+    openLightbox(parseInt(item.dataset.fi));
+  });
+})();
+
+document.addEventListener('dragover', e=>{
+  const ghost=document.getElementById('dragGhost');
+  if(ghost.style.display==='block'){
+    ghost.style.left=e.clientX+'px'; ghost.style.top=e.clientY+'px';
+  }
+});
+
+function toggleSel(i){
+  const p=S.selected.indexOf(i);
+  if(p===-1) S.selected.push(i); else S.selected.splice(p,1);
+  updateDlBtns(); renderSel(); updateSelBadge(); updateFillBtn();
+}
+function renderSel(){
+  document.querySelectorAll('.fitem').forEach(el=>{
+    el.classList.toggle('selected', S.selected.includes(parseInt(el.dataset.fi)));
+  });
+}
+function updateSelBadge(){
+  document.getElementById('selN').textContent=S.selected.length;
+  // 同步 Tab2 填充页的计数
+  const fn=document.getElementById('fillSelN'); if(fn) fn.textContent=S.selected.length;
+  const tn=document.getElementById('fillTotalN'); if(tn) tn.textContent=S.frames.length;
+}
+function updateFillBtn(){
+  document.getElementById('fillAllBtn').disabled = S.selected.length===0||S.batches.length===0;
+}
+function updateAiBtns(){
+  const has=S.frames.length>0;
+  document.getElementById('aiPickBtn').disabled=!has;
+  document.getElementById('aiAutoFillBtn').disabled=!has;
+}
+function updateDlBtns(){
+  const dlSel=document.getElementById('dlSelBtn');
+  const dlAll=document.getElementById('dlAllFramesBtn');
+  if(dlSel) dlSel.style.display=S.selected.length>0?'':'none';
+  if(dlAll) dlAll.style.display=S.frames.length>0?'':'none';
+}
+
+document.getElementById('selAllBtn').addEventListener('click',()=>{
+  S.selected=S.frames.map((_,i)=>i);
+  renderSel(); updateSelBadge(); updateFillBtn(); updateDlBtns(); updateQuickBar();
+  toast('已全选 '+S.frames.length+' 帧');
+});
+document.getElementById('clrSelBtn').addEventListener('click',()=>{
+  S.selected=[]; renderSel(); updateSelBadge(); updateFillBtn(); updateDlBtns(); updateQuickBar();
+});
+// Tab2 里的快捷全选/清除按钮
+document.getElementById('fillSelAllBtn').addEventListener('click',()=>{
+  S.selected=S.frames.map((_,i)=>i);
+  renderSel(); updateSelBadge(); updateFillBtn(); updateDlBtns(); updateQuickBar();
+  toast('已全选 '+S.frames.length+' 帧');
+});
+document.getElementById('fillClrSelBtn').addEventListener('click',()=>{
+  S.selected=[]; renderSel(); updateSelBadge(); updateFillBtn(); updateDlBtns(); updateQuickBar();
+});
+
+// ===================================================================
+// FRAME USAGE TAGS — show which batch/cell uses each frame
+// ===================================================================
+function refreshUsageTags(){
+  // Clear all
+  document.querySelectorAll('.fused-tag').forEach(el=>{ el.innerHTML=''; el.style.display='none'; });
+  // Re-build
+  S.batches.forEach(b=>{
+    b.cells.forEach((fi, ci)=>{
+      if(fi===null) return;
+      const tagEl = document.getElementById('fused-'+fi);
+      if(!tagEl) return;
+      tagEl.style.display='flex';
+      const badge = document.createElement('span');
+      badge.className='fused-badge';
+      badge.textContent='#'+b.id+'-'+( ci+1 );
+      tagEl.appendChild(badge);
+    });
+  });
+}
+
+// ===================================================================
+// FRAME DOWNLOADS
+// ===================================================================
+function downloadFrame(i, opts={}){
+  const f=S.frames[i]; if(!f) return;
+  const a=document.createElement('a');
+  a.href=f.dataUrl; a.download='frame_'+(i+1)+'_'+f.time.toFixed(2)+'s.jpg'; a.click();
+  if(!opts.silent) toast('已下载 第'+(i+1)+'帧');
+}
+function downloadSelected(){
+  if(S.selected.length===0){ toast('请先选择要下载的帧','err'); return; }
+  S.selected.forEach((fi,idx)=>{ setTimeout(()=>downloadFrame(fi,{silent:true}), idx*250); });
+  toast('正在下载 '+S.selected.length+' 帧...');
+}
+function downloadAllFrames(){
+  if(S.frames.length===0){ toast('暂无帧可下载','err'); return; }
+  S.frames.forEach((_,idx)=>{ setTimeout(()=>downloadFrame(idx,{silent:true}), idx*250); });
+  toast('正在下载全部 '+S.frames.length+' 帧...');
+}
+
+// ===================================================================
+// FILL ALL BATCHES
+// ===================================================================
+document.getElementById('fillAllBtn').addEventListener('click', ()=>{
+  if(S.selected.length===0){ toast('请先选择帧','err'); return; }
+  let fi=0;
+  S.batches.forEach(b=>{
+    b.cells.forEach((_,ci)=>{
+      if(fi<S.selected.length){ b.cells[ci]=S.selected[fi++]; renderCell(b,ci); }
+    });
+  });
+  refreshUsageTags();
+  toast('已填充 '+fi+' 个格子');
+  updateFillBtn();
+});
+function clearAllCells(){
+  S.batches.forEach(b=>{ b.cells=b.cells.map(()=>null); renderAllCells(b); });
+  refreshUsageTags();
+  toast('已清空所有拼图格子');
+}
+
+// ===================================================================
+// AI SMART PICK — Vision API 优先，失败自动降级本地算法
+// ===================================================================
+
+function toggleApiKeyVis(){
+  const inp = document.getElementById('aiApiKey');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+// ===================================================================
+// API KEY 本地存储
+// ===================================================================
+const API_KEY_STORAGE = 'vfp_api_key';
+
+function saveApiKey(){
+  const val = document.getElementById('aiApiKey').value.trim();
+  if(!val){ toast('请先输入 API Key', 'err'); return; }
+  localStorage.setItem(API_KEY_STORAGE, val);
+  updateApiKeyUI(true);
+  toast('API Key 已保存到本地 🔒');
+}
+
+function clearApiKey(){
+  localStorage.removeItem(API_KEY_STORAGE);
+  document.getElementById('aiApiKey').value = '';
+  updateApiKeyUI(false);
+  toast('已清除本地保存的 API Key');
+}
+
+function updateApiKeyUI(saved){
+  const badge    = document.getElementById('apiKeySavedBadge');
+  const clearRow = document.getElementById('apiKeyClearRow');
+  if(badge)    badge.style.display    = saved ? '' : 'none';
+  if(clearRow) clearRow.style.display = saved ? '' : 'none';
+}
+
+// 页面加载时自动读取已保存的 Key
+(function loadSavedApiKey(){
+  const saved = localStorage.getItem(API_KEY_STORAGE);
+  if(saved){
+    document.getElementById('aiApiKey').value = saved;
+    updateApiKeyUI(true);
+  }
+})();
+
+// -------- 本地算法：Laplacian + 亮度 + 饱和度 --------
+function aiAnalyzeFrame(dataUrl){
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.onload=()=>{
+      const SZ=64;
+      const c=document.createElement('canvas'); c.width=SZ; c.height=Math.round(SZ*img.height/img.width)||36;
+      const ctx=c.getContext('2d'); ctx.drawImage(img,0,0,c.width,c.height);
+      const data=ctx.getImageData(0,0,c.width,c.height).data;
+      const n=data.length/4;
+      const lums=new Float32Array(n);
+      let sumL=0, sumR=0, sumG=0, sumB=0;
+      for(let i=0;i<n;i++){
+        const r=data[i*4], g=data[i*4+1], b=data[i*4+2];
+        const lum=0.299*r+0.587*g+0.114*b;
+        lums[i]=lum; sumL+=lum; sumR+=r; sumG+=g; sumB+=b;
+      }
+      const meanL=sumL/n;
+      const meanR=sumR/n, meanG=sumG/n, meanB=sumB/n;
+      const W=c.width, H=c.height;
+      let lapVar=0, lapCnt=0;
+      for(let y=1;y<H-1;y++){
+        for(let x=1;x<W-1;x++){
+          const idx=y*W+x;
+          const lap=Math.abs(-lums[idx-W-1]-lums[idx-W]-lums[idx-W+1]
+                             -lums[idx-1]+8*lums[idx]-lums[idx+1]
+                             -lums[idx+W-1]-lums[idx+W]-lums[idx+W+1]);
+          lapVar+=lap; lapCnt++;
+        }
+      }
+      const sharpness=lapCnt>0?(lapVar/lapCnt):0;
+      const brightScore=1-Math.abs(meanL-125)/125;
+      const maxC=Math.max(meanR,meanG,meanB), minC=Math.min(meanR,meanG,meanB);
+      const saturation=maxC>0?(maxC-minC)/maxC:0;
+      const thumbUrl=c.toDataURL('image/jpeg',.4);
+      resolve({sharpness, brightScore:Math.max(0,brightScore), saturation, thumbUrl, meanLum:meanL});
+    };
+    img.onerror=()=>resolve({sharpness:0,brightScore:0,saturation:0,thumbUrl:'',meanLum:0});
+    img.src=dataUrl;
+  });
+}
+
+// -------- Vision API：压缩帧 → base64 → 批量评分 --------
+// 压缩到 256×144 (16:9)，满足模型最小10px要求，体积约8-15KB
+function compressFrameForVision(dataUrl){
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.onload=()=>{
+      const c=document.createElement('canvas');
+      c.width=256; c.height=144;
+      const ctx=c.getContext('2d');
+      const ar=img.width/img.height;
+      let sx=0,sy=0,sw=img.width,sh=img.height;
+      if(ar>16/9){ sw=Math.round(img.height*(16/9)); sx=(img.width-sw)/2; }
+      else       { sh=Math.round(img.width/(16/9));  sy=(img.height-sh)/2; }
+      ctx.drawImage(img,sx,sy,sw,sh,0,0,256,144);
+      const dataURL=c.toDataURL('image/jpeg',0.75);
+      const b64=dataURL.split(',')[1];
+      resolve(b64 && b64.length>100 ? b64 : null);
+    };
+    img.onerror=()=>resolve(null);
+    img.src=dataUrl;
+  });
+}
+
+// 单批次调用 Vision API，frames = [{frameIdx, b64}]（b64必须非null）
+// 返回 [{frameIdx, clarity, composition, appeal, overall}]
+// goodRefImages / badRefImages：base64 数组（不含 data: 前缀），AI 会直接看见这些参考图
+async function visionScoreBatch(frames, apiKey, model, hintText, goodRefImages=[], badRefImages=[]){
+  // skip frames where compression failed
+  const validFrames = frames.filter(f => f.b64);
+  if(validFrames.length === 0) return [];
+
+  const hint = hintText ? (hintText + ' ') : '';
+
+  // build example to guide model output format
+  const exampleScores = validFrames.map((_,i)=>
+    '{"idx":'+(i+1)+',"clarity":8,"composition":7,"appeal":6,"overall":7}'
+  ).join(',');
+
+  const contentParts = [];
+
+  // ── 如有参考图，先插入参考图块 ──
+  let refBlock = '';
+  if(goodRefImages.length > 0){
+    refBlock += '【用户喜欢的参考图风格，请学习以下'+goodRefImages.length+'张图的构图、色调、主题，在候选帧中优先选出同类型的帧】\n';
+  }
+  if(badRefImages.length > 0){
+    refBlock += '【用户不喜欢的参考图风格，请回避与以下'+badRefImages.length+'张图相似的候选帧】\n';
+  }
+
+  const systemText =
+    '你是专业视频封面图质量评审 AI。\n'+
+    (refBlock ? refBlock+'\n' : '')+
+    hint+
+    '下面将提供'+validFrames.length+'张候选视频截图（每张前有【候选图N】标记）。\n'+
+    '请对每张候选图从以下4个维度打分（0-10整数）：\n'+
+    '1. clarity（清晰度/对焦/画面锐利程度）\n'+
+    '2. composition（构图/画面平衡/主体突出度）\n'+
+    '3. appeal（视觉吸引力/色彩表现/情绪感染力）\n'+
+    '4. overall（综合推荐分，是否适合作视频封面/缩略图'+(goodRefImages.length?'，参考用户偏好风格':'')+'）\n\n'+
+    '每张图必须分别给出独立评分，共输出'+validFrames.length+'个评分对象。\n'+
+    '严格只输出纯JSON，不要任何说明，不要代码块：\n'+
+    '{"scores":['+exampleScores+']}';
+
+  contentParts.push({ type:'text', text: systemText });
+
+  // 插入好图参考图
+  goodRefImages.forEach((b64, i)=>{
+    contentParts.push({ type:'text', text:'【用户喜欢的参考图 '+(i+1)+'】' });
+    contentParts.push({ type:'image_url', image_url:{ url:'data:image/jpeg;base64,'+b64, detail:'low' } });
+  });
+  // 插入坏图参考图
+  badRefImages.forEach((b64, i)=>{
+    contentParts.push({ type:'text', text:'【用户不喜欢的参考图 '+(i+1)+'】' });
+    contentParts.push({ type:'image_url', image_url:{ url:'data:image/jpeg;base64,'+b64, detail:'low' } });
+  });
+
+  // 插入候选帧
+  if(goodRefImages.length + badRefImages.length > 0){
+    contentParts.push({ type:'text', text:'──以下是候选帧，请按照上面参考图的偏好标准进行评分──' });
+  }
+  validFrames.forEach((f,i)=>{
+    contentParts.push({type:'text', text:'【候选图'+(i+1)+'】'});
+    contentParts.push({
+      type:'image_url',
+      image_url:{url:'data:image/jpeg;base64,'+f.b64, detail:'low'}
+    });
+  });
+
+  const resp = await fetch('https://llm-api.mcisaas.com/v1/chat/completions',{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'Authorization':'Bearer '+apiKey
+    },
+    body: JSON.stringify({
+      model,
+      messages:[{role:'user', content:contentParts}],
+      max_tokens: 800,
+      temperature: 0
+    })
+  });
+
+  if(!resp.ok){
+    const errText = await resp.text();
+    throw new Error('API错误 '+resp.status+': '+errText.slice(0,300));
+  }
+
+  const json = await resp.json();
+  const raw  = (json.choices?.[0]?.message?.content || '').trim();
+  if(!raw) throw new Error('AI返回空响应，请检查模型或API余额');
+
+  // robust JSON parse: handle raw / markdown wrapped / prefixed responses
+  let parsed = null;
+  // try direct parse
+  try { parsed = JSON.parse(raw); } catch(_){}
+  // fallback: extract JSON by finding first { and last }
+  if(!parsed || !parsed.scores){
+    const jsonStart = raw.indexOf('{');
+    const jsonEnd   = raw.lastIndexOf('}');
+    if(jsonStart >= 0 && jsonEnd > jsonStart){
+      try{ parsed = JSON.parse(raw.slice(jsonStart, jsonEnd+1)); }catch(_){}
+    }
+  }
+  if(!parsed || !Array.isArray(parsed.scores)){
+    throw new Error('AI返回格式无法解析：'+raw.slice(0,300));
+  }
+
+  // map by position i, not AI-returned idx
+  const results = [];
+  for(let i = 0; i < validFrames.length; i++){
+    const s = parsed.scores[i];
+    if(!s) continue;
+    results.push({
+      frameIdx    : validFrames[i].frameIdx,
+      clarity     : Math.max(0, Math.min(10, Number(s.clarity)     || 5)) / 10,
+      composition : Math.max(0, Math.min(10, Number(s.composition) || 5)) / 10,
+      appeal      : Math.max(0, Math.min(10, Number(s.appeal)      || 5)) / 10,
+      overall     : Math.max(0, Math.min(10, Number(s.overall)     || 5)) / 10,
+    });
+  }
+  return results;
+}
+
+// -------- 进度条辅助 --------
+function setAiProgress(pct, label){
+  const wrap  = document.getElementById('aiProgress');
+  const fill  = document.getElementById('aiProgFill');
+  const lbl   = document.getElementById('aiProgLabel');
+  const num   = document.getElementById('aiProgNum');
+  if(pct < 0){ wrap.style.display='none'; return; }
+  wrap.style.display = '';
+  fill.style.width   = pct.toFixed(0)+'%';
+  lbl.textContent    = label || '分析中...';
+  num.textContent    = pct.toFixed(0)+'%';
+}
+
+// -------- 通用：像素差计算（用于多样性筛选）--------
+async function buildPixCache(frameIndices, getThumbFn){
+  const cache={};
+  for(const idx of frameIndices){
+    cache[idx] = await new Promise(r=>{
+      const img=new Image();
+      img.onload=()=>{
+        const c=document.createElement('canvas'); c.width=16; c.height=9;
+        c.getContext('2d').drawImage(img,0,0,16,9);
+        r(c.getContext('2d').getImageData(0,0,16,9).data);
+      };
+      img.onerror=()=>r(null);
+      img.src = getThumbFn(idx);
+    });
+    await sleep(0);
+  }
+  return cache;
+}
+function pixDiff(pA, pB){
+  if(!pA||!pB) return 1;
+  let d=0;
+  for(let i=0;i<pA.length;i+=4)
+    d+=Math.abs(pA[i]-pB[i])+Math.abs(pA[i+1]-pB[i+1])+Math.abs(pA[i+2]-pB[i+2]);
+  return d/(16*9*3*255);
+}
+
+// -------- 贪心多样性筛选（通用） --------
+// 策略：第1帧选最高质量分；后续帧取 质量×0.55 + 与已选最小差异×0.45
+// 相似度惩罚：若与已选某帧像素差 < 阈值，视为重复帧，大幅降权
+function greedyDiversePick(scored, N, pixCache){
+  if(!scored.length) return [];
+  const SIM_THRESHOLD = 0.06; // 像素差低于此值 = 高度相似（重复帧）
+  const selected = [];
+  const remaining = [...scored].sort((a,b) => b.score - a.score);
+
+  // 第一帧：直接选最高质量分
+  selected.push(remaining.shift());
+
+  // 后续帧：贪心 composite
+  while(selected.length < N && remaining.length){
+    remaining.forEach(s => {
+      const diffs = selected.map(sel => pixDiff(pixCache[s.frameIdx], pixCache[sel.frameIdx]));
+      const minDiff = Math.min(...diffs);
+      // 高度相似惩罚：minDiff越小惩罚越重
+      const penalty = minDiff < SIM_THRESHOLD
+        ? Math.pow(minDiff / SIM_THRESHOLD, 1.5)  // 0~1，越相似越趋向0
+        : 1.0;
+      s.composite = (s.score * 0.55 + minDiff * 0.45) * penalty;
+    });
+    remaining.sort((a,b) => b.composite - a.composite);
+    selected.push(remaining.shift());
+  }
+  return selected;
+}
+
+// -------- 本地算法降级 --------
+async function runLocalPick(N){
+  const analyses=[];
+  for(let i=0;i<S.frames.length;i++){
+    const r=await aiAnalyzeFrame(S.frames[i].dataUrl);
+    analyses.push({...r, frameIdx:i});
+    if(i%10===0) await sleep(0);
+  }
+  S.aiScores=analyses;
+  const maxSharp=Math.max(...analyses.map(a=>a.sharpness))||1;
+  analyses.forEach(a=>{ a.sharpNorm=a.sharpness/maxSharp; });
+
+  // 像素缓存（用Map避免数组位置偏移问题）
+  const thumbMap = {};
+  analyses.forEach(a => { thumbMap[a.frameIdx] = a.thumbUrl; });
+  const pixCache = await buildPixCache(
+    analyses.map(a => a.frameIdx),
+    idx => thumbMap[idx]
+  );
+
+  // 将本地分数合并为单一 score
+  analyses.forEach(a=>{
+    a.score = a.sharpNorm*0.50 + a.brightScore*0.25 + a.saturation*0.25;
+  });
+
+  const selected = greedyDiversePick(analyses, N, pixCache);
+
+  // 更新评分标签 → 本地维度
+  document.getElementById('sl-sharp').textContent  = '清晰度';
+  document.getElementById('sl-bright').textContent = '亮度';
+  document.getElementById('sl-sat').textContent    = '饱和度';
+  document.getElementById('sl-diff').textContent   = '差异性';
+  document.getElementById('aiScoresTitle').textContent = '最高分帧（本地算法）';
+  document.getElementById('aiScoresMode').textContent  = '📐 LOCAL';
+
+  if(selected[0]){
+    const top=selected[0];
+    document.getElementById('aiScores').style.display='block';
+    const setBar=(id,v)=>{
+      document.getElementById('sc-'+id).style.width=(v*100).toFixed(0)+'%';
+      document.getElementById('sv-'+id).textContent=(v*100).toFixed(0);
+    };
+    setBar('sharp', top.sharpNorm);
+    setBar('bright', top.brightScore);
+    setBar('sat',   top.saturation);
+    const avgDiv=selected.slice(1).reduce((s,a)=>s+a.composite,0)/Math.max(1,selected.length-1);
+    setBar('diff', avgDiv);
+  }
+
+  return { indices: selected.map(a=>a.frameIdx).sort((a,b)=>a-b), mode:'local' };
+}
+
+// -------- Vision AI 主流程 --------
+async function runVisionPick(N, apiKey, model, hintText){
+  // ── 获取审美记忆：好图/坏图 base64 + 文字描述 ──
+  const prefCtx = await buildPrefContext();
+  if(prefCtx.hintText) hintText = (hintText ? hintText + '。' : '') + prefCtx.hintText;
+  const goodRefImages = prefCtx.goodImages;  // 直接传给 AI 看的参考好图
+  const badRefImages  = prefCtx.badImages;   // 直接传给 AI 看的参考坏图
+  if(goodRefImages.length + badRefImages.length > 0){
+    toast('🧠 已加载 '+goodRefImages.length+' 张偏好参考图发给AI学习...', 'info');
+  }
+  // sample up to 60 frames evenly to avoid timeout
+  const MAX_SEND = 60;
+  const total = S.frames.length;
+  let sendIndices;
+  if(total <= MAX_SEND){
+    sendIndices = Array.from({length:total}, (_,i) => i);
+  } else {
+    sendIndices = [];
+    for(let i=0;i<MAX_SEND;i++) sendIndices.push(Math.round(i*(total-1)/(MAX_SEND-1)));
+    sendIndices = [...new Set(sendIndices)];
+  }
+
+  // Step1: compress sampled frames
+  setAiProgress(0, '正在压缩帧（共'+sendIndices.length+'帧）...');
+  const compressed = [];
+  for(let j=0; j<sendIndices.length; j++){
+    const fi = sendIndices[j];
+    const b64 = await compressFrameForVision(S.frames[fi].dataUrl);
+    if(b64) compressed.push({frameIdx:fi, b64});
+    if(j%5===0) setAiProgress(j/sendIndices.length*28, '压缩帧 '+(j+1)+'/'+sendIndices.length);
+    await sleep(0);
+  }
+  if(compressed.length === 0) throw new Error('所有帧压缩失败，请检查视频帧数据');
+
+  // Step2: score in batches of 4
+  const BATCH = 4;
+  const allScores = [];
+  const batches = [];
+  for(let i=0; i<compressed.length; i+=BATCH) batches.push(compressed.slice(i, i+BATCH));
+
+  for(let bi=0; bi<batches.length; bi++){
+    setAiProgress(28 + (bi/batches.length)*62, 'AI 评分 '+(bi+1)+'/'+batches.length+' 批...');
+    try {
+      // 仅第一批次传入参考图（避免每批都带大量图片增加 token）
+      const refGood = bi===0 ? goodRefImages : [];
+      const refBad  = bi===0 ? badRefImages  : [];
+      const scores = await visionScoreBatch(batches[bi], apiKey, model, hintText, refGood, refBad);
+      allScores.push(...scores);
+    } catch(batchErr){
+      // on batch failure, fill with neutral scores
+      console.warn('批次'+(bi+1)+'评分失败:', batchErr.message);
+      for(const f of batches[bi]){
+        allScores.push({frameIdx:f.frameIdx, clarity:0.5, composition:0.5, appeal:0.5, overall:0.5});
+      }
+    }
+    await sleep(80); // rate limit pause
+  }
+
+  if(allScores.length === 0) throw new Error('All batches failed. Check API key and balance.');
+  setAiProgress(92, '计算多样性...');
+
+  // Step3: 使用动态自适应权重合并评分（权重由用户历史点赞图特征决定）
+  const w = _adaptiveWeights;
+  allScores.forEach(s => {
+    s.score = s.overall*w.overall + s.clarity*w.clarity + s.composition*w.composition + s.appeal*w.appeal;
+  });
+
+  // Step4: build pixel diversity cache using compressed b64
+  const b64Map = {};
+  compressed.forEach(f => { b64Map[f.frameIdx] = 'data:image/jpeg;base64,'+f.b64; });
+  const pixCache = await buildPixCache(
+    allScores.map(s => s.frameIdx),
+    idx => b64Map[idx] || S.frames[idx]?.dataUrl
+  );
+  setAiProgress(97, '挑选最优帧...');
+
+  const selected = greedyDiversePick(allScores, N, pixCache);
+  S.aiScores = allScores;
+  setAiProgress(-1);
+  return { indices: selected.map(s=>s.frameIdx), mode: 'vision' };
+}
+
+// -------- 主入口 --------
+async function runAIPick(autoFill=false){
+  if(S.frames.length===0){ toast('请先截取视频帧','err'); return; }
+  const N   = Math.min(parseInt(document.getElementById('aiN').value)||15, S.frames.length);
+  const btn = document.getElementById('aiPickBtn');
+  const btn2= document.getElementById('aiAutoFillBtn');
+  const starSVG='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:middle;margin-right:4px;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>';
+
+  btn.innerHTML='<span class="spin"></span>分析中...'; btn.disabled=true; btn2.disabled=true;
+
+  const apiKey  = document.getElementById('aiApiKey').value.trim();
+  const model   = document.getElementById('aiModel').value;
+  const hint    = document.getElementById('aiPromptHint').value.trim();
+
+  let result;
+
+  if(apiKey){
+    // 优先尝试 Vision AI
+    try {
+      result = await runVisionPick(N, apiKey, model, hint);
+      toast('✨ Vision AI（'+model.split('-').slice(0,3).join('-')+'）挑选出 '+result.indices.length+' 帧');
+    } catch(err){
+      setAiProgress(-1);
+      // 自动降级本地算法
+      toast('⚠️ Vision AI 失败（'+err.message.slice(0,40)+'），已切换本地算法', 'warn');
+      try {
+        result = await runLocalPick(N);
+        toast('📐 本地算法已挑选出 '+result.indices.length+' 帧');
+      } catch(e2){
+        toast('挑帧失败：'+e2.message,'err');
+        btn.innerHTML=starSVG+'AI 自动挑帧'; btn.disabled=false; btn2.disabled=false;
+        return;
+      }
+    }
+  } else {
+    // 无 Key → 直接本地算法
+    try {
+      result = await runLocalPick(N);
+      toast('📐 本地算法已挑选出 '+result.indices.length+' 帧（填入 API Key 可使用 Vision AI）');
+    } catch(e){
+      toast('挑帧失败：'+e.message,'err');
+      btn.innerHTML=starSVG+'AI 自动挑帧'; btn.disabled=false; btn2.disabled=false;
+      return;
+    }
+  }
+
+  // 更新选中状态
+  S.selected = result.indices;
+  renderSel(); updateSelBadge(); updateFillBtn(); updateDlBtns();
+
+  // 标记徽章
+  document.querySelectorAll('.ai-top-badge').forEach(el=>el.remove());
+  result.indices.forEach((fi,rank)=>{
+    const el=document.getElementById('fGrid').querySelector('[data-fi="'+fi+'"]');
+    if(el){
+      const badge=document.createElement('div');
+      badge.className='ai-top-badge';
+      badge.innerHTML=(result.mode==='vision'?'🤖':'★')+' #'+(rank+1);
+      el.appendChild(badge);
+    }
+  });
+
+  btn.innerHTML=starSVG+'AI 自动挑帧'; btn.disabled=false; btn2.disabled=false;
+  updateQuickBar();
+
+  // 自动给 AI 选中的帧挂载反馈按钮（async，fire-and-forget）
+  result.indices.forEach(fi=>{
+    const el = document.getElementById('fGrid').querySelector('[data-fi="'+fi+'"]');
+    if(el) addFeedbackBtns(fi, el).catch(()=>{});
+  });
+
+  // 自动切到填充拼图 Tab（除非已是 autoFill 或一键流程中）
+  if(!autoFill && !S._superFlowRunning){
+    setTimeout(()=>switchTab(2), 600);
+  }
+
+  if(autoFill && S.batches.length>0){
+    let fi=0;
+    S.batches.forEach(b=>{
+      b.cells.forEach((_,ci)=>{
+        if(fi<S.selected.length){ b.cells[ci]=S.selected[fi++]; renderCell(b,ci); }
+      });
+    });
+    refreshUsageTags();
+    toast('AI 挑帧完成，已自动填入 '+fi+' 个格子');
+  }
+}
+
+document.getElementById('aiPickBtn').addEventListener('click', ()=>runAIPick(false));
+document.getElementById('aiAutoFillBtn').addEventListener('click', ()=>runAIPick(true));
+
+// ===================================================================
+// BATCHES
+// ===================================================================
+function promptCustomBatch(){
+  const input=prompt('输入行×列 (例: 2×3 或 4 4)','3×4');
+  if(!input) return;
+  const m=input.match(/(\d+)[x×,\s]+(\d+)/i);
+  if(m){ addBatch(parseInt(m[1]),parseInt(m[2])); }
+  else toast('格式有误，请输入如 3×4','err');
+}
+
+function addBatch(cols,rows){
+  const id=++batchIdCnt;
+  const total=cols*rows;
+  const batch={id, cols, rows, cells:Array(total).fill(null), hasBadge:(cols===2&&rows===2), canvas:null};
+  S.batches.push(batch);
+  document.getElementById('batchEmpty').style.display='none';
+  renderBatch(batch);
+  updateFillBtn();
+  updateQuickBar();
+  toast('已添加 '+cols+'×'+rows+' 拼图批次 #'+id);
+}
+
+function renderBatch(b){
+  const el=document.createElement('div');
+  el.className='batch'; el.id='batch-'+b.id;
+  el.innerHTML=batchHTML(b);
+  document.getElementById('batchList').appendChild(el);
+  initBatchEvents(el,b);
+  // bind preview click
+  const prev=el.querySelector('.prev-thumb');
+  if(prev) prev.addEventListener('click', ()=>openPreviewModal(b));
+}
+
+function batchHTML(b){
+  return (
+    // ── 顶部：标题 + 操作按钮 ──
+    '<div class="batch-head">'+
+    '  <div class="batch-title">'+
+    '    <span class="batch-tag">'+b.cols+'×'+b.rows+'</span>'+
+    '    <span style="color:var(--tm);font-size:9px;">批次 #'+b.id+'</span>'+
+    '  </div>'+
+    '  <div class="batch-actions">'+
+    '    <button class="btn-sm" onclick="downloadBatch('+b.id+')" id="dl-'+b.id+'" disabled>'+
+    '      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>下载'+
+    '    </button>'+
+    '    <button class="btn-del" onclick="removeBatch('+b.id+')">删除</button>'+
+    '  </div>'+
+    '</div>'+
+    // ── 拼图格子（全宽） ──
+    '<div class="collage-grid" id="cgrid-'+b.id+'"'+
+    '     style="grid-template-columns:repeat('+b.cols+',1fr);grid-template-rows:repeat('+b.rows+',1fr);">'+
+    '  '+Array.from({length:b.cols*b.rows},(_,i)=>cellHTML(b,i)).join('')+
+    '</div>'+
+    // ── 预览图（生成后显示，全宽大图） ──
+    '<div class="prev-thumb" id="prev-'+b.id+'" title="点击全屏预览"><canvas id="pcanvas-'+b.id+'"></canvas></div>'+
+    // ── 底部工具栏：横向紧凑排列 ──
+    '<div class="batch-side">'+
+    '  <div class="side-section">'+
+    '    <span style="font-size:8px;color:var(--tm);white-space:nowrap;">尺寸</span>'+
+    '    <input type="number" class="gs-inp" id="gc-'+b.id+'" value="'+b.cols+'" min="1" max="10" style="width:36px;"/>'+
+    '    <span class="gs-x">×</span>'+
+    '    <input type="number" class="gs-inp" id="gr-'+b.id+'" value="'+b.rows+'" min="1" max="10" style="width:36px;"/>'+
+    '    <button class="btn-apply" onclick="resizeBatch('+b.id+')" style="white-space:nowrap;">应用</button>'+
+    '  </div>'+
+    '  <div class="side-section">'+
+    '    <span style="font-size:8px;color:var(--tp);white-space:nowrap;">4K角标</span>'+
+    '    <label class="tog" style="margin:0;">'+
+    '      <input type="checkbox" id="badge-'+b.id+'" '+(b.hasBadge?'checked':'')+' />'+
+    '      <div class="tog-track"></div>'+
+    '      <div class="tog-thumb"></div>'+
+    '    </label>'+
+    '  </div>'+
+    '  <button class="btn-gen" onclick="generateBatch('+b.id+')" id="gen-'+b.id+'" style="flex:1;min-width:80px;">生成拼图</button>'+
+    '  <button class="btn-dl" onclick="downloadBatch('+b.id+')" id="dl2-'+b.id+'" disabled style="flex:1;min-width:80px;">'+
+    '    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>下载 1080P'+
+    '  </button>'+
+    '</div>'
+  );
+}
+
+function cellHTML(b,i){
+  const hasImg = b.cells[i]!==null;
+  const f = hasImg ? S.frames[b.cells[i]] : null;
+  return '<div class="cell '+(hasImg?'has-img':'')+'" id="cell-'+b.id+'-'+i+'" data-bid="'+b.id+'" data-ci="'+i+'">'+
+    (hasImg
+      ? '<img src="'+f.dataUrl+'"/>'+
+        '<div class="cell-remove" onclick="removeCell('+b.id+','+i+');event.stopPropagation();">\xd7</div>'+
+        '<div class="cell-replace-hint">\u70b9\u51fb\u66ff\u6362</div>'
+      : '<div class="cell-ph"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>\u70b9\u51fb/\u62d6\u5165</span></div>'
+    )+
+    '<div class="cell-num">'+(i+1)+'</div>'+
+  '</div>';
+}
+
+function initBatchEvents(el, b){
+  el.querySelectorAll('.cell').forEach(cell=>{
+    const ci=parseInt(cell.dataset.ci);
+    // ALL cells (empty + has-img) trigger picker on click
+    cell.onclick = e=>{
+      if(e.target.closest('.cell-remove')) return;
+      pickFrame(b, ci);
+    };
+    bindDropEvents(cell, b, ci);
+  });
+}
+
+function bindDropEvents(cell, b, ci){
+  cell.ondragover = e=>{
+    if(S.dragFrameIdx!==null){ e.preventDefault(); cell.classList.add('drop-target'); }
+  };
+  cell.ondragleave = ()=>cell.classList.remove('drop-target');
+  cell.ondrop = e=>{
+    e.preventDefault(); cell.classList.remove('drop-target');
+    if(S.dragFrameIdx!==null){
+      b.cells[ci]=S.dragFrameIdx; renderCell(b,ci); clearBatchCanvas(b);
+      refreshUsageTags();
+    }
+  };
+}
+
+function clearDropTargets(){
+  document.querySelectorAll('.cell.drop-target').forEach(c=>c.classList.remove('drop-target'));
+}
+
+// ===================================================================
+// FRAME PICKER (modal)
+// ===================================================================
+function pickFrame(b, ci){
+  if(S.frames.length===0){ toast('请先截取视频帧','err'); return; }
+  showFramePicker(b, ci);
+}
+
+function showFramePicker(b, ci){
+  document.getElementById('framePicker')?.remove();
+  const current = b.cells[ci];
+  const picker = document.createElement('div');
+  picker.id='framePicker';
+  Object.assign(picker.style,{
+    position:'fixed',inset:'0',zIndex:'888',
+    background:'rgba(0,0,0,0.7)',backdropFilter:'blur(6px)',
+    display:'flex',alignItems:'center',justifyContent:'center',
+  });
+  picker.innerHTML=
+    '<div style="background:var(--card2);border:1px solid var(--bs);border-radius:14px;'+
+    'padding:20px;max-width:820px;width:92%;max-height:85vh;'+
+    'display:flex;flex-direction:column;gap:12px;box-shadow:0 24px 80px rgba(0,0,0,.7);">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">'+
+    '<span style="font-size:13px;font-weight:600;color:var(--mint-light);">'+
+    '选择帧 → 格子 #'+(ci+1)+'（批次 #'+b.id+'）'+
+    (current!==null?'<span style="font-size:10px;color:var(--tm);">当前: 第'+(current+1)+'帧</span>':'')+
+    '</span>'+
+    '<div style="display:flex;gap:8px;align-items:center;">'+
+    (current!==null?'<button onclick="removeCell('+b.id+','+ci+');document.getElementById(\'framePicker\').remove();" style="padding:4px 10px;background:transparent;border:1px solid rgba(255,80,80,0.3);border-radius:6px;color:rgba(255,100,100,0.8);font-size:10px;cursor:pointer;">清除此格</button>':'')+
+    '<button onclick="document.getElementById(\'framePicker\').remove()" style="background:transparent;border:none;color:var(--tm);font-size:20px;cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;">×</button>'+
+    '</div></div>'+
+    '<div id="fpGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;overflow-y:auto;flex:1;padding-right:4px;"></div></div>';
+  picker.addEventListener('click', e=>{ if(e.target===picker) picker.remove(); });
+  document.body.appendChild(picker);
+  const fpGrid = picker.querySelector('#fpGrid');
+  renderFramePickerGrid(fpGrid, b, ci);
+}
+
+function renderFramePickerGrid(grid, b, ci){
+  const CHUNK = 40;
+  const total = S.frames.length;
+  const selected = b.cells[ci];
+  let offset = 0;
+
+  // IntersectionObserver 懒加载，root 为弹窗容器
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(entry=>{
+      if(!entry.isIntersecting) return;
+      const el = entry.target;
+      const idx = parseInt(el.dataset.lazy);
+      if(!isNaN(idx) && S.frames[idx] && !el.src){
+        el.src = S.frames[idx].dataUrl;
+        delete el.dataset.lazy;
+      }
+      io.unobserve(el);
+    });
+  },{root: grid, rootMargin:'300px'});
+
+  function renderChunk(){
+    const end = Math.min(offset + CHUNK, total);
+    const frag = document.createDocumentFragment();
+    for(let i=offset;i<end;i++){
+      const f = S.frames[i];
+      const sel = selected===i;
+      const item = document.createElement('div');
+      item.setAttribute('onclick','pickDone('+b.id+','+ci+','+i+')');
+      // 外层容器：固定宽高比 16:9，overflow:hidden 防止子元素撑破
+      item.style.cssText =
+        'position:relative;border-radius:7px;overflow:hidden;'+
+        'border:2px solid '+(sel?'var(--mint)':'transparent')+';'+
+        'cursor:pointer;background:#111;transition:border-color .15s;'+
+        'aspect-ratio:16/9;width:100%;';
+      // img：绝对定位填满，object-fit:cover 确保不变形、不留白
+      const img = document.createElement('img');
+      img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;display:block;pointer-events:none;';
+      img.dataset.lazy = i; // 懒加载，不直接赋 src
+      io.observe(img);
+      item.appendChild(img);
+      // 时间戳
+      const ts = document.createElement('div');
+      ts.style.cssText = 'position:absolute;bottom:2px;left:3px;font-size:8px;color:var(--mint-lighter);background:rgba(0,0,0,.75);padding:1px 4px;border-radius:3px;pointer-events:none;line-height:1.4;';
+      ts.textContent = f.time.toFixed(1)+'s';
+      item.appendChild(ts);
+      // 序号
+      const num = document.createElement('div');
+      num.style.cssText = 'position:absolute;top:2px;right:3px;font-size:8px;color:var(--tm);background:rgba(0,0,0,.65);padding:1px 4px;border-radius:3px;pointer-events:none;line-height:1.4;';
+      num.textContent = '#'+(i+1);
+      item.appendChild(num);
+      // 选中勾
+      if(sel){
+        const chk = document.createElement('div');
+        chk.style.cssText = 'position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--mint);display:flex;align-items:center;justify-content:center;pointer-events:none;';
+        chk.innerHTML = '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+        item.appendChild(chk);
+      }
+      frag.appendChild(item);
+    }
+    grid.appendChild(frag);
+    offset = end;
+    if(offset<total){
+      if('requestIdleCallback' in window) window.requestIdleCallback(renderChunk, {timeout:200});
+      else setTimeout(renderChunk, 16);
+    }
+  }
+  renderChunk();
+}
+
+function pickDone(bid, ci, fi){
+  document.getElementById('framePicker')?.remove();
+  const b=S.batches.find(x=>x.id===bid); if(!b) return;
+  b.cells[ci]=fi; renderCell(b,ci); clearBatchCanvas(b);
+  refreshUsageTags();
+}
+
+function removeCell(bid, ci){
+  const b=S.batches.find(x=>x.id===bid); if(!b) return;
+  b.cells[ci]=null; renderCell(b,ci); clearBatchCanvas(b);
+  refreshUsageTags();
+}
+
+function renderCell(b, ci){
+  const cellEl=document.getElementById('cell-'+b.id+'-'+ci); if(!cellEl) return;
+  const hasImg=b.cells[ci]!==null;
+  const f=hasImg?S.frames[b.cells[ci]]:null;
+  cellEl.className='cell '+(hasImg?'has-img':'');
+  cellEl.innerHTML=hasImg
+    ? '<img src="'+f.dataUrl+'"/>'+
+      '<div class="cell-remove" onclick="removeCell('+b.id+','+ci+');event.stopPropagation();">×</div>'+
+      '<div class="cell-replace-hint">点击替换</div>'
+    : '<div class="cell-ph"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>点击/拖入</span></div>';
+  cellEl.innerHTML+='<div class="cell-num">'+(ci+1)+'</div>';
+  // re-bind ALL cell events (both empty and has-img)
+  cellEl.onclick = e=>{
+    if(e.target.closest('.cell-remove')) return;
+    pickFrame(b, ci);
+  };
+  bindDropEvents(cellEl, b, ci);
+}
+
+function renderAllCells(b){
+  b.cells.forEach((_,ci)=>renderCell(b,ci));
+  clearBatchCanvas(b);
+}
+
+function clearBatchCanvas(b){
+  b.canvas=null;
+  const prev=document.getElementById('prev-'+b.id);
+  if(prev) prev.style.display='none';
+  const dlBtn=document.getElementById('dl-'+b.id);
+  if(dlBtn) dlBtn.disabled=true;
+  const dl2Btn=document.getElementById('dl2-'+b.id);
+  if(dl2Btn) dl2Btn.disabled=true;
+}
+
+function resizeBatch(bid){
+  const b=S.batches.find(x=>x.id===bid); if(!b) return;
+  const nc=parseInt(document.getElementById('gc-'+bid).value)||b.cols;
+  const nr=parseInt(document.getElementById('gr-'+bid).value)||b.rows;
+  b.cols=Math.max(1,Math.min(10,nc)); b.rows=Math.max(1,Math.min(10,nr));
+  b.cells=Array(b.cols*b.rows).fill(null);
+  const grid=document.getElementById('cgrid-'+bid);
+  grid.style.gridTemplateColumns='repeat('+b.cols+',1fr)';
+  grid.style.gridTemplateRows='repeat('+b.rows+',1fr)';
+  grid.innerHTML=Array.from({length:b.cols*b.rows},(_,i)=>cellHTML(b,i)).join('');
+  // rebind
+  grid.querySelectorAll('.cell').forEach(cell=>{
+    const ci=parseInt(cell.dataset.ci);
+    cell.onclick = e=>{ if(e.target.closest('.cell-remove')) return; pickFrame(b,ci); };
+    bindDropEvents(cell, b, ci);
+  });
+  const tagEl=document.querySelector('#batch-'+bid+' .batch-tag');
+  if(tagEl) tagEl.textContent=b.cols+'×'+b.rows;
+  clearBatchCanvas(b);
+  refreshUsageTags();
+  toast('已调整为 '+b.cols+'×'+b.rows+' 拼图');
+}
+
+function removeBatch(bid){
+  const idx=S.batches.findIndex(x=>x.id===bid); if(idx===-1) return;
+  S.batches.splice(idx,1);
+  document.getElementById('batch-'+bid)?.remove();
+  if(S.batches.length===0) document.getElementById('batchEmpty').style.display='flex';
+  updateFillBtn(); refreshUsageTags();
+  toast('已删除批次 #'+bid);
+}
+
+// ===================================================================
+// GENERATE
+// ===================================================================
+async function generateBatch(bid){
+  const b=S.batches.find(x=>x.id===bid); if(!b) return;
+  const filledCells=b.cells.filter(c=>c!==null);
+  if(filledCells.length===0){ toast('请先为格子添加帧图像','err'); return; }
+
+  const genBtn=document.getElementById('gen-'+bid);
+  genBtn.innerHTML='<span class="spin"></span>生成中...'; genBtn.disabled=true;
+  await sleep(20);
+
+  const W=1920, H=1080;
+  const canvas=document.createElement('canvas');
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+  const uniqFilled = [...new Set(filledCells)];
+  await Promise.all(uniqFilled.map(fi=>loadImg(S.frames[fi].dataUrl)));
+
+  // Precise cell dimensions: last col/row gets the remainder pixels
+  for(let r=0;r<b.rows;r++){
+    for(let c=0;c<b.cols;c++){
+      const i=r*b.cols+c;
+      // Recalculate: simpler precise approach
+      const x0 = Math.round(W*c/b.cols);
+      const y0 = Math.round(H*r/b.rows);
+      const x1 = Math.round(W*(c+1)/b.cols);
+      const y1 = Math.round(H*(r+1)/b.rows);
+      const cw = x1-x0, ch = y1-y0;
+
+      const fi=b.cells[i];
+      if(fi!==null){
+        const img=await loadImg(S.frames[fi].dataUrl);
+        if(img){
+          const sc=Math.max(cw/img.width, ch/img.height);
+          const sw=img.width*sc, sh=img.height*sc;
+          const sx=x0+(cw-sw)/2, sy=y0+(ch-sh)/2;
+          ctx.drawImage(img,sx,sy,sw,sh);
+        }
+      } else {
+        ctx.fillStyle='#0a140f'; ctx.fillRect(x0,y0,cw,ch);
+        ctx.strokeStyle='rgba(62,180,137,0.12)';ctx.lineWidth=1;
+        ctx.strokeRect(x0+.5,y0+.5,cw-1,ch-1);
+      }
+      // Inner grid lines (between cells, no outer border)
+      ctx.strokeStyle='rgba(0,0,0,0)'; ctx.lineWidth=0; // no dividers = seamless
+    }
+  }
+
+  // Badge overlay: original pixel 1:1, draw at (0,0)
+  const badgeChk=document.getElementById('badge-'+bid);
+  if(badgeChk&&badgeChk.checked&&S.badgeImg){
+    const bi=S.badgeImg;
+    ctx.drawImage(bi, 0, 0, bi.naturalWidth, bi.naturalHeight);
+  }
+
+  b.canvas=canvas;
+
+  // Show thumbnail preview
+  const prevWrap=document.getElementById('prev-'+bid);
+  const pcanvas=document.getElementById('pcanvas-'+bid);
+  prevWrap.style.display='block';
+  const pw=prevWrap.clientWidth||360;
+  const ph=Math.round(pw*9/16);
+  pcanvas.width=pw; pcanvas.height=ph;
+  pcanvas.getContext('2d').drawImage(canvas,0,0,pw,ph);
+
+  // Enable download buttons
+  const dlBtn=document.getElementById('dl-'+bid);
+  if(dlBtn) dlBtn.disabled=false;
+  const dl2Btn=document.getElementById('dl2-'+bid);
+  if(dl2Btn) dl2Btn.disabled=false;
+
+  genBtn.innerHTML='重新生成'; genBtn.disabled=false;
+
+  // Activate global download
+  checkDlAllBtn();
+  const hasBadge=badgeChk&&badgeChk.checked;
+  toast('批次 #'+bid+' 生成成功！'+(hasBadge?' ✦ 已叠加角标':'')+' — 点击预览图可全屏查看');
+
+  // 生成完成后自动弹出全屏预览，方便查看效果
+  setTimeout(()=>openPreviewModal(b), 300);
+}
+
+function checkDlAllBtn(){
+  const anyCanvas=S.batches.some(b=>b.canvas);
+  const dlAllBtn=document.getElementById('dlAllBtn');
+  if(dlAllBtn) dlAllBtn.disabled=!anyCanvas;
+}
+
+function downloadBatch(bid){
+  const b=S.batches.find(x=>x.id===bid);
+  if(!b||!b.canvas){ toast('请先生成拼图','err'); return; }
+  const a=document.createElement('a');
+  a.href=b.canvas.toDataURL('image/jpeg',0.95);
+  a.download='videoframe_'+b.cols+'x'+b.rows+'_batch'+bid+'_1080p.jpg';
+  a.click();
+  toast('批次 #'+bid+' 已下载 1920×1080');
+}
+
+async function generateAll(){
+  if(S.batches.length===0){ toast('请先添加拼图批次','err'); return; }
+  const btn=document.getElementById('genAllBtn');
+  btn.innerHTML='<span class="spin"></span>生成中...'; btn.disabled=true;
+  let ok=0;
+  for(const b of S.batches){
+    if(b.cells.filter(c=>c!==null).length>0){ await generateBatch(b.id); ok++; }
+  }
+  btn.innerHTML='<svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" fill="none" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg>一键生成全部';
+  btn.disabled=false;
+  if(ok===0) toast('所有批次均无填充图像','err');
+  else toast('一键生成完成，共 '+ok+' 个批次');
+}
+
+function downloadAll(){
+  const ready=S.batches.filter(b=>b.canvas);
+  if(ready.length===0){ toast('请先生成拼图','err'); return; }
+  ready.forEach((b,i)=>{ setTimeout(()=>downloadBatch(b.id), i*300); });
+  toast('正在下载全部 '+ready.length+' 个拼图...');
+}
+
+function loadImg(src){
+  if(S.imgCache.has(src)) return S.imgCache.get(src);
+  const p = new Promise(r=>{
+    const img=new Image(); img.onload=()=>r(img); img.onerror=()=>r(null); img.src=src;
+  });
+  S.imgCache.set(src, p);
+  return p;
+}
+
+// ===================================================================
+// FULL PREVIEW MODAL
+// ===================================================================
+let pmCurrentBatch=null;
+function openPreviewModal(b){
+  if(!b.canvas) return;
+  pmCurrentBatch=b;
+  const modal=document.getElementById('previewModal');
+  const pmCanvas=document.getElementById('pmCanvas');
+  document.getElementById('pmTitle').textContent=b.cols+'×'+b.rows+' 批次 #'+b.id+' 预览';
+  // Scale canvas to fit screen
+  const maxW=window.innerWidth-40;
+  const maxH=window.innerHeight-80;
+  const scale=Math.min(maxW/1920, maxH/1080, 1);
+  pmCanvas.width=Math.round(1920*scale);
+  pmCanvas.height=Math.round(1080*scale);
+  pmCanvas.style.width=pmCanvas.width+'px';
+  pmCanvas.style.height=pmCanvas.height+'px';
+  pmCanvas.getContext('2d').drawImage(b.canvas,0,0,pmCanvas.width,pmCanvas.height);
+  modal.classList.add('open');
+}
+function closePreviewModal(){
+  document.getElementById('previewModal').classList.remove('open');
+  pmCurrentBatch=null;
+}
+document.getElementById('pmClose').addEventListener('click', closePreviewModal);
+document.getElementById('previewModal').addEventListener('click', e=>{
+  if(e.target===document.getElementById('previewModal')) closePreviewModal();
+});
+document.getElementById('pmDlBtn').addEventListener('click', ()=>{
+  if(pmCurrentBatch) downloadBatch(pmCurrentBatch.id);
+});
+
+// ===================================================================
+// THUMB SIZE SLIDER
+// ===================================================================
+(function initThumbSlider(){
+  const slider = document.getElementById('thumbSizeSlider');
+  const label  = document.getElementById('thumbSizeLabel');
+  const grid   = document.getElementById('fGrid');
+  const btnIn  = document.getElementById('thumbZoomIn');
+  const btnOut = document.getElementById('thumbZoomOut');
+  const MIN=60, MAX=320, STEP=10;
+
+  function applySize(v){
+    v=Math.max(MIN,Math.min(MAX,v));
+    slider.value=v; label.textContent=v+'px';
+    grid.style.setProperty('--thumb-size', v+'px');
+    const pct=((v-MIN)/(MAX-MIN)*100).toFixed(1)+'%';
+    slider.style.setProperty('--pct', pct);
+  }
+
+  slider.addEventListener('input', ()=>applySize(parseInt(slider.value)));
+  btnIn.addEventListener('click', ()=>applySize(parseInt(slider.value)+STEP));
+  btnOut.addEventListener('click',()=>applySize(parseInt(slider.value)-STEP));
+
+  grid.addEventListener('wheel', e=>{
+    if(e.ctrlKey||e.metaKey){
+      e.preventDefault();
+      applySize(parseInt(slider.value)+(e.deltaY<0?STEP:-STEP));
+    }
+  },{passive:false});
+
+  applySize(130);
+})();
+
+// ===================================================================
+// LIGHTBOX
+// ===================================================================
+// ===================================================================
+// LIGHTBOX — 重写缩放逻辑：图片以自然尺寸显示，用 CSS transform 缩放平移
+// 彻底解决缩放变形问题
+// ===================================================================
+const LB={
+  idx:0, scale:1, minScale:.05, maxScale:10,
+  // panX/panY：图片中心相对于视口中心的偏移（像素，原始尺寸下）
+  panX:0, panY:0,
+  drag:false, dragStartX:0, dragStartY:0, dragStartPanX:0, dragStartPanY:0,
+  iw:1, ih:1  // 图片自然尺寸
+};
+const lb        =document.getElementById('lb');
+const lbImg     =document.getElementById('lbImg');
+const lbViewport=document.getElementById('lbViewport');
+const lbStrip   =document.getElementById('lbStrip');
+
+function openLightbox(frameIdx){
+  if(S.frames.length===0) return;
+  LB.idx=Math.max(0,Math.min(frameIdx,S.frames.length-1));
+  lb.classList.add('open'); lb.focus();
+  buildStrip(); showFrame(LB.idx,true);
+}
+function closeLightbox(){ lb.classList.remove('open'); lbImg.src=''; }
+function buildStrip(){
+  lbStrip.innerHTML='';
+  const total = S.frames.length;
+  const CHUNK = 180;
+  let offset = 0;
+  function appendChunk(){
+    const end = Math.min(offset + CHUNK, total);
+    const frag = document.createDocumentFragment();
+    for(let i=offset;i<end;i++){
+      const f=S.frames[i];
+      const el=document.createElement('div');
+      el.className='lb-strip-item'+(i===LB.idx?' active':'');
+      el.dataset.fi=i;
+      el.innerHTML='<img src="'+f.dataUrl+'" loading="lazy"/>';
+      el.addEventListener('click',()=>showFrame(i,true));
+      frag.appendChild(el);
+    }
+    lbStrip.appendChild(frag);
+    offset = end;
+    if(offset<total){
+      if('requestIdleCallback' in window) window.requestIdleCallback(appendChunk);
+      else setTimeout(appendChunk, 0);
+    }
+  }
+  appendChunk();
+}
+function showFrame(i,resetZoom){
+  LB.idx=Math.max(0,Math.min(i,S.frames.length-1));
+  const f=S.frames[LB.idx];
+  lbImg.src=f.dataUrl;
+  document.getElementById('lbTitle').textContent='帧 #'+(LB.idx+1);
+  document.getElementById('lbSub').textContent=f.time.toFixed(2)+'s · '+(LB.idx+1)+' / '+S.frames.length;
+  const prevActive = lbStrip.querySelector('.lb-strip-item.active');
+  if(prevActive) prevActive.classList.remove('active');
+  const active = lbStrip.querySelector('.lb-strip-item[data-fi="'+LB.idx+'"]');
+  if(active){
+    active.classList.add('active');
+    active.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'});
+  }
+  document.getElementById('lbPrev').classList.toggle('hidden',LB.idx===0);
+  document.getElementById('lbNext').classList.toggle('hidden',LB.idx===S.frames.length-1);
+  if(resetZoom){
+    const doFit=()=>{ LB.iw=lbImg.naturalWidth||1; LB.ih=lbImg.naturalHeight||1; fitToView(false); };
+    if(lbImg.complete && lbImg.naturalWidth>0) doFit();
+    else lbImg.onload=doFit;
+  } else {
+    applyTransform(false);
+  }
+}
+
+function getViewportMetrics(){
+  const vw = lbViewport.clientWidth || window.innerWidth || 1;
+  const rawH = (lbViewport.clientHeight || window.innerHeight || 1) - 72;
+  const vh = Math.max(1, rawH);
+  return { vw, vh };
+}
+
+// fitToView: 自适应缩放，图片完整显示在视口内
+function fitToView(anim){
+  const { vw, vh } = getViewportMetrics();
+  LB.iw=lbImg.naturalWidth||LB.iw||1;
+  LB.ih=lbImg.naturalHeight||LB.ih||1;
+  LB.scale=Math.min(vw/LB.iw, vh/LB.ih, 1);
+  LB.panX=0; LB.panY=0;  // 居中
+  // 设置图片自然尺寸，让transform-origin:center center正确工作
+  lbImg.style.width=LB.iw+'px';
+  lbImg.style.height=LB.ih+'px';
+  // 将图片定位到视口中心
+  lbImg.style.left=((vw-LB.iw)/2)+'px';
+  lbImg.style.top=((vh-LB.ih)/2)+'px';
+  applyTransform(anim);
+}
+
+// applyTransform: 只负责 scale 和 pan，不改变基础定位
+function applyTransform(anim){
+  if(anim){ lbImg.classList.add('anim'); setTimeout(()=>lbImg.classList.remove('anim'),260); }
+  else lbImg.classList.remove('anim');
+  lbImg.style.transform='translate('+LB.panX+'px,'+LB.panY+'px) scale('+LB.scale+')';
+  document.getElementById('lbZoomVal').textContent=Math.round(LB.scale*100)+'%';
+}
+
+// zoomAt: 以视口坐标 (cx,cy) 为中心缩放
+function zoomAt(cx,cy,factor){
+  const newScale=Math.max(LB.minScale,Math.min(LB.maxScale,LB.scale*factor));
+  if(Math.abs(newScale-LB.scale)<1e-6) return;
+  // 计算图片左上角在视口中的位置
+  const { vw, vh } = getViewportMetrics();
+  const imgLeft=(vw-LB.iw)/2 + LB.panX - LB.iw*(LB.scale-1)/2;
+  const imgTop =(vh-LB.ih)/2 + LB.panY - LB.ih*(LB.scale-1)/2;
+  // 缩放前鼠标相对图片左上角的偏移
+  const mx=cx-imgLeft, my=cy-imgTop;
+  // 新的图片左上角位置（保持鼠标下图片像素不动）
+  const newLeft=cx-mx*(newScale/LB.scale);
+  const newTop =cy-my*(newScale/LB.scale);
+  // 转换回 panX/panY
+  LB.panX=newLeft-(vw-LB.iw)/2-LB.iw*(newScale-1)/2;
+  LB.panY=newTop -(vh-LB.ih)/2-LB.ih*(newScale-1)/2;
+  LB.scale=newScale;
+  applyTransform(false);
+}
+lbViewport.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const rect=lbViewport.getBoundingClientRect();
+  zoomAt(e.clientX-rect.left, e.clientY-rect.top, e.deltaY<0?1.12:1/1.12);
+},{passive:false});
+lbViewport.addEventListener('mousedown',e=>{
+  if(e.button!==0) return;
+  LB.drag=true;
+  LB.dragStartX=e.clientX; LB.dragStartY=e.clientY;
+  LB.dragStartPanX=LB.panX; LB.dragStartPanY=LB.panY;
+  lbViewport.classList.add('grabbing'); e.preventDefault();
+});
+window.addEventListener('mousemove',e=>{
+  if(!LB.drag) return;
+  LB.panX=LB.dragStartPanX+(e.clientX-LB.dragStartX);
+  LB.panY=LB.dragStartPanY+(e.clientY-LB.dragStartY);
+  applyTransform(false);
+});
+window.addEventListener('mouseup',()=>{ LB.drag=false; lbViewport.classList.remove('grabbing'); });
+lbViewport.addEventListener('dblclick',e=>{
+  const rect=lbViewport.getBoundingClientRect();
+  const cx=e.clientX-rect.left, cy=e.clientY-rect.top;
+  LB.scale<1.5 ? zoomAt(cx,cy,2/LB.scale) : fitToView(true);
+});
+// touch
+let lastTouches=null, lastPinchDist=null;
+lbViewport.addEventListener('touchstart',e=>{
+  lastTouches=e.touches;
+  if(e.touches.length===2){
+    const dx=e.touches[0].clientX-e.touches[1].clientX, dy=e.touches[0].clientY-e.touches[1].clientY;
+    lastPinchDist=Math.hypot(dx,dy);
+  } else if(e.touches.length===1){
+    LB.drag=true; LB.dragStartX=e.touches[0].clientX; LB.dragStartY=e.touches[0].clientY;
+    LB.dragStartPanX=LB.panX; LB.dragStartPanY=LB.panY;
+  }
+  e.preventDefault();
+},{passive:false});
+lbViewport.addEventListener('touchmove',e=>{
+  if(e.touches.length===2&&lastPinchDist!==null){
+    const dx=e.touches[0].clientX-e.touches[1].clientX, dy=e.touches[0].clientY-e.touches[1].clientY;
+    const dist=Math.hypot(dx,dy);
+    const rect=lbViewport.getBoundingClientRect();
+    const cx=((e.touches[0].clientX+e.touches[1].clientX)/2)-rect.left;
+    const cy=((e.touches[0].clientY+e.touches[1].clientY)/2)-rect.top;
+    zoomAt(cx,cy,dist/lastPinchDist); lastPinchDist=dist;
+  } else if(e.touches.length===1&&LB.drag){
+    LB.panX=LB.dragStartPanX+(e.touches[0].clientX-LB.dragStartX);
+    LB.panY=LB.dragStartPanY+(e.touches[0].clientY-LB.dragStartY);
+    applyTransform(false);
+  }
+  e.preventDefault();
+},{passive:false});
+lbViewport.addEventListener('touchend',e=>{
+  if(e.touches.length<2) lastPinchDist=null;
+  if(e.touches.length===0) LB.drag=false;
+});
+lb.addEventListener('keydown',e=>{
+  if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A') showFrame(LB.idx-1,true);
+  if(e.key==='ArrowRight'||e.key==='d'||e.key==='D') showFrame(LB.idx+1,true);
+  if(e.key==='Escape') closeLightbox();
+  if(e.key==='+'||e.key==='='){
+    const { vw, vh } = getViewportMetrics();
+    zoomAt(vw/2,vh/2,1.2);
+  }
+  if(e.key==='-'){
+    const { vw, vh } = getViewportMetrics();
+    zoomAt(vw/2,vh/2,1/1.2);
+  }
+  if(e.key==='0'||e.key==='f'||e.key==='F') fitToView(true);
+  if(e.key==='1'){
+    // 100%原始大小，居中
+    LB.scale=1; LB.panX=0; LB.panY=0;
+    lbImg.style.width=LB.iw+'px'; lbImg.style.height=LB.ih+'px';
+    const { vw, vh } = getViewportMetrics();
+    lbImg.style.left=((vw-LB.iw)/2)+'px'; lbImg.style.top=((vh-LB.ih)/2)+'px';
+    applyTransform(true);
+  }
+});
+document.getElementById('lbClose').addEventListener('click', closeLightbox);
+document.getElementById('lbPrev').addEventListener('click',()=>showFrame(LB.idx-1,true));
+document.getElementById('lbNext').addEventListener('click',()=>showFrame(LB.idx+1,true));
+document.getElementById('lbBtnZoomIn').addEventListener('click',()=>{
+  const { vw, vh } = getViewportMetrics();
+  zoomAt(vw/2,vh/2,1.5);
+});
+document.getElementById('lbBtnZoomOut').addEventListener('click',()=>{
+  const { vw, vh } = getViewportMetrics();
+  zoomAt(vw/2,vh/2,1/1.5);
+});
+document.getElementById('lbBtnFit').addEventListener('click',()=>fitToView(true));
+document.getElementById('lbBtnOrig').addEventListener('click',()=>{
+  LB.scale=1; LB.panX=0; LB.panY=0;
+  lbImg.style.width=LB.iw+'px'; lbImg.style.height=LB.ih+'px';
+  const { vw, vh } = getViewportMetrics();
+  lbImg.style.left=((vw-LB.iw)/2)+'px'; lbImg.style.top=((vh-LB.ih)/2)+'px';
+  applyTransform(true);
+});
+document.getElementById('lbBtnDl').addEventListener('click',()=>downloadFrame(LB.idx));
+document.getElementById('lbzIn').addEventListener('click',()=>{
+  const { vw, vh } = getViewportMetrics();
+  zoomAt(vw/2,vh/2,1.3);
+});
+document.getElementById('lbzOut').addEventListener('click',()=>{
+  const { vw, vh } = getViewportMetrics();
+  zoomAt(vw/2,vh/2,1/1.3);
+});
+document.getElementById('lbzReset').addEventListener('click',()=>fitToView(true));
+lb.addEventListener('click',e=>{ if(e.target===lb) closeLightbox(); });
+
+// ===================================================================
+// GLOBAL KEYBOARD SHORTCUTS
+// ===================================================================
+document.addEventListener('keydown', e=>{
+  // 帮助浮层打开时：? 或 Esc 关闭，其余拦截
+  const helpO = document.getElementById('helpOverlay');
+  if(helpO && helpO.classList.contains('open')){
+    if(e.key==='Escape'||e.key==='?') closeHelp();
+    return;
+  }
+  // skip if in input/textarea or lightbox/modal is open
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT') return;
+  // ? 打开帮助（不受其它面板限制）
+  if(e.key==='?'){ e.preventDefault(); openHelp(); return; }
+  if(lb.classList.contains('open')) return;
+  if(document.getElementById('previewModal').classList.contains('open')){
+    if(e.key==='Escape') closePreviewModal();
+    return;
+  }
+  if(document.getElementById('framePicker')) return;
+
+  // 撤销 / 重做
+  if((e.ctrlKey||e.metaKey)&&(e.key==='z'||e.key==='Z')&&!e.shiftKey){ e.preventDefault(); if(typeof undo==='function') undo(); return; }
+  if((e.ctrlKey||e.metaKey)&&((e.key==='y'||e.key==='Y')||((e.key==='z'||e.key==='Z')&&e.shiftKey))){ e.preventDefault(); if(typeof redo==='function') redo(); return; }
+
+  if(e.key==='a'||e.key==='A'){
+    S.selected=S.frames.map((_,i)=>i);
+    renderSel(); updateSelBadge(); updateFillBtn(); updateDlBtns(); updateQuickBar();
+    toast('已全选 '+S.frames.length+' 帧');
+  }
+  if(e.key==='d'||e.key==='D'){
+    S.selected=[]; renderSel(); updateSelBadge(); updateFillBtn(); updateDlBtns(); updateQuickBar();
+  }
+  if(e.key==='1') switchTab(0);
+  if(e.key==='2') switchTab(1);
+  if(e.key==='3') switchTab(2);
+  if(e.key==='r'||e.key==='R') doCapture();
+  if(e.key==='q'||e.key==='Q') runSmartFlow();
+  if(e.key==='g'||e.key==='G') generateAll();
+  if((e.ctrlKey||e.metaKey)&&(e.key==='s'||e.key==='S')){
+    e.preventDefault(); downloadAll();
+  }
+  if(e.key==='Escape'){
+    S.selected=[]; renderSel(); updateSelBadge(); updateFillBtn(); updateDlBtns(); updateQuickBar();
+  }
+});
+
+// ===================================================================
+// INITIAL DEFAULT BATCHES
+// ===================================================================
+addBatch(2,2);
+addBatch(3,3);
+</script>
+</body>
+</html>
