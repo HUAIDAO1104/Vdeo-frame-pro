@@ -154,6 +154,15 @@
       <!-- ── Tab 0: 导入 & 截帧 ── -->
       <div class="tab-pane active" id="tabPane0">
 
+        <!-- 项目（多视频）切换栏 -->
+        <div class="card" id="projectsCard" style="display:none;">
+          <div class="ct"><div class="ctd"></div>视频项目
+            <span class="proj-count" id="projCount"></span>
+          </div>
+          <div class="proj-tabs" id="projTabs"></div>
+          <div class="proj-hint">每个视频是独立项目，帧、挑选与拼图互不干扰</div>
+        </div>
+
         <!-- Upload -->
         <div class="card">
           <div class="ct"><div class="ctd"></div>视频导入</div>
@@ -183,7 +192,39 @@
         <!-- Capture Settings -->
         <div class="card">
           <div class="ct"><div class="ctd"></div>截帧参数</div>
-          <div class="crow"><span class="clabel">截取间隔（秒）</span><input type="number" id="itvl" class="cinput" value="1" min="0.1" max="60" step="0.1"/></div>
+
+          <!-- 截帧模式切换 -->
+          <div class="mode-switch" id="capModeSwitch">
+            <button class="mode-opt active" data-mode="interval" onclick="setCaptureMode('interval')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              固定间隔
+            </button>
+            <button class="mode-opt" data-mode="scene" onclick="setCaptureMode('scene')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h4l2-7 4 14 2-7h6"/></svg>
+              场景检测
+            </button>
+          </div>
+
+          <!-- 间隔模式参数 -->
+          <div id="intervalParams">
+            <div class="crow"><span class="clabel">截取间隔（秒）</span><input type="number" id="itvl" class="cinput" value="1" min="0.1" max="60" step="0.1"/></div>
+          </div>
+
+          <!-- 场景检测模式参数 -->
+          <div id="sceneParams" style="display:none;">
+            <div class="crow" style="margin-bottom:6px;"><span class="clabel">检测灵敏度</span>
+              <span id="sceneSensLabel" style="font-size:var(--fs-sm);font-weight:700;color:var(--accent);">中</span>
+            </div>
+            <input type="range" id="sceneSens" min="10" max="60" value="30" step="5"
+              style="width:100%;height:4px;appearance:none;-webkit-appearance:none;margin:2px 0 8px;
+                     background:linear-gradient(to right,var(--accent) 0%,var(--accent) 40%,var(--card3) 40%);
+                     border-radius:2px;cursor:pointer;outline:none;" oninput="updateSceneSensLabel()"/>
+            <div style="font-size:var(--fs-2xs);color:var(--tm);line-height:1.6;margin-bottom:4px;">
+              检测相邻画面的像素差异，仅在<b style="color:var(--ts)">镜头/场景切换</b>时抓帧。灵敏度越高，抓取的帧越多。
+            </div>
+            <div class="crow" style="margin-bottom:0;"><span class="clabel">最小帧间隔（秒）</span><input type="number" id="sceneMinGap" class="cinput" value="0.5" min="0.1" max="10" step="0.1"/></div>
+          </div>
+
           <div class="crow"><span class="clabel">开始时间（秒）</span><input type="number" id="stt" class="cinput" value="0" min="0" step="0.1"/></div>
           <div class="crow"><span class="clabel">结束时间（秒）</span><input type="number" id="edt" class="cinput" placeholder="末尾"/></div>
           <div class="crow" style="margin-bottom:0"><span class="clabel">最多截取帧数</span><input type="number" id="mxf" class="cinput" value="10000" min="1" max="99999"/></div>
@@ -603,6 +644,9 @@
         <button class="btn-global" onclick="downloadAll()" id="dlAllBtn" disabled>
           <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>一键下载全部
         </button>
+        <button class="btn-global" onclick="openExportOptions()" id="expOptBtn" title="导出格式 / 质量 / 分辨率">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>导出选项
+        </button>
       </div>
       <div class="batch-list" id="batchList">
         <div class="empty" id="batchEmpty">
@@ -778,8 +822,194 @@ const S = {
   dragFrameIdx: null,
   aiScores: [],     // per-frame ai scores (populated on demand)
   imgCache: new Map(),
+  captureMode: 'interval', // 'interval' | 'scene'
 };
 let batchIdCnt = 0;
+
+// ===================================================================
+// 多视频项目管理（每个视频 = 独立项目，互不干扰）
+// ===================================================================
+const PROJECTS = { list: [], activeId: null, idCnt: 0 };
+
+// 把当前全局 S + UI 状态打包进活动项目
+function saveActiveProject(){
+  const p = PROJECTS.list.find(x=>x.id===PROJECTS.activeId);
+  if(!p) return;
+  p.frames     = S.frames;
+  p.selected   = S.selected;
+  p.batches    = S.batches;
+  p.aiScores   = S.aiScores;
+  p.imgCache   = S.imgCache;
+  p.captureMode= S.captureMode;
+  p.batchIdCnt = batchIdCnt;
+  // 视频源信息（用于切换时恢复预览）
+  p.videoUrl   = vPrev.src || p.videoUrl;
+}
+
+// 从项目载回到全局 S 并整体重渲染
+function restoreProject(p){
+  S.frames     = p.frames     || [];
+  S.selected   = p.selected   || [];
+  S.batches    = p.batches    || [];
+  S.aiScores   = p.aiScores   || [];
+  S.imgCache   = p.imgCache   || new Map();
+  S.captureMode= p.captureMode|| 'interval';
+  batchIdCnt   = p.batchIdCnt || 0;
+  // 历史栈按项目隔离 → 切换即清空
+  if(typeof HISTORY!=='undefined'){ HISTORY.stack.length=0; HISTORY.future.length=0; if(typeof updateUndoRedoUI==='function') updateUndoRedoUI(); }
+
+  // 视频预览
+  if(p.videoUrl){
+    vPrev.src = p.videoUrl;
+    document.getElementById('vCon').style.display='block';
+    document.getElementById('iSz').textContent  = p.fileSize||'—';
+    document.getElementById('iFmt').textContent = p.fileFmt||'—';
+    vPrev.onloadedmetadata = ()=>{
+      document.getElementById('iDur').textContent = fmtT(vPrev.duration);
+      document.getElementById('iRes').textContent = vPrev.videoWidth+'×'+vPrev.videoHeight;
+      document.getElementById('edt').placeholder  = Math.floor(vPrev.duration)+'s';
+      document.getElementById('capBtn').disabled  = false;
+      document.getElementById('superBtn').disabled= false;
+    };
+  }
+  // 截帧模式 UI
+  if(typeof setCaptureMode==='function') setCaptureMode(S.captureMode);
+
+  // 重建帧墙
+  renderAllFrames();
+  // 重建批次
+  renderAllBatches();
+  // 刷新各类状态
+  updateSelBadge(); updateFillBtn(); updateDlBtns(); updateAiBtns();
+  document.getElementById('totalN').textContent = S.frames.length;
+  renderSel();
+  if(S.aiScores && S.aiScores.length) renderFrameScores();
+  refreshUsageTags();
+  updateQuickBar();
+}
+
+// 整体重建帧缩略图墙
+function renderAllFrames(){
+  const fGrid=document.getElementById('fGrid'); if(!fGrid) return;
+  fGrid.innerHTML='';
+  if(S.frames.length===0){
+    fGrid.innerHTML='<div class="empty"><svg viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 20M6 8h.01" stroke-width="1.5"/></svg><p>上传视频并点击截取后<br/>帧缩略图将显示于此</p></div>';
+    return;
+  }
+  const frag=document.createDocumentFragment();
+  for(let i=0;i<S.frames.length;i++) addThumb(i, frag);
+  fGrid.appendChild(frag);
+}
+
+// 整体重建所有批次面板
+function renderAllBatches(){
+  const list=document.getElementById('batchList');
+  if(list) list.innerHTML='';
+  const emptyEl=document.getElementById('batchEmpty');
+  if(S.batches.length===0){
+    if(emptyEl) emptyEl.style.display='flex';
+    return;
+  }
+  if(emptyEl) emptyEl.style.display='none';
+  S.batches.forEach(b=>{
+    renderBatch(b);
+    // 恢复每格图像 + 裁剪
+    b.cells.forEach((_,ci)=>renderCell(b,ci));
+  });
+  checkDlAllBtn();
+}
+
+// 新建项目（载入新视频时调用）
+function createProject(file){
+  const id=++PROJECTS.idCnt;
+  const name=file.name.replace(/\.[^.]+$/,'').slice(0,24) || ('视频'+id);
+  const p={
+    id, name, fileName:file.name,
+    fileSize: fmtSz(file.size), fileFmt: file.name.split('.').pop().toUpperCase(),
+    videoUrl: URL.createObjectURL(file),
+    frames:[], selected:[], batches:[], aiScores:[], imgCache:new Map(),
+    captureMode:'interval', batchIdCnt:0,
+  };
+  PROJECTS.list.push(p);
+  return p;
+}
+
+// 切换到指定项目
+function switchProject(id){
+  if(id===PROJECTS.activeId) return;
+  saveActiveProject();
+  const p=PROJECTS.list.find(x=>x.id===id);
+  if(!p) return;
+  PROJECTS.activeId=id;
+  restoreProject(p);
+  renderProjectTabs();
+  toast('已切换到项目：'+p.name);
+}
+
+// 删除项目
+function deleteProject(id){
+  const idx=PROJECTS.list.findIndex(x=>x.id===id); if(idx===-1) return;
+  const p=PROJECTS.list[idx];
+  if(!confirm('删除项目「'+p.name+'」？该视频的帧与拼图将一并移除。')) return;
+  if(p.videoUrl){ try{ URL.revokeObjectURL(p.videoUrl); }catch(e){} }
+  const wasActive = (id===PROJECTS.activeId);
+  PROJECTS.list.splice(idx,1);
+  if(PROJECTS.list.length===0){
+    // 全部删除 → 清空界面
+    PROJECTS.activeId=null;
+    S.frames=[];S.selected=[];S.batches=[];S.aiScores=[];S.imgCache=new Map();batchIdCnt=0;
+    vPrev.removeAttribute('src'); vPrev.load();
+    document.getElementById('vCon').style.display='none';
+    document.getElementById('capBtn').disabled=true;
+    document.getElementById('superBtn').disabled=true;
+    renderAllFrames(); renderAllBatches();
+    updateSelBadge(); updateDlBtns(); updateAiBtns();
+    document.getElementById('totalN').textContent='0';
+    renderProjectTabs();
+    toast('已删除全部项目');
+    return;
+  }
+  if(wasActive){
+    const np=PROJECTS.list[Math.max(0,idx-1)];
+    PROJECTS.activeId=np.id;
+    restoreProject(np);
+  }
+  renderProjectTabs();
+  toast('已删除项目');
+}
+
+// 重命名项目
+function renameProject(id){
+  const p=PROJECTS.list.find(x=>x.id===id); if(!p) return;
+  const nv=prompt('项目名称', p.name);
+  if(nv && nv.trim()){ p.name=nv.trim().slice(0,24); renderProjectTabs(); }
+}
+
+// 渲染项目标签栏
+function renderProjectTabs(){
+  const card=document.getElementById('projectsCard');
+  const tabs=document.getElementById('projTabs');
+  const cnt =document.getElementById('projCount');
+  if(!tabs) return;
+  // 单个项目时也显示（便于命名），0 个时隐藏
+  if(PROJECTS.list.length===0){ card.style.display='none'; return; }
+  card.style.display='';
+  cnt.textContent='（'+PROJECTS.list.length+'）';
+  tabs.innerHTML = PROJECTS.list.map(p=>{
+    const active=p.id===PROJECTS.activeId;
+    // 活动项目读取实时 S 计数，非活动读取已保存快照
+    const fc=active ? S.frames.length  : (p.frames?p.frames.length:0);
+    const bc=active ? S.batches.length : (p.batches?p.batches.length:0);
+    return '<div class="proj-tab'+(active?' active':'')+'" onclick="switchProject('+p.id+')" ondblclick="renameProject('+p.id+')" title="双击重命名">'+
+      '<div class="proj-tab-main">'+
+        '<div class="proj-tab-name">'+escapeHtml(p.name)+'</div>'+
+        '<div class="proj-tab-meta">'+fc+' 帧 · '+bc+' 拼图</div>'+
+      '</div>'+
+      '<div class="proj-tab-del" onclick="event.stopPropagation();deleteProject('+p.id+')" title="删除项目">×</div>'+
+    '</div>';
+  }).join('');
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 // ===================================================================
 // BADGE
@@ -826,19 +1056,44 @@ vInput.addEventListener('change', e=>{ if(e.target.files[0]) loadVideo(e.target.
 
 const vPrev = document.getElementById('vPrev');
 function loadVideo(file){
-  const url = URL.createObjectURL(file);
-  vPrev.src = url;
+  // 判断：当前活动项目是否为空（无帧无拼图）→ 复用，否则新建独立项目
+  const cur = PROJECTS.list.find(x=>x.id===PROJECTS.activeId);
+  const curEmpty = cur && (!cur.frames || cur.frames.length===0) && (!cur.batches || cur.batches.length===0)
+                   && (!S.frames || S.frames.length===0) && (!S.batches || S.batches.length===0);
+  let p;
+  if(curEmpty){
+    // 复用当前空项目，仅替换视频
+    if(cur.videoUrl){ try{ URL.revokeObjectURL(cur.videoUrl); }catch(e){} }
+    cur.fileName=file.name; cur.fileSize=fmtSz(file.size); cur.fileFmt=file.name.split('.').pop().toUpperCase();
+    cur.videoUrl=URL.createObjectURL(file);
+    cur.name=file.name.replace(/\.[^.]+$/,'').slice(0,24)||cur.name;
+    p=cur;
+  } else {
+    // 保存当前 → 新建项目
+    saveActiveProject();
+    p=createProject(file);
+    PROJECTS.activeId=p.id;
+    // 重置全局状态为新项目空白
+    S.frames=[];S.selected=[];S.batches=[];S.aiScores=[];S.imgCache=new Map();S.captureMode='interval';batchIdCnt=0;
+    if(typeof HISTORY!=='undefined'){HISTORY.stack.length=0;HISTORY.future.length=0;if(typeof updateUndoRedoUI==='function')updateUndoRedoUI();}
+    renderAllFrames(); renderAllBatches();
+    updateSelBadge(); updateDlBtns(); updateAiBtns();
+    document.getElementById('totalN').textContent='0';
+  }
+
+  vPrev.src = p.videoUrl;
   document.getElementById('vCon').style.display = 'block';
-  document.getElementById('iSz').textContent  = fmtSz(file.size);
-  document.getElementById('iFmt').textContent = file.name.split('.').pop().toUpperCase();
+  document.getElementById('iSz').textContent  = p.fileSize;
+  document.getElementById('iFmt').textContent = p.fileFmt;
   vPrev.onloadedmetadata = ()=>{
     document.getElementById('iDur').textContent = fmtT(vPrev.duration);
     document.getElementById('iRes').textContent = vPrev.videoWidth+'×'+vPrev.videoHeight;
     document.getElementById('edt').placeholder  = Math.floor(vPrev.duration)+'s';
     document.getElementById('capBtn').disabled  = false;
     document.getElementById('superBtn').disabled = false;
-    toast('视频加载成功，可开始截帧');
+    toast('视频「'+p.name+'」加载成功，可开始截帧');
   };
+  renderProjectTabs();
 }
 function fmtSz(b){ return b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB'; }
 function fmtT(s){ return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'); }
@@ -847,11 +1102,31 @@ function fmtT(s){ return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(
 // CAPTURE
 // ===================================================================
 document.getElementById('capBtn').addEventListener('click', doCapture);
+// ── 截帧模式切换 ──
+function setCaptureMode(mode){
+  S.captureMode = mode;
+  document.querySelectorAll('#capModeSwitch .mode-opt').forEach(b=>{
+    b.classList.toggle('active', b.dataset.mode===mode);
+  });
+  document.getElementById('intervalParams').style.display = mode==='interval' ? '' : 'none';
+  document.getElementById('sceneParams').style.display    = mode==='scene'    ? '' : 'none';
+}
+function updateSceneSensLabel(){
+  const v = parseInt(document.getElementById('sceneSens').value);
+  const lbl = document.getElementById('sceneSensLabel');
+  const sl = document.getElementById('sceneSens');
+  // 滑块填充比例
+  const pct = (v-10)/(60-10)*100;
+  sl.style.background = 'linear-gradient(to right,var(--accent) 0%,var(--accent) '+pct+'%,var(--card3) '+pct+'%)';
+  lbl.textContent = v<=20 ? '低（仅大切换）' : v<=35 ? '中' : v<=50 ? '高' : '极高（细微变化）';
+}
+
 async function doCapture(){
   if(!Number.isFinite(vPrev.duration) || vPrev.duration<=0){
     toast('请先上传并加载视频','err');
     return;
   }
+  if(S.captureMode==='scene'){ return doCaptureScene(); }
   const iv  = parseFloat(document.getElementById('itvl').value)||1;
   const st  = parseFloat(document.getElementById('stt').value)||0;
   const edv = document.getElementById('edt').value;
@@ -946,6 +1221,116 @@ async function doCapture(){
     setTimeout(()=>switchTab(1), 800);
   }
 }
+
+// ── 场景变化检测截帧 ──
+// 以细粒度探测间隔扫描视频，计算相邻探测帧的像素差异，仅在差异超过阈值时保留为关键帧
+async function doCaptureScene(){
+  const st  = parseFloat(document.getElementById('stt').value)||0;
+  const edv = document.getElementById('edt').value;
+  const ed  = edv ? parseFloat(edv) : vPrev.duration;
+  const mx  = parseInt(document.getElementById('mxf').value)||10000;
+  const sens = parseInt(document.getElementById('sceneSens').value)||30; // 10~60
+  const minGap = parseFloat(document.getElementById('sceneMinGap').value)||0.5;
+  if(st>=ed){ toast('参数有误','err'); return; }
+
+  // 灵敏度 → 差异阈值：灵敏度越高阈值越低（更容易触发抓帧）
+  // sens 10→阈值0.18(大切换)  60→阈值0.03(细微)
+  const diffThreshold = 0.18 - (sens-10)/50*0.15;
+  // 探测间隔：在时间轴上以较密的步长扫描
+  const probeStep = Math.max(0.2, Math.min(1, minGap/2));
+
+  S.frames=[]; S.selected=[]; S.aiScores=[]; S.imgCache = new Map();
+  updateSelBadge(); updateDlBtns();
+  const fGrid=document.getElementById('fGrid');
+  fGrid.innerHTML='';
+  document.getElementById('totalN').textContent='0';
+
+  const prog = document.getElementById('prog'); prog.style.display='block';
+  const pFill = document.getElementById('pFill');
+  const pLbl  = document.getElementById('pLbl');
+  const pNum  = document.getElementById('pNum');
+  const capBtn = document.getElementById('capBtn');
+  capBtn.disabled=true; capBtn.innerHTML='<span class="spin"></span>场景分析中...';
+
+  const cc = document.createElement('canvas');
+  const cx = cc.getContext('2d');
+  // 低分辨率差异比较画布（16:9 缩略）
+  const dc = document.createElement('canvas'); dc.width=32; dc.height=18;
+  const dcx = dc.getContext('2d');
+
+  document.querySelector('#fGrid .empty')?.remove();
+  let frag = document.createDocumentFragment();
+  let queued = 0, captured = 0, failed = 0;
+  let prevData = null, lastKeptTime = -999;
+  const probeTimes=[];
+  for(let t=st; t<=ed; t=Math.round((t+probeStep)*1000)/1000) probeTimes.push(t);
+  const startTs = performance.now();
+
+  for(let i=0;i<probeTimes.length && captured<mx;i++){
+    const t=probeTimes[i];
+    if(i%2===0 || i===probeTimes.length-1){
+      const pct=Math.round(i/probeTimes.length*100);
+      pFill.style.width=pct+'%'; pNum.textContent=pct+'%';
+      let etaTxt='';
+      if(i>=3){
+        const elapsed=(performance.now()-startTs)/1000;
+        const remain=(elapsed/i)*(probeTimes.length-i);
+        etaTxt=' · 剩余约 '+fmtETA(remain);
+      }
+      pLbl.textContent='扫描 '+(i+1)+'/'+probeTimes.length+' · 已捕获 '+captured+' 关键帧'+etaTxt;
+    }
+    try{
+      const du = await seekCap(vPrev,cc,cx,t);
+      // 计算与上一探测帧的差异
+      const img = await loadImg(du);
+      dcx.drawImage(img,0,0,32,18);
+      const cur = dcx.getImageData(0,0,32,18).data;
+      let isKey=false;
+      if(prevData===null){
+        isKey=true; // 第一帧必留
+      }else{
+        let d=0;
+        for(let k=0;k<cur.length;k+=4){
+          d+=Math.abs(cur[k]-prevData[k])+Math.abs(cur[k+1]-prevData[k+1])+Math.abs(cur[k+2]-prevData[k+2]);
+        }
+        const diff=d/(32*18*3*255);
+        if(diff>=diffThreshold && (t-lastKeptTime)>=minGap) isKey=true;
+      }
+      prevData=cur;
+      if(isKey){
+        lastKeptTime=t;
+        S.frames.push({dataUrl:du, time:t, idx:S.frames.length});
+        addThumb(S.frames.length-1, frag);
+        queued++; captured++;
+        if(queued>=8){
+          fGrid.appendChild(frag); frag=document.createDocumentFragment(); queued=0;
+          document.getElementById('totalN').textContent=S.frames.length;
+        }
+      }
+    }catch(e){ failed++; console.warn('场景扫描失败 @'+t.toFixed(2)+'s:', e.message); }
+    if(i%4===0) await sleep(0);
+  }
+  if(queued>0){ fGrid.appendChild(frag); document.getElementById('totalN').textContent=S.frames.length; }
+
+  pFill.style.width='100%'; pNum.textContent='100%';
+  const elapsedTotal=((performance.now()-startTs)/1000).toFixed(1);
+  if(captured===0){
+    pLbl.textContent='未检测到场景变化';
+    toast('未检测到明显场景切换，可调高灵敏度或改用固定间隔模式','err');
+    setTimeout(()=>{ prog.style.display='none'; },1800);
+    capBtn.disabled=false; capBtn.innerHTML='截取视频帧';
+    return;
+  }
+  pLbl.textContent='场景检测完成：'+captured+' 关键帧 · 用时 '+elapsedTotal+'s';
+  toast('场景检测完成：从 '+probeTimes.length+' 个采样点中捕获 '+captured+' 个关键帧');
+  setTimeout(()=>{ prog.style.display='none'; },1800);
+  capBtn.disabled=false; capBtn.innerHTML='截取视频帧';
+  updateFillBtn(); updateDlBtns(); updateAiBtns();
+  const qb=document.getElementById('quickBar'); if(qb) qb.style.display='';
+  updateQuickBar();
+  if(!S._superFlowRunning){ setTimeout(()=>switchTab(1), 800); }
+}
+
 // ===================================================================
 // TAB 切换
 // ===================================================================
@@ -998,6 +1383,7 @@ function updateQuickBar(){
   const canFill=S.selected.length>0&&S.batches.length>0;
   if(qFill){ qFill.style.display=canFill?'':'none'; }
   if(qLayout){ qLayout.style.display=canFill?'':'none'; }
+  if(typeof renderProjectTabs==='function') renderProjectTabs();
 }
 
 async function runSmartFlow(){
@@ -1829,7 +2215,8 @@ function addThumb(i, parent){
     '<div class="fzoom" title="放大查看"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/></svg></div>'+
     '<div class="ftime">'+f.time.toFixed(1)+'s</div>'+
     '<div class="fnum">'+(i+1)+'</div>'+
-    '<div class="fused-tag" id="fused-'+i+'"></div>';
+    '<div class="fused-tag" id="fused-'+i+'"></div>'+
+    '<div class="fscore" id="fscore-'+i+'"></div>';
   // 注册懒加载观察
   const img = el.querySelector('img');
   thumbIO.observe(img);
@@ -2001,7 +2388,7 @@ const HISTORY = { stack: [], future: [], max: 50 };
 
 // 抓取当前所有批次 cells 的深拷贝快照
 function snapshotCells(){
-  return S.batches.map(b => ({ id: b.id, cells: b.cells.slice() }));
+  return S.batches.map(b => ({ id: b.id, cells: b.cells.slice(), crops: JSON.parse(JSON.stringify(b.crops||{})) }));
 }
 
 // 在「修改发生前」调用：把当前状态压入历史，清空 redo 栈
@@ -2018,6 +2405,7 @@ function applySnapshot(snap){
     const b = S.batches.find(x => x.id === s.id);
     if(b && b.cells.length === s.cells.length){
       b.cells = s.cells.slice();
+      b.crops = s.crops ? JSON.parse(JSON.stringify(s.crops)) : {};
       renderAllCells(b);
       clearBatchCanvas(b);
     }
@@ -2491,6 +2879,53 @@ async function runVisionPick(N, apiKey, model, hintText){
   return { indices: selected.map(s=>s.frameIdx), mode: 'vision' };
 }
 
+// -------- AI 逐帧评分可视化 --------
+// 在每个帧缩略图上渲染评分条 + 数值徽章。S.aiScores 中每项含 .score(0~1)
+function renderFrameScores(){
+  if(!S.aiScores || !S.aiScores.length) return;
+  // 计算分数范围用于归一化显示（相对排名更直观）
+  const vals = S.aiScores.map(a=>a.score).filter(Number.isFinite);
+  if(!vals.length) return;
+  const mn = Math.min(...vals), mx = Math.max(...vals);
+  const span = (mx - mn) || 1;
+  // 是否 Vision 模式（有 overall/clarity/composition/appeal 字段）
+  const isVision = S.aiScores[0] && S.aiScores[0].overall !== undefined;
+  S.aiScores.forEach(a=>{
+    const slot = document.getElementById('fscore-'+a.frameIdx);
+    if(!slot) return;
+    const norm = (a.score - mn) / span;          // 0~1 相对评分
+    const pct  = Math.round(norm*100);
+    // 颜色按相对分高低渐变：低=琥珀，中=青，高=翠绿
+    let barCls = norm >= 0.66 ? 'fs-hi' : (norm >= 0.33 ? 'fs-mid' : 'fs-lo');
+    // 评分数值：Vision 用 overall(1-10)，本地用归一化百分比
+    let scoreText;
+    if(isVision && Number.isFinite(a.overall)){
+      scoreText = (Math.round(a.overall*10)/10).toFixed(1);
+    } else {
+      scoreText = pct;
+    }
+    // tooltip 明细
+    let detail;
+    if(isVision){
+      detail = '综合 '+(a.overall??'-')+' · 清晰 '+(a.clarity??'-')+' · 构图 '+(a.composition??'-')+' · 吸引 '+(a.appeal??'-');
+    } else {
+      detail = '清晰 '+pf(a.sharpNorm)+' · 亮度 '+pf(a.brightScore)+' · 饱和 '+pf(a.saturation);
+    }
+    slot.title = detail;
+    slot.innerHTML =
+      '<div class="fscore-bar"><div class="fscore-fill '+barCls+'" style="width:'+pct+'%"></div></div>'+
+      '<div class="fscore-val '+barCls+'">'+scoreText+'</div>';
+    slot.classList.add('show');
+    const item = slot.closest('.fitem');
+    if(item) item.classList.add('has-score');
+  });
+}
+function pf(v){ return Number.isFinite(v) ? Math.round(v*100) : '-'; }
+function clearFrameScores(){
+  document.querySelectorAll('.fscore.show').forEach(el=>{ el.classList.remove('show'); el.innerHTML=''; });
+  document.querySelectorAll('.fitem.has-score').forEach(el=>el.classList.remove('has-score'));
+}
+
 // -------- 主入口 --------
 async function runAIPick(autoFill=false){
   if(S.frames.length===0){ toast('请先截取视频帧','err'); return; }
@@ -2540,6 +2975,9 @@ async function runAIPick(autoFill=false){
   // 更新选中状态
   S.selected = result.indices;
   renderSel(); updateSelBadge(); updateFillBtn(); updateDlBtns();
+
+  // 逐帧评分可视化（所有帧显示评分条/徽章）
+  renderFrameScores();
 
   // 标记徽章
   document.querySelectorAll('.ai-top-badge').forEach(el=>el.remove());
@@ -2597,7 +3035,7 @@ function promptCustomBatch(){
 function addBatch(cols,rows){
   const id=++batchIdCnt;
   const total=cols*rows;
-  const batch={id, cols, rows, cells:Array(total).fill(null), hasBadge:(cols===2&&rows===2), canvas:null};
+  const batch={id, cols, rows, cells:Array(total).fill(null), crops:{}, hasBadge:(cols===2&&rows===2), canvas:null};
   S.batches.push(batch);
   document.getElementById('batchEmpty').style.display='none';
   renderBatch(batch);
@@ -2671,6 +3109,7 @@ function cellHTML(b,i){
     (hasImg
       ? '<img src="'+f.dataUrl+'"/>'+
         '<div class="cell-remove" onclick="removeCell('+b.id+','+i+');event.stopPropagation();">\xd7</div>'+
+        '<div class="cell-crop-btn" title="\u8c03\u6574\u88c1\u526a/\u4f4d\u7f6e" onclick="openCropEditor('+b.id+','+i+');event.stopPropagation();"><svg viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14M18 22V8a2 2 0 0 0-2-2H2"/></svg></div>'+
         '<div class="cell-replace-hint">\u70b9\u51fb\u66ff\u6362</div>'
       : '<div class="cell-ph"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>\u70b9\u51fb/\u62d6\u5165</span></div>'
     )+
@@ -2828,8 +3267,166 @@ function removeCell(bid, ci){
   const b=S.batches.find(x=>x.id===bid); if(!b) return;
   if(b.cells[ci]===null) return;
   pushHistory();
-  b.cells[ci]=null; renderCell(b,ci); clearBatchCanvas(b);
+  b.cells[ci]=null;
+  if(b.crops) delete b.crops[ci];   // 清除该格裁剪
+  renderCell(b,ci); clearBatchCanvas(b);
   refreshUsageTags();
+}
+
+// ===================================================================
+// 单元格裁剪编辑（拖动调整位置 + 缩放）
+// crop = { scale:>=1, ox:-1~1, oy:-1~1 } —— ox/oy 为相对可平移范围的归一化偏移
+// ===================================================================
+function getCellCrop(b, ci){
+  if(!b.crops) b.crops={};
+  return b.crops[ci] || null;
+}
+// 将裁剪应用到 DOM <img>（CSS transform 模拟 cover + pan + zoom）
+function applyCellCropStyle(img, b, ci){
+  if(!img) return;
+  const crop=getCellCrop(b, ci);
+  const f=S.frames[b.cells[ci]];
+  if(!crop || !f){
+    img.style.transform='';
+    img.style.objectPosition='center';
+    return;
+  }
+  // cover 基础下，scale 放大，ox/oy 平移（百分比）
+  const panX = crop.ox * 50; // -50%~50%
+  const panY = crop.oy * 50;
+  img.style.transformOrigin='center';
+  img.style.transform='scale('+crop.scale+') translate('+panX+'%,'+panY+'%)';
+}
+
+let _cropCtx=null; // {bid,ci,scale,ox,oy,imgW,imgH,cellAR}
+function openCropEditor(bid, ci){
+  const b=S.batches.find(x=>x.id===bid); if(!b) return;
+  const fi=b.cells[ci]; if(fi===null||fi===undefined) return;
+  const f=S.frames[fi]; if(!f) return;
+  const existing=getCellCrop(b,ci);
+  const cellAR=b.cols && b.rows ? (1920/b.cols)/(1080/b.rows) : 16/9;
+
+  document.getElementById('cropEditor')?.remove();
+  const modal=document.createElement('div');
+  modal.id='cropEditor'; modal.className='crop-modal';
+  modal.innerHTML=
+    '<div class="crop-box">'+
+      '<div class="crop-head">'+
+        '<div class="crop-title">调整裁剪 · 格 #'+(ci+1)+'</div>'+
+        '<button class="crop-close" onclick="closeCropEditor()">×</button>'+
+      '</div>'+
+      '<div class="crop-stage-wrap">'+
+        '<div class="crop-stage" id="cropStage" style="aspect-ratio:'+cellAR+';">'+
+          '<img id="cropImg" src="'+f.dataUrl+'" draggable="false"/>'+
+          '<div class="crop-grid-overlay"></div>'+
+        '</div>'+
+        '<div class="crop-hint">拖动图片调整位置 · 滚轮或滑块缩放</div>'+
+      '</div>'+
+      '<div class="crop-controls">'+
+        '<div class="crop-ctl-row">'+
+          '<span class="crop-ctl-label">缩放</span>'+
+          '<input type="range" id="cropZoom" min="100" max="300" value="100" class="crop-range">'+
+          '<span class="crop-ctl-val" id="cropZoomVal">100%</span>'+
+        '</div>'+
+        '<div class="crop-btns">'+
+          '<button class="btn-sm" onclick="resetCrop()">复位</button>'+
+          '<button class="btn-sm" onclick="closeCropEditor()">取消</button>'+
+          '<button class="btn-sm btn-primary-sm" onclick="saveCrop()">应用</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  document.body.appendChild(modal);
+
+  _cropCtx={ bid, ci, scale:(existing?existing.scale:1), ox:(existing?existing.ox:0), oy:(existing?existing.oy:0), cellAR };
+  const zoom=document.getElementById('cropZoom');
+  zoom.value=Math.round(_cropCtx.scale*100);
+  document.getElementById('cropZoomVal').textContent=Math.round(_cropCtx.scale*100)+'%';
+  updateCropPreview();
+
+  // 缩放滑块
+  zoom.addEventListener('input', ()=>{
+    _cropCtx.scale=parseInt(zoom.value)/100;
+    document.getElementById('cropZoomVal').textContent=zoom.value+'%';
+    clampCropOffset();
+    updateCropPreview();
+  });
+  // 滚轮缩放
+  const stage=document.getElementById('cropStage');
+  stage.addEventListener('wheel', e=>{
+    e.preventDefault();
+    let s=_cropCtx.scale + (e.deltaY<0?0.08:-0.08);
+    s=Math.max(1,Math.min(3,s));
+    _cropCtx.scale=s;
+    zoom.value=Math.round(s*100);
+    document.getElementById('cropZoomVal').textContent=Math.round(s*100)+'%';
+    clampCropOffset();
+    updateCropPreview();
+  },{passive:false});
+  // 拖动平移
+  let dragging=false, lastX=0, lastY=0;
+  const cropImg=document.getElementById('cropImg');
+  const startDrag=(x,y)=>{ dragging=true; lastX=x; lastY=y; cropImg.style.cursor='grabbing'; };
+  const moveDrag=(x,y)=>{
+    if(!dragging) return;
+    const rect=stage.getBoundingClientRect();
+    const dx=(x-lastX)/rect.width;   // 归一化（占舞台宽度）
+    const dy=(y-lastY)/rect.height;
+    lastX=x; lastY=y;
+    // 偏移范围与可平移量相关：scale>1 时才有空间
+    _cropCtx.ox += dx*2; _cropCtx.oy += dy*2;
+    clampCropOffset();
+    updateCropPreview();
+  };
+  const endDrag=()=>{ dragging=false; cropImg.style.cursor='grab'; };
+  stage.addEventListener('mousedown', e=>{ e.preventDefault(); startDrag(e.clientX,e.clientY); });
+  window.addEventListener('mousemove', _cropMove=(e)=>moveDrag(e.clientX,e.clientY));
+  window.addEventListener('mouseup', _cropUp=endDrag);
+  stage.addEventListener('touchstart', e=>{ const t=e.touches[0]; startDrag(t.clientX,t.clientY); },{passive:true});
+  stage.addEventListener('touchmove', e=>{ const t=e.touches[0]; moveDrag(t.clientX,t.clientY); },{passive:true});
+  stage.addEventListener('touchend', endDrag);
+}
+let _cropMove=null, _cropUp=null;
+// 限制偏移使图片不脱离格子边界
+function clampCropOffset(){
+  if(!_cropCtx) return;
+  const room=(_cropCtx.scale-1)/_cropCtx.scale; // 可平移的归一化半径（基于 transform translate %）
+  const max=room; // ox/oy 对应 translate 50% * ox，translate 与 scale 联动
+  _cropCtx.ox=Math.max(-max,Math.min(max,_cropCtx.ox));
+  _cropCtx.oy=Math.max(-max,Math.min(max,_cropCtx.oy));
+}
+function updateCropPreview(){
+  if(!_cropCtx) return;
+  const img=document.getElementById('cropImg'); if(!img) return;
+  const panX=_cropCtx.ox*50, panY=_cropCtx.oy*50;
+  img.style.transform='scale('+_cropCtx.scale+') translate('+panX+'%,'+panY+'%)';
+}
+function resetCrop(){
+  if(!_cropCtx) return;
+  _cropCtx.scale=1; _cropCtx.ox=0; _cropCtx.oy=0;
+  const zoom=document.getElementById('cropZoom');
+  if(zoom){ zoom.value=100; document.getElementById('cropZoomVal').textContent='100%'; }
+  updateCropPreview();
+}
+function saveCrop(){
+  if(!_cropCtx) return;
+  const b=S.batches.find(x=>x.id===_cropCtx.bid); if(!b){ closeCropEditor(); return; }
+  pushHistory();
+  if(!b.crops) b.crops={};
+  if(_cropCtx.scale===1 && _cropCtx.ox===0 && _cropCtx.oy===0){
+    delete b.crops[_cropCtx.ci]; // 默认无裁剪
+  } else {
+    b.crops[_cropCtx.ci]={ scale:_cropCtx.scale, ox:_cropCtx.ox, oy:_cropCtx.oy };
+  }
+  renderCell(b, _cropCtx.ci);
+  clearBatchCanvas(b);
+  closeCropEditor();
+  toast('已应用裁剪，重新生成可查看效果');
+}
+function closeCropEditor(){
+  if(_cropMove) window.removeEventListener('mousemove', _cropMove);
+  if(_cropUp) window.removeEventListener('mouseup', _cropUp);
+  _cropMove=_cropUp=null; _cropCtx=null;
+  document.getElementById('cropEditor')?.remove();
 }
 
 function renderCell(b, ci){
@@ -2840,9 +3437,12 @@ function renderCell(b, ci){
   cellEl.innerHTML=hasImg
     ? '<img src="'+f.dataUrl+'"/>'+
       '<div class="cell-remove" onclick="removeCell('+b.id+','+ci+');event.stopPropagation();">×</div>'+
+      '<div class="cell-crop-btn" title="调整裁剪/位置" onclick="openCropEditor('+b.id+','+ci+');event.stopPropagation();"><svg viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14M18 22V8a2 2 0 0 0-2-2H2"/></svg></div>'+
       '<div class="cell-replace-hint">点击替换</div>'
     : '<div class="cell-ph"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>点击/拖入</span></div>';
   cellEl.innerHTML+='<div class="cell-num">'+(ci+1)+'</div>';
+  // 应用裁剪变换到缩略图
+  if(hasImg) applyCellCropStyle(cellEl.querySelector('img'), b, ci);
   // re-bind ALL cell events (both empty and has-img)
   cellEl.onclick = e=>{
     if(e.target.closest('.cell-remove')) return;
@@ -2933,10 +3533,22 @@ async function generateBatch(bid){
       if(fi!==null){
         const img=await loadImg(S.frames[fi].dataUrl);
         if(img){
-          const sc=Math.max(cw/img.width, ch/img.height);
+          const crop=getCellCrop(b,i);
+          const zoom=crop?crop.scale:1;
+          const sc=Math.max(cw/img.width, ch/img.height)*zoom;
           const sw=img.width*sc, sh=img.height*sc;
-          const sx=x0+(cw-sw)/2, sy=y0+(ch-sh)/2;
-          ctx.drawImage(img,sx,sy,sw,sh);
+          // 居中 + 裁剪平移（panX/panY 与 CSS translate 一致：translate% 基于自身尺寸 * scale）
+          let dx=x0+(cw-sw)/2, dy=y0+(ch-sh)/2;
+          if(crop){
+            // CSS: scale(zoom) translate(ox*50%, oy*50%) → 平移量 = ox*0.5*sw
+            dx += crop.ox*0.5*sw;
+            dy += crop.oy*0.5*sh;
+          }
+          // 裁剪到格子区域，避免溢出到相邻格
+          ctx.save();
+          ctx.beginPath(); ctx.rect(x0,y0,cw,ch); ctx.clip();
+          ctx.drawImage(img,dx,dy,sw,sh);
+          ctx.restore();
         }
       } else {
         ctx.fillStyle='#0a140f'; ctx.fillRect(x0,y0,cw,ch);
@@ -2989,14 +3601,70 @@ function checkDlAllBtn(){
   if(dlAllBtn) dlAllBtn.disabled=!anyCanvas;
 }
 
+// ── 导出选项 ──
+const EXPORT = { format:'jpeg', quality:0.95, scale:1 }; // scale: 0.5 / 1 / 2
+
+function openExportOptions(){
+  document.getElementById('exportModal')?.remove();
+  const m=document.createElement('div'); m.id='exportModal'; m.className='crop-modal';
+  const f=EXPORT.format;
+  m.innerHTML=
+    '<div class="crop-box" style="width:min(440px,94vw);">'+
+      '<div class="crop-head"><div class="crop-title">导出选项</div>'+
+        '<button class="crop-close" onclick="document.getElementById(\'exportModal\').remove()">×</button></div>'+
+      '<div style="padding:18px;">'+
+        '<div class="exp-row"><span class="exp-label">格式</span><div class="exp-seg" id="expFmt">'+
+          '<button data-f="jpeg"'+(f==='jpeg'?' class="active"':'')+'>JPEG</button>'+
+          '<button data-f="png"'+(f==='png'?' class="active"':'')+'>PNG</button>'+
+          '<button data-f="webp"'+(f==='webp'?' class="active"':'')+'>WEBP</button>'+
+        '</div></div>'+
+        '<div class="exp-row" id="expQRow"><span class="exp-label">质量</span>'+
+          '<input type="range" class="exp-range" id="expQ" min="50" max="100" value="'+Math.round(EXPORT.quality*100)+'">'+
+          '<span class="exp-val" id="expQVal">'+Math.round(EXPORT.quality*100)+'%</span></div>'+
+        '<div class="exp-row"><span class="exp-label">分辨率</span><div class="exp-seg" id="expScale">'+
+          '<button data-s="0.5"'+(EXPORT.scale===0.5?' class="active"':'')+'>960p</button>'+
+          '<button data-s="1"'+(EXPORT.scale===1?' class="active"':'')+'>1080p</button>'+
+          '<button data-s="2"'+(EXPORT.scale===2?' class="active"':'')+'>2160p</button>'+
+        '</div></div>'+
+        '<div class="crop-btns" style="margin-top:6px;"><button class="btn-sm btn-primary-sm" onclick="applyExportOptions()">保存设置</button></div>'+
+      '</div>'+
+    '</div>';
+  document.body.appendChild(m);
+  const syncQRow=()=>{ document.getElementById('expQRow').style.display = (EXPORT.format==='png')?'none':'flex'; };
+  syncQRow();
+  m.querySelector('#expFmt').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return;
+    EXPORT.format=b.dataset.f; m.querySelectorAll('#expFmt button').forEach(x=>x.classList.toggle('active',x===b)); syncQRow(); });
+  m.querySelector('#expScale').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return;
+    EXPORT.scale=parseFloat(b.dataset.s); m.querySelectorAll('#expScale button').forEach(x=>x.classList.toggle('active',x===b)); });
+  m.querySelector('#expQ').addEventListener('input',e=>{ EXPORT.quality=parseInt(e.target.value)/100; document.getElementById('expQVal').textContent=e.target.value+'%'; });
+}
+function applyExportOptions(){ document.getElementById('exportModal')?.remove(); toast('导出设置已保存：'+EXPORT.format.toUpperCase()+' · '+(1080*EXPORT.scale)+'p'); }
+
+// 根据 EXPORT 设置把画布转为 dataURL（含分辨率缩放）
+function exportCanvasURL(srcCanvas){
+  const mime = EXPORT.format==='png' ? 'image/png' : (EXPORT.format==='webp' ? 'image/webp' : 'image/jpeg');
+  let canvas = srcCanvas;
+  if(EXPORT.scale!==1){
+    const c=document.createElement('canvas');
+    c.width=Math.round(srcCanvas.width*EXPORT.scale);
+    c.height=Math.round(srcCanvas.height*EXPORT.scale);
+    const cx=c.getContext('2d'); cx.imageSmoothingQuality='high';
+    cx.drawImage(srcCanvas,0,0,c.width,c.height);
+    canvas=c;
+  }
+  return EXPORT.format==='png' ? canvas.toDataURL('image/png') : canvas.toDataURL(mime, EXPORT.quality);
+}
+function exportExt(){ return EXPORT.format==='png'?'png':(EXPORT.format==='webp'?'webp':'jpg'); }
+
 function downloadBatch(bid){
   const b=S.batches.find(x=>x.id===bid);
   if(!b||!b.canvas){ toast('请先生成拼图','err'); return; }
+  const res=Math.round(1080*EXPORT.scale);
   const a=document.createElement('a');
-  a.href=b.canvas.toDataURL('image/jpeg',0.95);
-  a.download='videoframe_'+b.cols+'x'+b.rows+'_batch'+bid+'_1080p.jpg';
+  a.href=exportCanvasURL(b.canvas);
+  a.download='videoframe_'+b.cols+'x'+b.rows+'_batch'+bid+'_'+res+'p.'+exportExt();
   a.click();
-  toast('批次 #'+bid+' 已下载 1920×1080');
+  toast('批次 #'+bid+' 已下载（'+EXPORT.format.toUpperCase()+' '+(res*16/9|0)+'×'+res+'）');
 }
 
 async function generateAll(){
