@@ -19,6 +19,7 @@
 <div id="previewModal">
   <div class="pm-bar">
     <span class="pm-title" id="pmTitle">拼图预览</span>
+    <span id="pmEngineBadge" style="display:none;align-items:center;gap:5px;margin-left:10px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;"></span>
     <div class="pm-actions">
       <span class="pm-hint" id="pmHint" style="font-size:12px;color:rgba(255,255,255,0.7);margin-right:6px;display:inline-flex;align-items:center;gap:5px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4"/></svg>点击任意格子可替换该帧</span>
       <button class="pm-btn" id="pmDlBtn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>下载</button>
@@ -570,6 +571,12 @@
             </button>
           </div>
 
+          <!-- 挑帧引擎状态：持久展示本次用了哪个模型 / 是否降级 / 失败原因 -->
+          <div id="collageEngineCard" style="display:none;margin-top:10px;padding:10px 12px;background:var(--card3);border:1px solid var(--b);border-radius:8px;">
+            <div style="font-size:11px;color:var(--tm);margin-bottom:6px;letter-spacing:1px;">挑帧引擎</div>
+            <div id="collageEngineInfo"></div>
+          </div>
+
           <div class="sep" style="margin:14px 0;"></div>
 
           <!-- 帧操作快捷 -->
@@ -736,6 +743,8 @@
           </button>
           <button class="btn-sm" onclick="document.getElementById('pickResultBar').style.display='none'" style="background:rgba(255,255,255,0.2);color:#fff;border:none;">关闭</button>
         </div>
+        <!-- 挑帧引擎说明：清楚告知用户实际用的是哪个模型 / 是否降级 / 失败原因 -->
+        <div id="pickEngineInfo" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.25);font-size:12px;color:#fff;line-height:1.5;"></div>
       </div>
       <div class="frames-grid" id="fGrid">
         <div class="empty">
@@ -844,6 +853,7 @@ const S = {
   aiScores: [],     // per-frame ai scores (populated on demand)
   imgCache: new Map(),
   captureMode: 'interval', // 'interval' | 'scene'
+  lastPick: null,   // 最近一次挑帧的引擎状态 {engine:'vision'|'local', model, ok, error, count, time}
 };
 let batchIdCnt = 0;
 
@@ -1380,7 +1390,7 @@ function switchTab(idx){
   // 将共享帧墙移动到当前视图的挂载点（视图0/1 显示帧墙）
   relocateFrameWall(idx);
   if(idx===1){ updateAiBtns(); }
-  if(idx===2){ updateSelBadge(); }
+  if(idx===2){ updateSelBadge(); refreshCollageEngineCard(); }
 }
 
 // 把共享帧墙(#sharedFrameWall)移动到目标视图的帧挂载点
@@ -2865,6 +2875,7 @@ async function runVisionPick(N, apiKey, model, hintText){
   for(let i=0; i<compressed.length; i+=BATCH) batches.push(compressed.slice(i, i+BATCH));
 
   const scoreStartTs = performance.now();
+  let okBatches = 0, failBatches = 0, firstErr = null;
   for(let bi=0; bi<batches.length; bi++){
     let etaTxt='';
     if(bi>=1){
@@ -2880,8 +2891,11 @@ async function runVisionPick(N, apiKey, model, hintText){
       const refBad  = bi===0 ? badRefImages  : [];
       const scores = await visionScoreBatch(batches[bi], apiKey, model, hintText, refGood, refBad);
       allScores.push(...scores);
+      okBatches++;
     } catch(batchErr){
-      // on batch failure, fill with neutral scores
+      // 记录失败原因；用中性分数占位，但若全部失败则在末尾抛错触发降级
+      failBatches++;
+      if(!firstErr) firstErr = batchErr;
       console.warn('批次'+(bi+1)+'评分失败:', batchErr.message);
       for(const f of batches[bi]){
         allScores.push({frameIdx:f.frameIdx, clarity:0.5, composition:0.5, appeal:0.5, overall:0.5});
@@ -2890,6 +2904,12 @@ async function runVisionPick(N, apiKey, model, hintText){
     await sleep(80); // rate limit pause
   }
 
+  // 关键：若没有任何一个批次成功，说明 Vision 实际没生效（如 401/余额不足/网络失败），
+  // 抛出真实原因让上层降级到本地算法，避免用伪造的 0.5 分误导用户。
+  if(okBatches === 0){
+    const msg = firstErr && firstErr.message ? firstErr.message : 'Vision API 全部批次调用失败';
+    throw new Error(msg);
+  }
   if(allScores.length === 0) throw new Error('All batches failed. Check API key and balance.');
   setAiProgress(92, '计算多样性...');
 
@@ -2961,11 +2981,102 @@ function clearFrameScores(){
   document.querySelectorAll('.fitem.has-score').forEach(el=>el.classList.remove('has-score'));
 }
 
+// 友好的模型显示名
+function prettyModelName(model){
+  if(!model) return '本地算法';
+  return model;
+}
+
+// 生成「挑帧引擎说明」HTML：清楚告知用户实际用的是哪个模型/是否降级/失败原因
+// variant: 'bar'(引导条,浅底白字) | 'panel'(拼图区,深色卡片)
+function pickEngineHTML(variant){
+  const lp = S.lastPick;
+  if(!lp) return '';
+  const onBar = variant==='bar';
+  const okIcon = '✓';
+  let icon, title, detail, color;
+  if(lp.engine==='vision' && lp.ok){
+    icon='🤖'; color = onBar ? '#fff' : 'var(--accent)';
+    title='本次由 <b>Vision AI 模型</b> 完成挑帧';
+    detail='模型：<b>'+prettyModelName(lp.model)+'</b> · 已生效 '+okIcon;
+  } else if(lp.engine==='local' && lp.noKey){
+    icon='⚙️'; color = onBar ? '#fff' : 'var(--warn,#e0a33e)';
+    title='本次由 <b>本地算法</b> 完成挑帧（未配置 AI 模型）';
+    detail='未填写 API Key，使用本地清晰度/构图算法。填入 Key 后可启用 Vision AI。';
+  } else if(lp.engine==='local' && lp.fallbackFrom){
+    icon='⚠️'; color = onBar ? '#ffe9c2' : 'var(--warn,#e0a33e)';
+    title='Vision AI 调用<b>失败</b>，已自动降级为 <b>本地算法</b>';
+    detail='尝试的模型：<b>'+prettyModelName(lp.model)+'</b><br>失败原因：<b>'+escapeHtmlSafe(lp.visionError||'未知错误')+'</b>';
+  } else if(!lp.ok){
+    icon='❌'; color = onBar ? '#ffd6d6' : 'var(--err,#e05a5a)';
+    title='挑帧<b>失败</b>';
+    detail='原因：<b>'+escapeHtmlSafe(lp.error||'未知错误')+'</b>';
+  } else {
+    return '';
+  }
+  if(onBar){
+    return '<span style="color:'+color+';">'+icon+' '+title+'。'+detail+'</span>';
+  }
+  // 拼图区卡片样式
+  return '<div style="display:flex;gap:8px;align-items:flex-start;">'+
+    '<span style="font-size:16px;line-height:1.2;">'+icon+'</span>'+
+    '<div style="font-size:12px;line-height:1.55;color:var(--ts,#cfe);">'+
+      '<div style="color:'+color+';font-weight:700;margin-bottom:2px;">'+title+'</div>'+
+      '<div style="color:var(--muted,#9ab);">'+detail+'</div>'+
+    '</div></div>';
+}
+
+function escapeHtmlSafe(s){
+  return String(s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+// 预览弹窗顶栏的引擎徽章：{text, bg, color}
+function pickEngineBadge(){
+  const lp=S.lastPick;
+  if(!lp) return null;
+  if(lp.engine==='vision' && lp.ok)
+    return { text:'🤖 Vision AI · '+prettyModelName(lp.model), bg:'rgba(62,180,137,0.22)', color:'#7fe3bd' };
+  if(lp.engine==='local' && lp.noKey)
+    return { text:'⚙️ 本地算法（未配置 AI）', bg:'rgba(224,163,62,0.2)', color:'#f0c477' };
+  if(lp.engine==='local' && lp.fallbackFrom)
+    return { text:'⚠️ AI失败已降级本地算法', bg:'rgba(224,163,62,0.22)', color:'#f0c477' };
+  if(!lp.ok)
+    return { text:'❌ 挑帧失败', bg:'rgba(224,90,90,0.22)', color:'#f5a3a3' };
+  return null;
+}
+function refreshPreviewEngineBadge(){
+  const el=document.getElementById('pmEngineBadge');
+  if(!el) return;
+  const b=pickEngineBadge();
+  if(!b){ el.style.display='none'; return; }
+  el.textContent=b.text;
+  el.style.background=b.bg;
+  el.style.color=b.color;
+  el.style.display='inline-flex';
+  // 失败/降级时给个 tooltip 说明原因
+  const lp=S.lastPick;
+  if(lp && lp.fallbackFrom) el.title='Vision 失败原因：'+(lp.visionError||'未知');
+  else if(lp && !lp.ok) el.title='失败原因：'+(lp.error||'未知');
+  else el.title='';
+}
+
+// 刷新拼图区的「挑帧引擎」状态卡片
+function refreshCollageEngineCard(){
+  const card=document.getElementById('collageEngineCard');
+  const info=document.getElementById('collageEngineInfo');
+  if(!card||!info) return;
+  if(!S.lastPick){ card.style.display='none'; return; }
+  info.innerHTML = pickEngineHTML('panel');
+  card.style.display='block';
+}
+
 // 显示挑帧结果引导条
 function showPickResultBar(n){
   const bar=document.getElementById('pickResultBar');
   if(!bar) return;
   document.getElementById('pickResultN').textContent=n;
+  const info=document.getElementById('pickEngineInfo');
+  if(info){ info.innerHTML = pickEngineHTML('bar'); }
   bar.style.display='block';
 }
 // 进入拼图区：确保有批次 → 填充已选帧 → 切到拼图工作区
@@ -2978,6 +3089,7 @@ function proceedToCollage(){
   }
   // 顺序填充
   doFillAll();
+  refreshCollageEngineCard();
   switchTab(2);
   toast('已进入拼图区，已将选中帧填入批次');
 }
@@ -3013,15 +3125,19 @@ async function runAIPick(autoFill=false){
     // 优先尝试 Vision AI
     try {
       result = await runVisionPick(N, apiKey, model, hint);
+      S.lastPick = { engine:'vision', model, ok:true, error:null, count:result.indices.length, time:Date.now() };
       toast('Vision AI（'+model.split('-').slice(0,3).join('-')+'）挑选出 '+result.indices.length+' 帧');
     } catch(err){
       setAiProgress(-1);
       // 自动降级本地算法
-      toast('⚠️ Vision AI 失败（'+err.message.slice(0,40)+'），已切换本地算法', 'warn');
+      const reason = (err && err.message) ? err.message : '未知错误';
+      toast('⚠️ Vision AI 失败（'+reason.slice(0,40)+'），已切换本地算法', 'warn');
       try {
         result = await runLocalPick(N);
+        S.lastPick = { engine:'local', model, ok:true, error:null, fallbackFrom:'vision', visionError:reason, count:result.indices.length, time:Date.now() };
         toast('本地算法已挑选出 '+result.indices.length+' 帧');
       } catch(e2){
+        S.lastPick = { engine:'local', model, ok:false, error:(e2&&e2.message)||'未知错误', fallbackFrom:'vision', visionError:reason, count:0, time:Date.now() };
         toast('挑帧失败：'+e2.message,'err');
         btn.innerHTML=starSVG+'AI 自动挑帧'; btn.disabled=false; btn2.disabled=false;
         return;
@@ -3031,8 +3147,10 @@ async function runAIPick(autoFill=false){
     // 无 Key → 直接本地算法
     try {
       result = await runLocalPick(N);
+      S.lastPick = { engine:'local', model:null, ok:true, error:null, noKey:true, count:result.indices.length, time:Date.now() };
       toast('本地算法已挑选出 '+result.indices.length+' 帧（填入 API Key 可使用 Vision AI）');
     } catch(e){
+      S.lastPick = { engine:'local', model:null, ok:false, error:(e&&e.message)||'未知错误', noKey:true, count:0, time:Date.now() };
       toast('挑帧失败：'+e.message,'err');
       btn.innerHTML=starSVG+'AI 自动挑帧'; btn.disabled=false; btn2.disabled=false;
       return;
@@ -3093,6 +3211,7 @@ async function runAIPick(autoFill=false){
       });
     });
     refreshUsageTags();
+    refreshCollageEngineCard();
     // 一键流程中不切换（由 runSmartFlow 控制），否则进入拼图区查看
     if(!S._superFlowRunning){ switchTab(2); }
     toast('AI 挑帧完成，已自动填入 '+fi+' 个格子');
@@ -3839,6 +3958,7 @@ function openPreviewModal(b){
   const pmcx=pmCanvas.getContext('2d'); pmcx.imageSmoothingEnabled=true; pmcx.imageSmoothingQuality='high';
   pmcx.drawImage(b.canvas,0,0,pmCanvas.width,pmCanvas.height);
   buildPreviewCellOverlay(b);
+  refreshPreviewEngineBadge();
   modal.classList.add('open');
 }
 // 在预览图上构建可点击格子热区，点击即可替换该格
