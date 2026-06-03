@@ -184,6 +184,18 @@
             <input type="file" id="vInput" accept="video/*" style="display:none"/>
           </div>
           <div id="vCon">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <span style="font-size:var(--fs-sm);color:var(--tm);">当前视频预览</span>
+              <button id="closeVideoBtn" type="button" onclick="closeCurrentVideo()" title="移除当前视频，重新上传"
+                style="display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 11px;border-radius:8px;
+                       background:var(--card3);border:1px solid var(--b);color:var(--tm);font-size:var(--fs-2xs);
+                       cursor:pointer;transition:.15s;"
+                onmouseover="this.style.borderColor='#e06b6b';this.style.color='#e06b6b';"
+                onmouseout="this.style.borderColor='var(--b)';this.style.color='var(--tm)';">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                关闭/更换视频
+              </button>
+            </div>
             <video id="vPrev" controls preload="metadata"></video>
             <div class="vinfo">
               <div class="vi"><div class="vi-l">时长</div><div class="vi-v" id="iDur">—</div></div>
@@ -338,17 +350,17 @@
                      padding:0 12px;font-size:var(--fs-base);color:var(--ts);outline:none;cursor:pointer;
                      -webkit-appearance:none;transition:.2s;"
               onfocus="this.style.borderColor='var(--bs)'" onblur="this.style.borderColor='var(--b)'">
-              <optgroup label="── Qwen 通义千问（阿里 · 推荐）">
+              <optgroup label="── Qwen 通义千问 VL（阿里 · 推荐）">
                 <option value="qwen3-vl-plus" selected>qwen3-vl-plus · 推荐（速度与效果兼顾）</option>
+                <option value="qwen3-vl-plus-2025-12-19">qwen3-vl-plus-1219 · 最新版</option>
+                <option value="qwen3-vl-plus-2025-09-23">qwen3-vl-plus-0923 · 稳定版</option>
                 <option value="qwen3-vl-flash">qwen3-vl-flash · 最快</option>
-                <option value="qwen3-vl-plus-2025-12-19">qwen3-vl-plus-1219 · 新版</option>
-                <option value="qwen3-vl-235b-a22b-instruct">qwen3-vl-235b · 最强开源旗舰</option>
-                <option value="qwen3.5-plus">qwen3.5-plus · 最新多模态</option>
-                <option value="qwen3-vl-32b-instruct">qwen3-vl-32b · 高精度</option>
+                <option value="qwen3-vl-flash-2026-01-22">qwen3-vl-flash-0122 · 最快新版</option>
                 <option value="qwen-vl-max-latest">qwen-vl-max-latest · max最强</option>
                 <option value="qwen-vl-max-2025-04-08">qwen-vl-max-0408 · max稳定</option>
                 <option value="qwen-vl-plus-latest">qwen-vl-plus-latest · plus稳定</option>
-                <option value="qwen2.5-vl-32b-instruct">qwen2.5-vl-32b · 2.5代</option>
+                <option value="qwen-vl-plus-2025-08-15">qwen-vl-plus-0815 · plus新版</option>
+                <option value="qwen2.5-vl-32b-instruct">qwen2.5-vl-32b · 2.5代高精度</option>
                 <option value="qwen-vl-ocr-latest">qwen-vl-ocr · OCR增强</option>
               </optgroup>
               <optgroup label="── Claude（Anthropic）">
@@ -706,6 +718,9 @@
           <div class="sel-badge"><span id="selN">0</span> 已选 / <span id="totalN">0</span></div>
           <button class="btn-sm" id="selAllBtn">全选</button>
           <button class="btn-sm" id="clrSelBtn">清除</button>
+          <button class="btn-sm" id="onlySelBtn" onclick="toggleOnlySelected()" title="只显示 AI/手动选中的帧，隐藏其余">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>只看已选
+          </button>
           <div class="vsep"></div>
           <button class="btn-sm" id="dlSelBtn" style="display:none;border-color:rgba(62,180,137,0.5);color:var(--mint-light);" onclick="downloadSelected()">
             <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>下载已选
@@ -873,6 +888,7 @@ const S = {
   captureMode: 'interval', // 'interval' | 'scene'
   lastPick: null,   // 最近一次挑帧的引擎状态 {engine:'vision'|'local', model, ok, error, count, time}
   aiIntent: 'auto', // 拼图目标意图：'auto'|'cover'(封面四宫格)|'detail'(细节九宫格)
+  onlySelected: false, // 帧墙是否只显示已选中的帧（AI/手动选图结果）
 };
 let batchIdCnt = 0;
 
@@ -960,6 +976,7 @@ function restoreProject(p){
   S.imgCache   = p.imgCache   || new Map();
   S.captureMode= p.captureMode|| 'interval';
   batchIdCnt   = p.batchIdCnt || 0;
+  if(S.onlySelected){ S.onlySelected=false; syncOnlySelBtn(); }  // 切换项目时退出「只看已选」
   // 历史栈按项目隔离 → 切换即清空
   if(typeof HISTORY!=='undefined'){ HISTORY.stack.length=0; HISTORY.future.length=0; if(typeof updateUndoRedoUI==='function') updateUndoRedoUI(); }
 
@@ -1004,6 +1021,7 @@ function renderAllFrames(){
   const frag=document.createDocumentFragment();
   for(let i=0;i<S.frames.length;i++) addThumb(i, frag);
   fGrid.appendChild(frag);
+  renderSel(); // 应用选中态 +「只看已选」过滤
 }
 
 // 整体重建所有批次面板
@@ -1051,16 +1069,49 @@ function switchProject(id){
   toast('已切换到项目：'+p.name);
 }
 
-// 删除项目
+// 删除项目（带确认）
 function deleteProject(id){
+  const p=PROJECTS.list.find(x=>x.id===id); if(!p) return;
+  if(!confirm('删除项目「'+p.name+'」？该视频的帧与拼图将一并移除。')) return;
+  const willEmpty = PROJECTS.list.length===1;
+  deleteProjectNoConfirm(id);
+  toast(willEmpty ? '已删除全部项目' : '已删除项目');
+}
+
+// 关闭/更换当前视频：移除当前活动项目（含其帧/拼图），回到上传态以便重新上传
+function closeCurrentVideo(){
+  if(PROJECTS.activeId==null){
+    // 无项目记录但可能残留预览 → 直接清空预览
+    vPrev.removeAttribute('src'); vPrev.load();
+    document.getElementById('vCon').style.display='none';
+    document.getElementById('capBtn').disabled=true;
+    document.getElementById('superBtn').disabled=true;
+    return;
+  }
+  const p=PROJECTS.list.find(x=>x.id===PROJECTS.activeId);
+  if(!p){ return; }
+  // 判断当前项目是否已有实质内容（帧或已填充拼图）
+  const hasContent = (S.frames&&S.frames.length>0) ||
+    (S.batches&&S.batches.some(b=>b.cells&&b.cells.some(c=>c!==null)));
+  const msg = hasContent
+    ? '关闭并移除当前视频「'+p.name+'」？该视频已截取的帧与拼图将一并清除，可重新上传新视频。'
+    : '关闭当前视频「'+p.name+'」？可重新上传新视频。';
+  if(!confirm(msg)) return;
+  // 复用 deleteProject 的清理逻辑，但跳过它内部的二次确认
+  deleteProjectNoConfirm(PROJECTS.activeId);
+  // 重置文件 input，确保再次选择同一文件也能触发 change
+  try{ vInput.value=''; }catch(_){}
+  toast('已关闭视频，可重新上传');
+}
+
+// 删除项目（无确认版，供 closeCurrentVideo 调用）
+function deleteProjectNoConfirm(id){
   const idx=PROJECTS.list.findIndex(x=>x.id===id); if(idx===-1) return;
   const p=PROJECTS.list[idx];
-  if(!confirm('删除项目「'+p.name+'」？该视频的帧与拼图将一并移除。')) return;
   if(p.videoUrl){ try{ URL.revokeObjectURL(p.videoUrl); }catch(e){} }
   const wasActive = (id===PROJECTS.activeId);
   PROJECTS.list.splice(idx,1);
   if(PROJECTS.list.length===0){
-    // 全部删除 → 清空界面
     PROJECTS.activeId=null;
     S.frames=[];S.selected=[];S.batches=[];S.aiScores=[];S.imgCache=new Map();batchIdCnt=0;
     vPrev.removeAttribute('src'); vPrev.load();
@@ -1071,7 +1122,6 @@ function deleteProject(id){
     updateSelBadge(); updateDlBtns(); updateAiBtns();
     document.getElementById('totalN').textContent='0';
     renderProjectTabs();
-    toast('已删除全部项目');
     return;
   }
   if(wasActive){
@@ -1080,7 +1130,6 @@ function deleteProject(id){
     restoreProject(np);
   }
   renderProjectTabs();
-  toast('已删除项目');
 }
 
 // 重命名项目
@@ -1254,6 +1303,7 @@ async function doCapture(){
   for(let t=st; t<=ed&&times.length<mx; t=Math.round((t+iv)*1000)/1000) times.push(t);
 
   S.frames=[]; S.selected=[]; S.aiScores=[]; S.imgCache = new Map();
+  if(S.onlySelected){ S.onlySelected=false; syncOnlySelBtn(); }  // 重新截帧时退出「只看已选」
   updateSelBadge();
   updateDlBtns();
   const fGrid=document.getElementById('fGrid');
@@ -1356,6 +1406,7 @@ async function doCaptureScene(){
   const probeStep = Math.max(0.2, Math.min(1, minGap/2));
 
   S.frames=[]; S.selected=[]; S.aiScores=[]; S.imgCache = new Map();
+  if(S.onlySelected){ S.onlySelected=false; syncOnlySelBtn(); }  // 重新截帧时退出「只看已选」
   updateSelBadge(); updateDlBtns();
   const fGrid=document.getElementById('fGrid');
   fGrid.innerHTML='';
@@ -2416,8 +2467,41 @@ function toggleSel(i){
 }
 function renderSel(){
   document.querySelectorAll('.fitem').forEach(el=>{
-    el.classList.toggle('selected', S.selected.includes(parseInt(el.dataset.fi)));
+    const sel = S.selected.includes(parseInt(el.dataset.fi));
+    el.classList.toggle('selected', sel);
+    // 「只看已选」模式：隐藏未选中的帧，只展示 AI/手动选图结果
+    if(S.onlySelected){
+      el.style.display = sel ? '' : 'none';
+    } else {
+      el.style.display = '';
+    }
   });
+}
+
+// 同步「只看已选」按钮的视觉状态（高亮/文案）
+function syncOnlySelBtn(){
+  const btn = document.getElementById('onlySelBtn');
+  if(!btn) return;
+  const on = S.onlySelected;
+  const eyeSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+  btn.style.background = on ? 'var(--accent-soft)' : '';
+  btn.style.borderColor = on ? 'var(--bs)' : '';
+  btn.style.color = on ? 'var(--mint-light)' : '';
+  btn.innerHTML = eyeSvg + (on ? '仅显示已选' : '只看已选');
+}
+
+// 切换「只看已选」：帧墙仅显示当前选中的帧（AI 选图结果），方便聚焦查看
+function toggleOnlySelected(){
+  S.onlySelected = !S.onlySelected;
+  syncOnlySelBtn();
+  if(S.onlySelected && S.selected.length===0){
+    toast('当前没有已选中的帧，请先 AI 挑帧或手动选择','warn');
+  } else if(S.onlySelected){
+    toast('已切换为只显示选中的 '+S.selected.length+' 帧');
+  } else {
+    toast('已显示全部帧');
+  }
+  renderSel();
 }
 function updateSelBadge(){
   document.getElementById('selN').textContent=S.selected.length;
