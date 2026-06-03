@@ -3601,19 +3601,21 @@ async function generateBatch(bid){
   genBtn.innerHTML='<span class="spin"></span>生成中...'; genBtn.disabled=true;
   await sleep(20);
 
-  // 依据源帧真实分辨率动态决定画布尺寸，避免被写死成 1920×1080 导致放大模糊。
-  // 单格目标尺寸取本批已填充帧的最大原始分辨率（不缩小源像素），整张画布 = 单格 × 网格。
+  // 画布尺寸：以源帧宽高比为基准，单格目标分辨率取一个合理值（约半个 1080p），
+  // 这样 2×2 拼图正好 ~1920×1080，文件不会过大；格子多时分辨率随之提升但封顶在 4K，
+  // 配合高质量缩放(imageSmoothingQuality=high)保证清晰不糊。
   let srcW=0, srcH=0;
   filledCells.forEach(fi=>{
     const f=S.frames[fi];
     if(f){ srcW=Math.max(srcW, f.w||0); srcH=Math.max(srcH, f.h||0); }
   });
   if(!srcW||!srcH){ srcW=1920; srcH=1080; }
-  // 每个格子保留源帧的完整像素密度
-  let cellW=srcW, cellH=srcH;
+  const ar = srcW/srcH;              // 源帧宽高比
+  let cellH = 540;                   // 单格目标高度（半个 1080p），保证清晰又不过大
+  let cellW = Math.round(cellH*ar);
   let W=cellW*b.cols, H=cellH*b.rows;
-  // 上限保护：最长边超过 8192 时整体等比缩小，防止内存/性能问题
-  const MAXEDGE=8192;
+  // 最长边上限 3840(4K)：超出时整体等比缩小，避免文件过大/内存压力
+  const MAXEDGE=3840;
   const longest=Math.max(W,H);
   if(longest>MAXEDGE){ const k=MAXEDGE/longest; W=Math.round(W*k); H=Math.round(H*k); }
   const canvas=document.createElement('canvas');
