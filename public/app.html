@@ -338,14 +338,17 @@
                      padding:0 12px;font-size:var(--fs-base);color:var(--ts);outline:none;cursor:pointer;
                      -webkit-appearance:none;transition:.2s;"
               onfocus="this.style.borderColor='var(--bs)'" onblur="this.style.borderColor='var(--b)'">
-              <optgroup label="── Qwen VL（阿里）">
+              <optgroup label="── Qwen 通义千问（阿里 · 推荐）">
+                <option value="qwen3-vl-plus" selected>qwen3-vl-plus · 推荐（速度与效果兼顾）</option>
                 <option value="qwen3-vl-flash">qwen3-vl-flash · 最快</option>
-                <option value="qwen3-vl-plus">qwen3-vl-plus · 平衡</option>
                 <option value="qwen3-vl-plus-2025-12-19">qwen3-vl-plus-1219 · 新版</option>
-                <option value="qwen-vl-max-latest">qwen-vl-max-latest · 最强千问</option>
-                <option value="qwen-vl-max-2025-04-08">qwen-vl-max-0408 · 稳定版</option>
+                <option value="qwen3-vl-235b-a22b-instruct">qwen3-vl-235b · 最强开源旗舰</option>
+                <option value="qwen3.5-plus">qwen3.5-plus · 最新多模态</option>
+                <option value="qwen3-vl-32b-instruct">qwen3-vl-32b · 高精度</option>
+                <option value="qwen-vl-max-latest">qwen-vl-max-latest · max最强</option>
+                <option value="qwen-vl-max-2025-04-08">qwen-vl-max-0408 · max稳定</option>
                 <option value="qwen-vl-plus-latest">qwen-vl-plus-latest · plus稳定</option>
-                <option value="qwen2.5-vl-32b-instruct">qwen2.5-vl-32b · 高精度</option>
+                <option value="qwen2.5-vl-32b-instruct">qwen2.5-vl-32b · 2.5代</option>
                 <option value="qwen-vl-ocr-latest">qwen-vl-ocr · OCR增强</option>
               </optgroup>
               <optgroup label="── Claude（Anthropic）">
@@ -358,7 +361,7 @@
                 <option value="claude-opus-4-7">claude-opus-4-7 · 旗舰新版</option>
               </optgroup>
               <optgroup label="── GPT（OpenAI）">
-                <option value="gpt-5.5" selected>gpt-5.5 · 旗舰最强</option>
+                <option value="gpt-5.5">gpt-5.5 · 旗舰最强</option>
                 <option value="gpt-5.5-pro">gpt-5.5-pro · 旗舰Pro</option>
                 <option value="gpt-5.4-mini">gpt-5.4-mini · 轻量快速</option>
                 <option value="gpt-5.4-nano">gpt-5.4-nano · 最便宜</option>
@@ -371,21 +374,18 @@
             </select>
           </div>
 
-          <!-- 拼图目标：决定评分维度/选图标准/排版逻辑 -->
+          <!-- 拼图标准说明：系统按批次类型自动套用不同标准（无需手动选） -->
           <div style="margin-bottom:10px;">
-            <div style="font-size:11px;color:var(--tm);margin-bottom:4px;letter-spacing:1px;">拼图目标（决定挑图标准）</div>
-            <div id="aiIntentSeg" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
-              <button type="button" class="intent-btn active" data-intent="auto" onclick="setAiIntent('auto')"
-                style="height:auto;padding:7px 4px;border-radius:9px;background:var(--accent-soft);border:1px solid var(--bs);color:var(--mint-light);font-size:11px;line-height:1.35;cursor:pointer;transition:.15s;">
-                <b style="font-size:12px;">🎯 自动</b><br><span style="opacity:.85;">按批次智能</span></button>
-              <button type="button" class="intent-btn" data-intent="cover" onclick="setAiIntent('cover')"
-                style="height:auto;padding:7px 4px;border-radius:9px;background:var(--card3);border:1px solid var(--b);color:var(--tm);font-size:11px;line-height:1.35;cursor:pointer;transition:.15s;">
-                <b style="font-size:12px;">🖼 封面四宫格</b><br><span style="opacity:.85;">展现主题·吸睛</span></button>
-              <button type="button" class="intent-btn" data-intent="detail" onclick="setAiIntent('detail')"
-                style="height:auto;padding:7px 4px;border-radius:9px;background:var(--card3);border:1px solid var(--b);color:var(--tm);font-size:11px;line-height:1.35;cursor:pointer;transition:.15s;">
-                <b style="font-size:12px;">🔍 细节九宫格</b><br><span style="opacity:.85;">强化主体·细节</span></button>
+            <div style="font-size:11px;color:var(--tm);margin-bottom:5px;letter-spacing:1px;">挑图标准（按拼图类型自动套用）</div>
+            <div id="aiStandardInfo" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+              <div style="padding:8px 9px;border-radius:9px;background:var(--card3);border:1px solid var(--b);font-size:11px;line-height:1.4;">
+                <b style="font-size:12px;color:var(--mint-light);">🖼 四宫格 = 封面</b><br>
+                <span style="opacity:.85;color:var(--tm);">展现主题、构图美观、吸引点击</span></div>
+              <div style="padding:8px 9px;border-radius:9px;background:var(--card3);border:1px solid var(--b);font-size:11px;line-height:1.4;">
+                <b style="font-size:12px;color:var(--mint-light);">🔍 九宫格 = 细节</b><br>
+                <span style="opacity:.85;color:var(--tm);">强化主体、展示更多细节</span></div>
             </div>
-            <div id="aiIntentHint" style="margin-top:6px;font-size:11px;color:var(--tm);line-height:1.5;"></div>
+            <div id="aiIntentHint" style="margin-top:6px;font-size:11px;color:var(--tm);line-height:1.5;">🎯 自动：四宫格按封面标准、九宫格按细节标准分别挑图排版，整体覆盖全片以代表整个视频。</div>
           </div>
 
           <!-- 推荐数量 + 关键词 同行 -->
@@ -882,28 +882,30 @@ let batchIdCnt = 0;
 const INTENT_PRESETS = {
   cover: {
     label: '封面四宫格',
-    hint: '🖼 目标：4 张图组成吸引点击的封面 —— 优先主题鲜明、视觉冲击强、构图精美的高光画面。',
-    // 评分维度权重（含新维度 theme 主题代表性 / subject 主体突出 / detail 细节量）
-    weights: { appeal:0.30, theme:0.25, composition:0.20, clarity:0.15, subject:0.10, detail:0.0 },
+    hint: '🖼 目标：4 张图组成吸引点击的封面 —— 优先主题鲜明、构图精美、画面美观、视觉冲击强的高光画面。',
+    // 评分维度权重（7 维：清晰 clarity / 构图 composition / 美观 appeal / 主题 theme / 主体 subject / 细节 detail）
+    // 封面强调【构图 + 画面美观度 + 主题】——这是用户重点要求增强的美学维度
+    weights: { appeal:0.26, composition:0.26, theme:0.22, clarity:0.13, subject:0.13, detail:0.0 },
     coverage: 0.35,   // 时间覆盖权重（0~1，越高越强制均匀分布于全片）
-    qualityVsDiversity: 0.70, // 选图时 质量 vs 多样性 的偏向（越高越看重单帧质量）
-    promptGoal: '这些帧将组成一张【4宫格视频封面】，目标是用最少的画面概括视频主题并吸引观众点击。请优先选出：主题表达鲜明、视觉冲击力强、构图精美、有代表性高光时刻的画面。'
+    qualityVsDiversity: 0.72, // 选图时 质量 vs 多样性 的偏向（越高越看重单帧质量）
+    promptGoal: '这些帧将组成一张【4宫格视频封面】，目标是用最少的画面概括视频主题并吸引观众点击。请优先选出：构图精美讲究（主体位置、留白、平衡感、视觉引导线）、画面美观有质感（色彩和谐、光影出色、有美感）、主题表达鲜明、视觉冲击力强、有代表性的高光时刻。构图与画面美观度是本次最重要的评分维度。'
   },
   detail: {
     label: '细节九宫格',
-    hint: '🔍 目标：9 张图强化主体、展示更多细节 —— 优先主体清晰一致、信息丰富、角度/场景互补的画面，并尽量覆盖全片。',
-    weights: { subject:0.28, detail:0.25, clarity:0.22, composition:0.13, appeal:0.07, theme:0.05 },
+    hint: '🔍 目标：9 张图强化主体、展示更多细节 —— 优先主体清晰突出、信息丰富、构图讲究、角度/场景互补，并尽量覆盖全片。',
+    // 细节在强化主体/细节的同时，也兼顾构图与美观（用户要求增强美学维度）
+    weights: { subject:0.26, detail:0.22, composition:0.18, clarity:0.18, appeal:0.11, theme:0.05 },
     coverage: 0.55,   // 九宫格更强调铺陈全片
     qualityVsDiversity: 0.45, // 更看重多样性/互补
-    promptGoal: '这些帧将组成一张【9宫格细节展示图】，目标是强化视频主体并尽可能多地展示不同细节、角度、场景。请优先选出：主体清晰且贯穿一致、画面信息/细节丰富、彼此互补不重复、能覆盖视频不同阶段的画面。'
+    promptGoal: '这些帧将组成一张【9宫格细节展示图】，目标是强化视频主体并尽可能多地展示不同细节、角度、场景。请优先选出：主体清晰突出且贯穿一致、画面信息/细节丰富、构图讲究且具美感、彼此互补不重复、能覆盖视频不同阶段的画面。在保证主体与细节的前提下，请同样重视构图与画面美观度。'
   },
   auto: {
     label: '自动',
-    hint: '🎯 自动：根据你创建的拼图批次智能判断 —— 2×2 走封面策略，3×3 及更大走细节策略。',
-    weights: { appeal:0.22, theme:0.18, composition:0.18, clarity:0.18, subject:0.16, detail:0.08 },
+    hint: '🎯 自动：四宫格按封面标准、九宫格按细节标准分别挑图排版，整体覆盖全片以代表整个视频。',
+    weights: { appeal:0.20, composition:0.20, theme:0.16, clarity:0.16, subject:0.18, detail:0.10 },
     coverage: 0.45,
     qualityVsDiversity: 0.55,
-    promptGoal: '这些帧将组成一张能代表整个视频的多宫格拼图，请综合考虑主题代表性、主体突出、画面质量与多样性。'
+    promptGoal: '这些帧将组成能代表整个视频的多宫格拼图（四宫格作封面、九宫格作细节展示）。请综合考虑构图精美、画面美观、主题代表性、主体突出、清晰度与多样性，其中构图与画面美观度尤为重要。'
   }
 };
 
@@ -921,26 +923,12 @@ function resolveIntent(){
   return { key:it, preset: INTENT_PRESETS[it] || INTENT_PRESETS.auto };
 }
 
+// 系统固定为 auto 模式：四宫格按封面标准、九宫格按细节标准逐批次自动套用。
+// 保留此函数仅用于初始化提示文案（不再有手动切换按钮）。
 function setAiIntent(intent){
-  S.aiIntent = intent;
-  document.querySelectorAll('#aiIntentSeg .intent-btn').forEach(btn=>{
-    const on = btn.dataset.intent === intent;
-    btn.classList.toggle('active', on);
-    btn.style.background = on ? 'var(--accent-soft)' : 'var(--card3)';
-    btn.style.borderColor = on ? 'var(--bs)' : 'var(--b)';
-    btn.style.color = on ? 'var(--mint-light)' : 'var(--tm)';
-  });
+  S.aiIntent = 'auto';
   const hintEl = document.getElementById('aiIntentHint');
-  if(hintEl){
-    const p = INTENT_PRESETS[intent] || INTENT_PRESETS.auto;
-    hintEl.textContent = p.hint;
-  }
-  // 根据意图联动推荐帧数（封面默认更精，细节默认更多）
-  const nEl = document.getElementById('aiN');
-  if(nEl && !nEl._userTouched){
-    if(intent==='cover') nEl.value = 8;
-    else if(intent==='detail') nEl.value = 12;
-  }
+  if(hintEl) hintEl.textContent = INTENT_PRESETS.auto.hint;
 }
 
 // ===================================================================
@@ -2046,16 +2034,22 @@ function doFillAll(){
   // 没有批次则按选中帧数自动创建合适批次
   if(S.batches.length===0){ autoCreateBatchForSelection(S.selected.length); }
   pushHistory();
-  // 意图感知排版：封面强调主角黄金位，细节主体居中+时序环绕
+  // 逐批次按意图排版：有 AI 评分则各批次按自身意图重新挑选（四宫格封面/九宫格细节），
+  // 否则按当前已选帧顺序+批次尺寸推断意图排版。
   let total=0;
+  const hasScores = S.aiScores && S.aiScores.length;
   S.batches.forEach(b=>{
-    placeFramesIntoBatch(b, S.selected);
+    if(hasScores){
+      pickAndPlaceForBatch(b);
+    } else {
+      placeFramesIntoBatch(b, S.selected, batchIntentKey(b));
+    }
     total += Math.min(b.cols*b.rows, S.selected.length);
   });
+  if(hasScores){ renderSel(); updateSelBadge(); updateFillBtn(); updateDlBtns(); }
   clearBatchCanvasAll();
   refreshUsageTags();
-  const it = resolveIntent();
-  toast('已按「'+it.preset.label+'」布局填入 '+total+' 个格子');
+  toast('已按拼图类型自动布局（四宫格封面 / 九宫格细节）填入 '+total+' 个格子');
 }
 
 // ===================================================================
@@ -2117,8 +2111,8 @@ async function aiSmartLayoutLocal(){
     const topN = greedyDiversePick(allScored, total, pixCache);
     // topN 已按质量+多样性排序，topN[0] = 最强的帧
 
-    // 第二步：按拼图意图分配位置（封面=视觉黄金位强调主角；细节=主体居中+时序环绕）
-    placeFramesIntoBatch(b, topN.map(f=>f.frameIdx));
+    // 第二步：按拼图类型分配位置（四宫格封面=视觉黄金位强调主角；九宫格细节=主体居中+时序环绕）
+    placeFramesIntoBatch(b, topN.map(f=>f.frameIdx), batchIntentKey(b));
     filled += Math.min(total, topN.length);
     clearBatchCanvas(b);
   }
@@ -2131,13 +2125,13 @@ async function aiSmartLayoutLocal(){
 //   · 封面(2×2/cover)：最强帧占视觉黄金位(左上)，营造冲击力与主题感；
 //   · 细节(3×3+/detail)：最强主体帧居【正中心 C 位】强化主体，其余按【时间顺序】环绕，形成叙事铺陈；
 //   · auto：按批次尺寸推断（≥9 走细节，否则走封面）。
-function placeFramesIntoBatch(b, framesRanked){
+function placeFramesIntoBatch(b, framesRanked, intentKeyOverride){
   const cols=b.cols, rows=b.rows, total=cols*rows;
   const picks = framesRanked.slice(0, total);
   if(picks.length===0) return;
 
-  // 解析该批次应采用的排版意图
-  let itKey = (S.aiIntent && S.aiIntent!=='auto') ? S.aiIntent : (total>=9 ? 'detail' : 'cover');
+  // 解析该批次应采用的排版意图：优先用传入的 intentKey，否则按批次尺寸推断（四宫格→封面，九宫格→细节）
+  let itKey = intentKeyOverride || (total>=9 ? 'detail' : 'cover');
 
   const setCell=(ci, fi)=>{ b.cells[ci]=fi; renderCell(b, ci); };
 
@@ -2733,8 +2727,8 @@ async function visionScoreBatch(frames, apiKey, model, hintText, goodRefImages=[
     '下面将提供'+validFrames.length+'张候选视频截图（每张前有【候选图N】标记）。\n'+
     '请对每张候选图从以下7个维度打分（0-10整数）：\n'+
     '1. clarity（清晰度/对焦/画面锐利程度）\n'+
-    '2. composition（构图/画面平衡/视觉舒适度）\n'+
-    '3. appeal（视觉吸引力/色彩表现/情绪感染力，越想点击越高）\n'+
+    '2. composition（构图：主体位置、三分法/黄金分割、留白与平衡、视觉引导线、画面层次，构图越讲究越高）\n'+
+    '3. appeal（画面美观度与吸引力：色彩是否和谐、光影质感、整体美感与情绪感染力，越赏心悦目越想点击越高）\n'+
     '4. theme（主题代表性：该画面在多大程度上能代表/概括视频主题，越能一眼看出视频讲什么越高）\n'+
     '5. subject（主体突出度：画面主体是否清晰明确、占据视觉重心，杂乱/空镜得分低）\n'+
     '6. detail（信息与细节量：画面包含的有效信息/细节是否丰富，纯色/模糊/过场画面得分低）\n'+
@@ -2957,6 +2951,8 @@ async function runLocalPick(N, intent){
     qualityVsDiversity: preset.qualityVsDiversity,
     coverage: preset.coverage
   });
+  S.pixCache = pixCache;       // 保存供逐批次按不同意图重新挑选
+  S.scoreEngine = 'local';
 
   // 更新评分标签 → 本地维度
   document.getElementById('sl-sharp').textContent  = '清晰度';
@@ -3097,9 +3093,73 @@ async function runVisionPick(N, apiKey, model, hintText, intent){
     coverage: preset.coverage
   });
   S.aiScores = allScores;
+  S.pixCache = pixCache;          // 保存供逐批次按不同意图重新挑选使用
+  S.scoreEngine = 'vision';
   S.lastIntentKey = intent.key;
   setAiProgress(-1);
   return { indices: selected.map(s=>s.frameIdx), mode: 'vision' };
+}
+
+// ── 逐批次意图挑选：从已评分的全部帧里，按【该批次的意图】重新加权并挑出最合适的一组 ──
+// 让同一次评分结果能同时服务「四宫格(封面)」与「九宫格(细节)」：各取所需、各自最优。
+//   scores: S.aiScores（含 7 维 vision 分 或 本地特征）；count: 需要的帧数；intentKey: 'cover'|'detail'|'auto'
+function selectFramesForIntent(scores, count, pixCache, intentKey){
+  if(!scores || !scores.length) return [];
+  const preset = INTENT_PRESETS[intentKey] || INTENT_PRESETS.auto;
+  const isVision = (S.scoreEngine === 'vision');
+  const iw = preset.weights;
+  const aw = _adaptiveWeights;
+  // 复制一份并按该意图重算 score（不污染原始维度分）
+  const reweighted = scores.map(s=>{
+    let sc;
+    if(isVision){
+      const intentScore =
+        (s.appeal||0)*iw.appeal + (s.theme||0)*iw.theme + (s.composition||0)*iw.composition +
+        (s.clarity||0)*iw.clarity + (s.subject||0)*iw.subject + (s.detail||0)*iw.detail;
+      const personalize = (s.clarity||0)*(aw.clarity-0.2) + (s.composition||0)*(aw.composition-0.15) + (s.appeal||0)*(aw.appeal-0.15);
+      sc = (s.overall||0)*0.30 + intentScore*0.62 + Math.max(-0.1,Math.min(0.1,personalize))*0.08 + 0.5*0.08;
+    } else {
+      // 本地特征近似映射
+      const wClar = (iw.clarity + iw.subject*0.5 + iw.composition*0.5);
+      const wDet  = (iw.detail + iw.subject*0.5);
+      const wApp  = (iw.appeal + iw.theme*0.6);
+      const wSum  = (wClar + wDet + wApp) || 1;
+      const subjectApprox = s.sharpNorm || 0;
+      const detailApprox  = s.detailApprox || Math.sqrt(Math.max(0,s.sharpNorm||0)*Math.max(0,s.saturation||0));
+      const appealApprox  = s.appealApprox || ((s.saturation||0)*0.6 + (s.brightScore||0)*0.4);
+      sc = (subjectApprox*wClar + detailApprox*wDet + appealApprox*wApp) / wSum;
+    }
+    return { ...s, score: sc };
+  });
+  return greedyDiversePick(reweighted, count, pixCache || S.pixCache || {}, {
+    qualityVsDiversity: preset.qualityVsDiversity,
+    coverage: preset.coverage
+  });
+}
+
+// 决定某个批次应使用的意图键：四宫格(≤4)→封面，九宫格及更大(≥9)→细节，其余按尺寸近似
+function batchIntentKey(b){
+  const total = b.cols * b.rows;
+  if(total >= 9) return 'detail';
+  if(total <= 4) return 'cover';
+  return total >= 6 ? 'detail' : 'cover';
+}
+
+// 为单个批次：按其意图从全部评分帧中挑选并排版（四宫格走封面、九宫格走细节）
+function pickAndPlaceForBatch(b){
+  const total = b.cols * b.rows;
+  const intentKey = batchIntentKey(b);
+  let ranked;
+  if(S.aiScores && S.aiScores.length){
+    const sel = selectFramesForIntent(S.aiScores, total, S.pixCache, intentKey);
+    ranked = sel.map(s=>s.frameIdx);
+  } else {
+    // 无评分数据时退回当前已选帧顺序
+    ranked = [...S.selected];
+  }
+  // 确保选中帧并入全局已选集合（用于帧墙高亮）
+  ranked.forEach(fi=>{ if(!S.selected.includes(fi)) S.selected.push(fi); });
+  placeFramesIntoBatch(b, ranked, intentKey);
 }
 
 // -------- AI 逐帧评分可视化 --------
@@ -3378,18 +3438,22 @@ async function runAIPick(autoFill=false){
       autoCreateBatchForSelection(S.selected.length);
     }
     pushHistory();
-    // 意图感知排版：result.indices 已按质量排序，逐批次按意图布局
+    // 逐批次按各自意图挑选+排版：四宫格走封面标准、九宫格走细节标准
     let total=0;
+    const usedIntents = new Set();
     S.batches.forEach(b=>{
-      placeFramesIntoBatch(b, S.selected);
-      total += Math.min(b.cols*b.rows, S.selected.length);
+      pickAndPlaceForBatch(b);
+      usedIntents.add(batchIntentKey(b)==='detail' ? '九宫格→细节' : '四宫格→封面');
+      total += b.cols*b.rows;
       clearBatchCanvas(b);
     });
+    // 重新渲染帧墙选中态（逐批次挑选可能扩充了 S.selected）
+    renderSel(); updateSelBadge(); updateFillBtn(); updateDlBtns();
     refreshUsageTags();
     refreshCollageEngineCard();
     // 一键流程中不切换（由 runSmartFlow 控制），否则进入拼图区查看
     if(!S._superFlowRunning){ switchTab(2); }
-    toast('AI 挑帧完成，已按「'+intent.preset.label+'」布局填入 '+total+' 个格子');
+    toast('AI 挑帧完成：'+[...usedIntents].join('、')+'，共填入 '+total+' 个格子');
   }
 }
 
