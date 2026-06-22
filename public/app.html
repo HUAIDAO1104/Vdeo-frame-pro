@@ -85,9 +85,9 @@
       <svg viewBox="0 0 24 24"><path d="M12 2l2.4 5.2L20 8l-4 4 1 6-5-3-5 3 1-6-4-4 5.6-.8z"/></svg>
       <span class="rail-lbl">AI</span>
     </button>
-    <button class="rail-btn" id="railBtn2" onclick="switchTab(2)" title="填充拼图">
+    <button class="rail-btn" id="railBtn2" onclick="switchTab(2)" title="销售图资产">
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
-      <span class="rail-lbl">拼图</span>
+      <span class="rail-lbl">资产</span>
     </button>
 
     <div class="rail-spacer"></div>
@@ -143,9 +143,9 @@
     <section class="view active" id="view0">
       <div class="view-head">
         <div class="vh-l">
-          <span class="view-eyebrow">Step 01 · Capture</span>
-          <h2 class="view-title">导入视频 · 智能截帧</h2>
-          <p class="view-sub">上传视频后设置参数，按间隔或场景变化抽取关键帧</p>
+          <span class="view-eyebrow">Step 01 · Sales Kit</span>
+          <h2 class="view-title">上传视频 · 生成光厂上架套件</h2>
+          <p class="view-sub">先理解素材包主题与卖点，再生成封面候选、详情展示图和 SEO 文案</p>
         </div>
         <div class="vh-r">
           <div class="badge-pill"><div class="dot"></div><span>全本地处理 · 隐私安全</span></div>
@@ -159,6 +159,155 @@
       <!-- ── Tab 0: 导入 & 截帧 ── -->
       <div class="tab-pane active" id="tabPane0">
 
+        <!-- 光厂上架套件生成器：销售目标优先，而不是参数优先 -->
+        <div class="card sales-kit-card">
+          <div class="sales-kit-head">
+            <div>
+              <div class="sales-eyebrow">Guangchang Sales Kit</div>
+              <div class="sales-title">光厂素材包上架套件</div>
+              <div class="sales-sub">上传视频并粘贴分镜/卖点文档，AI 会先理解素材包卖点，再生成封面候选、详情长图和 SEO 文案。</div>
+            </div>
+            <div class="sales-badge">封面 + 详情 + SEO</div>
+          </div>
+
+          <div class="sales-form">
+            <div class="sales-row">
+              <label class="sales-field">
+	                <span>素材包类型</span>
+	                <select id="salesPackType">
+	                  <option value="自定义" selected>自定义 / 由文档判断</option>
+	                  <option value="智慧工厂">智慧工厂 / 工业制造</option>
+	                  <option value="金融科技">金融科技 / 数字经济</option>
+	                  <option value="城市建筑">城市建筑 / 商业空间</option>
+	                  <option value="新能源">新能源 / 绿色科技</option>
+	                  <option value="医疗科技">医疗科技 / 科研实验</option>
+	                  <option value="办公人物">办公人物 / 企业商务</option>
+	                </select>
+              </label>
+              <label class="sales-field">
+                <span>主销售目标</span>
+                <select id="salesGoal">
+                  <option value="点击与转化兼顾">点击与转化兼顾</option>
+                  <option value="提高封面点击">提高封面点击</option>
+                  <option value="证明内容丰富">证明内容丰富</option>
+                  <option value="强化高级商用感">强化高级商用感</option>
+                  <option value="突出可用场景">突出可用场景</option>
+                </select>
+              </label>
+            </div>
+
+            <label class="sales-field sales-doc">
+              <span>分镜脚本 / 素材说明 / 卖点文档</span>
+              <textarea id="storyDoc" rows="6" placeholder="粘贴分镜、镜头内容、素材包主题、目标行业、使用场景、客户要求等。例：智慧工厂自动化生产线，包含机械臂、AGV、产线设备、数据大屏、工人巡检、无人工厂全景..."></textarea>
+            </label>
+            <div class="doc-upload-row">
+              <input type="file" id="storyFileInput" accept=".txt,.md,.csv,.json,.doc,.docx,.rtf,text/plain,text/markdown,application/json" style="display:none"/>
+              <button class="doc-upload-btn" type="button" id="storyFileBtn">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6M9 15l3 3 3-3"/></svg>
+                上传文档
+              </button>
+              <span id="storyFileName" class="doc-file-name">支持 txt / md / csv / json，doc/docx 会尽量提取可读文本</span>
+            </div>
+
+            <div class="sales-row compact">
+              <label class="sales-check">
+                <input type="checkbox" id="salesUseText" checked />
+                <span>详情图允许少量文字卖点</span>
+              </label>
+              <label class="sales-check">
+                <input type="checkbox" id="salesMakeAltCovers" checked />
+                <span>生成 3 版封面候选并评分</span>
+              </label>
+            </div>
+
+            <details class="text-design-panel" id="textDesignPanel">
+              <summary>详情文字设计</summary>
+              <div class="text-design-grid">
+                <label class="sales-field">
+                  <span>文字风格</span>
+                  <select id="detailTextStyle">
+                    <option value="minimal">极简高级</option>
+                    <option value="editorial">杂志标题</option>
+                    <option value="tech">科技标签</option>
+                    <option value="none">不加文字</option>
+                  </select>
+                </label>
+                <label class="sales-field">
+                  <span>文字位置</span>
+                  <select id="detailTextPosition">
+                    <option value="top">每段顶部</option>
+                    <option value="overlay">图片左下角轻叠加</option>
+                    <option value="side">左侧窄栏</option>
+                  </select>
+                </label>
+                <label class="sales-field">
+                  <span>文字强度</span>
+                  <select id="detailTextDensity">
+                    <option value="light">轻量：只放分区标题</option>
+                    <option value="medium">适中：标题 + 短卖点</option>
+                    <option value="rich">丰富：标题 + 标签 + 场景说明</option>
+                  </select>
+                </label>
+                <label class="sales-field">
+                  <span>视觉基调</span>
+                  <select id="detailVisualTone">
+                    <option value="premium">高级暗色</option>
+                    <option value="clean">干净浅色</option>
+                    <option value="tech">科技蓝绿</option>
+                    <option value="warm">暖色商业</option>
+                  </select>
+                </label>
+              </div>
+            </details>
+
+            <div class="sales-actions">
+              <button class="btn-p sales-primary" id="salesKitBtn">
+                <svg viewBox="0 0 24 24"><path d="M13 2L3 14h7v8l10-12h-7z"/></svg>
+                生成光厂上架套件
+              </button>
+              <button class="btn-p btn-ghost sales-secondary" id="salesCopyBtn" type="button">
+                生成文案
+              </button>
+            </div>
+            <div id="salesProgress" class="sales-progress" style="display:none;">
+              <div class="sales-progress-bar"><div id="salesProgressFill"></div></div>
+              <span id="salesProgressText">准备分析...</span>
+            </div>
+          </div>
+
+          <div id="salesResultPanel" class="sales-results" style="display:none;">
+            <div class="sales-result-grid">
+              <div class="sales-result-block">
+                <div class="sales-result-title">销售策略</div>
+                <div id="salesStrategy" class="sales-copy"></div>
+              </div>
+              <div class="sales-result-block">
+                <div class="sales-result-title">封面候选判断</div>
+                <div id="coverPlanList" class="cover-plan-list"></div>
+              </div>
+            </div>
+            <div class="sales-result-block">
+              <div class="sales-result-title">SEO 上架文案</div>
+              <div class="seo-output">
+                <label>标题</label>
+                <textarea id="seoTitle" rows="2" readonly></textarea>
+                <label>作品简介</label>
+                <textarea id="seoIntro" rows="5" readonly></textarea>
+                <label>50 个关键词（空格分隔）</label>
+                <textarea id="seoKeywords" rows="5" readonly></textarea>
+              </div>
+            </div>
+            <div class="sales-result-block" id="detailPreviewBlock" style="display:none;">
+              <div class="sales-result-title">详情长图预览</div>
+              <div class="detail-preview-wrap"><canvas id="salesDetailCanvas"></canvas></div>
+              <div class="detail-actions">
+                <button class="btn-sm btn-primary-sm" id="downloadDetailBtn">下载详情长图</button>
+                <span id="detailMeta" class="detail-meta"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 项目（多视频）切换栏 -->
         <div class="card" id="projectsCard" style="display:none;">
           <div class="ct"><div class="ctd"></div>视频项目
@@ -169,8 +318,8 @@
         </div>
 
         <!-- Upload -->
-        <div class="card">
-          <div class="ct"><div class="ctd"></div>视频导入</div>
+        <div class="card upload-compact-card">
+          <div class="ct"><div class="ctd"></div>视频素材</div>
           <div class="upzone" id="upzone">
             <div class="up-icon">
               <svg viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
@@ -207,8 +356,9 @@
         </div>
 
         <!-- Capture Settings -->
-        <div class="card">
-          <div class="ct"><div class="ctd"></div>截帧参数</div>
+        <details class="card advanced-settings-card">
+          <summary><span><span class="ctd"></span>高级视频分析设置</span><small>需要控制截帧间隔、场景检测时再展开</small></summary>
+          <div class="advanced-settings-body">
 
           <!-- 截帧模式切换 -->
           <div class="mode-switch" id="capModeSwitch">
@@ -246,12 +396,12 @@
           <div class="crow"><span class="clabel">结束时间（秒）</span><input type="number" id="edt" class="cinput" placeholder="末尾"/></div>
           <div class="crow" style="margin-bottom:0"><span class="clabel">最多截取帧数</span><input type="number" id="mxf" class="cinput" value="10000" min="1" max="99999"/></div>
           <div class="sep"></div>
-          <button class="btn-p" id="capBtn" disabled>截取视频帧</button>
+          <button class="btn-p subtle-action" id="capBtn" disabled>仅提取候选画面</button>
 
           <!-- 一键到出图超级按钮 -->
-          <button class="btn-p btn-flow" id="superBtn" disabled style="margin-top:8px;">
+          <button class="btn-p btn-flow subtle-action" id="superBtn" disabled style="margin-top:8px;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><path d="M13 2L3 14h7v8l10-12h-7z"/></svg>
-            一键截帧 · AI挑帧 · 出图
+            老流程：一键生成销售图
           </button>
           <!-- 一键进度说明 -->
           <div id="superSteps" style="display:none;margin-top:6px;padding:8px 10px;
@@ -264,7 +414,8 @@
             <div class="prog-bg"><div class="prog-fill" id="pFill"></div></div>
             <div class="prog-t"><span id="pLbl">正在截取...</span><span id="pNum">0%</span></div>
           </div>
-        </div>
+          </div>
+        </details>
 
         <!-- 截帧完成后提示（保留但隐藏，逻辑改为自动跳转） -->
         <div id="captureHint" style="display:none;"></div>
@@ -273,18 +424,26 @@
         </div><!-- /panel left (view0) -->
 
         <!-- 右：帧墙挂载点（共享帧墙将被移动到此） -->
-        <div class="view-slot" id="frameSlot0"></div>
+        <div class="view-slot sales-workspace" id="frameSlot0">
+          <div class="sales-empty-state" id="salesEmptyState">
+            <div class="sales-empty-icon">
+              <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 10h16M9 5v14"/><path d="M14 14l2 2 4-5"/></svg>
+            </div>
+            <h3>等待生成光厂上架套件</h3>
+            <p>上传视频，粘贴或导入分镜文档，然后点击左侧主按钮。这里会展示候选画面、封面方案和详情图结果。</p>
+          </div>
+        </div>
 
       </div><!-- /view-body -->
     </section>
 
-    <!-- ════════ 视图 1：AI 智能挑帧 ════════ -->
+    <!-- ════════ 视图 1：AI 销售画面策划 ════════ -->
     <section class="view" id="view1">
       <div class="view-head">
         <div class="vh-l">
-          <span class="view-eyebrow">Step 02 · AI Curation</span>
-          <h2 class="view-title">AI 智能挑帧</h2>
-          <p class="view-sub">Vision 大模型为每帧打分，自动挑选最佳画面组合</p>
+          <span class="view-eyebrow">Step 02 · Selling Points</span>
+          <h2 class="view-title">AI 挖掘卖点与高光画面</h2>
+          <p class="view-sub">结合销售目标为封面和详情展示挑选最有转化价值的画面</p>
         </div>
         <div class="vh-r">
           <span class="badge-pill"><div class="dot"></div><span>Vision AI 评分</span></span>
@@ -298,58 +457,120 @@
       <!-- ── Tab 1: AI 挑帧 ── -->
       <div class="tab-pane" id="tabPane1">
 
-        <div class="card">
-          <div class="ct">
-            <div class="ctd"></div>AI 智能挑帧
-            <span style="margin-left:4px;padding:1px 6px;border-radius:3px;background:rgba(62,180,137,0.12);border:1px solid var(--bs);font-size:12px;color:var(--mint);letter-spacing:.5px;">VISION AI</span>
-          </div>
-          <div style="font-size:12px;color:var(--tm);margin-bottom:12px;line-height:1.8;">
-            调用 <b style="color:var(--mint-light)">Vision 大模型</b> 对每帧构图、清晰度、吸引力综合打分，自动挑选最佳组合。
-            <br/><span style="color:var(--mint-darker);">无 Key 或失败时自动降级本地算法。</span>
+        <div class="card ai-planner-card">
+          <div class="ai-planner-head">
+            <div>
+              <div class="sales-eyebrow">Vision AI</div>
+              <h3>让 AI 先判断哪些画面更好卖</h3>
+              <p>按封面点击力、详情证明力和素材包卖点，挑出适合做销售图的候选画面。</p>
+            </div>
+            <span class="ai-status-chip">自动降级可用</span>
           </div>
 
-          <!-- API Key -->
-          <div style="margin-bottom:10px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-              <span style="font-size:11px;color:var(--tm);letter-spacing:1px;">API KEY</span>
-              <span id="apiKeySavedBadge" style="display:none;align-items:center;gap:3px;font-size:var(--fs-2xs);color:var(--accent);
-                padding:2px 8px;border:1px solid var(--accent-soft);border-radius:20px;
-                background:var(--accent-soft);"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>已本地保存</span>
+          <div class="ai-strategy-grid" id="aiStandardInfo">
+            <div class="ai-strategy-card">
+              <strong>封面候选</strong>
+              <span>主题明确、视觉冲击强、适合四宫格首图</span>
             </div>
-            <div style="display:flex;gap:4px;align-items:center;">
+            <div class="ai-strategy-card">
+              <strong>详情展示图</strong>
+              <span>覆盖丰富度、商用场景、细节和风格变化</span>
+            </div>
+          </div>
+          <div id="aiIntentHint" class="ai-intent-line">自动按资产类型分别挑图：封面重点击，详情重证明。</div>
+
+          <div class="ai-field-grid">
+            <label class="sales-field">
+              <span>候选画面数量</span>
+              <input type="number" id="aiN" value="15" min="1" max="100"/>
+            </label>
+            <label class="sales-field">
+              <span>额外要求</span>
+              <input type="text" id="aiPromptHint" value="" placeholder="如：偏暖色 / 有人物 / 风景为主" maxlength="60"/>
+            </label>
+          </div>
+
+          <div class="ai-action-stack">
+            <button class="btn-p btn-flow" id="aiAutoFillBtn" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h7v8l10-12h-7z"/></svg>
+              挑选并生成销售图
+            </button>
+            <button class="btn-p btn-ghost" id="aiPickBtn" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              只挑选销售画面
+            </button>
+          </div>
+
+          <!-- Vision AI 进度条 -->
+          <div id="aiProgress" class="ai-progress-card">
+            <div class="ai-progress-meta">
+              <span id="aiProgLabel">正在分析...</span>
+              <span id="aiProgNum">0%</span>
+            </div>
+            <div class="ai-progress-track">
+              <div id="aiProgFill" class="ai-progress-fill"></div>
+            </div>
+          </div>
+
+          <!-- 评分结果 -->
+          <div class="ai-scores" id="aiScores">
+            <div class="ai-scores-head">
+              <span id="aiScoresTitle">最高分画面分析</span>
+              <span id="aiScoresMode"></span>
+            </div>
+            <div class="ai-score-row">
+              <span class="ai-score-label" id="sl-sharp">清晰度</span>
+              <div class="ai-score-bar"><div class="ai-score-fill" id="sc-sharp" style="background:var(--mint);width:0%"></div></div>
+              <span id="sv-sharp" class="ai-score-value">—</span>
+            </div>
+            <div class="ai-score-row">
+              <span class="ai-score-label" id="sl-bright">亮度</span>
+              <div class="ai-score-bar"><div class="ai-score-fill" id="sc-bright" style="background:#6ECFAA;width:0%"></div></div>
+              <span id="sv-bright" class="ai-score-value">—</span>
+            </div>
+            <div class="ai-score-row">
+              <span class="ai-score-label" id="sl-sat">饱和度</span>
+              <div class="ai-score-bar"><div class="ai-score-fill" id="sc-sat" style="background:#A8E6CF;width:0%"></div></div>
+              <span id="sv-sat" class="ai-score-value">—</span>
+            </div>
+            <div class="ai-score-row">
+              <span class="ai-score-label" id="sl-diff">差异性</span>
+              <div class="ai-score-bar"><div class="ai-score-fill" id="sc-diff" style="background:#3EB489;width:0%"></div></div>
+              <span id="sv-diff" class="ai-score-value">—</span>
+            </div>
+          </div>
+
+          <details class="advanced-settings-card ai-engine-settings">
+            <summary><span><div class="ctd"></div>AI 引擎设置</span><small>API Key、模型与本地保存</small></summary>
+            <div class="advanced-settings-body">
+
+          <!-- API Key -->
+          <div class="ai-input-group">
+            <div class="ai-label-row">
+              <span>API Key</span>
+              <span id="apiKeySavedBadge" class="saved-badge"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>已本地保存</span>
+            </div>
+            <div class="api-key-row">
               <input type="password" id="aiApiKey"
                 value=""
                 autocomplete="off"
-                placeholder="粘贴你的 API Key..."
-                style="flex:1;min-width:0;height:34px;background:var(--card3);border:1px solid var(--b);border-radius:8px;
-                       padding:0 10px;font-size:var(--fs-sm);color:var(--ts);outline:none;font-family:monospace;
-                       transition:.2s;"
-                onfocus="this.style.borderColor='var(--bs)'" onblur="this.style.borderColor='var(--b)'"/>
-              <button onclick="toggleApiKeyVis()" title="显示/隐藏"
-                style="flex-shrink:0;width:34px;display:flex;align-items:center;justify-content:center;padding:0;height:34px;background:var(--card3);border:1px solid var(--b);
-                       border-radius:8px;color:var(--tm);cursor:pointer;transition:.2s;"
-                onmouseover="this.style.borderColor='var(--bs)';this.style.color='var(--ts)'" onmouseout="this.style.borderColor='var(--b)';this.style.color='var(--tm)'"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
-              <button onclick="saveApiKey()" title="保存到本地"
-                style="flex-shrink:0;height:34px;padding:0 14px;background:var(--grad);
-                       border:none;border-radius:8px;color:white;cursor:pointer;font-size:var(--fs-sm);
-                       font-weight:700;transition:.2s;white-space:nowrap;">保存</button>
+                placeholder="粘贴你的 API Key..."/>
+              <button class="icon-soft-btn" onclick="toggleApiKeyVis()" title="显示/隐藏">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+              <button class="save-key-btn" onclick="saveApiKey()" title="保存到本地">保存</button>
             </div>
             <!-- 已保存时显示清除入口 -->
-            <div id="apiKeyClearRow" style="display:none;margin-top:5px;display:none;">
-              <button onclick="clearApiKey()"
-                style="font-size:11px;color:var(--tm);background:none;border:none;cursor:pointer;
-                       padding:0;text-decoration:underline;opacity:.7;">清除已保存的 Key</button>
+            <div id="apiKeyClearRow" class="api-key-clear-row">
+              <button onclick="clearApiKey()">清除已保存的 Key</button>
             </div>
           </div>
 
-          <!-- Model -->
-          <div style="margin-bottom:10px;">
-            <div style="font-size:11px;color:var(--tm);margin-bottom:4px;letter-spacing:1px;">模型</div>
+          <!-- Vision Model -->
+          <div class="ai-input-group">
+            <div class="ai-label-row"><span>视觉选图模型</span></div>
             <select id="aiModel"
-              style="width:100%;height:38px;background:var(--card3);border:1px solid var(--b);border-radius:9px;
-                     padding:0 12px;font-size:var(--fs-base);color:var(--ts);outline:none;cursor:pointer;
-                     -webkit-appearance:none;transition:.2s;"
-              onfocus="this.style.borderColor='var(--bs)'" onblur="this.style.borderColor='var(--b)'">
+              style="width:100%;height:38px;cursor:pointer;-webkit-appearance:none;">
               <optgroup label="── Qwen 通义千问 VL（阿里 · 推荐）">
                 <option value="qwen3-vl-plus" selected>qwen3-vl-plus · 推荐（速度与效果兼顾）</option>
                 <option value="qwen3.6-plus">qwen3.6-plus · 最新一代多模态旗舰（效果最佳）</option>
@@ -385,136 +606,60 @@
                 <option value="gpt-4.1-nano">gpt-4.1-nano · 极速低价</option>
               </optgroup>
             </select>
+            </div>
+          <div class="ai-input-group">
+            <div class="ai-label-row"><span>SEO 文案模型</span></div>
+            <select id="aiSeoModel" style="width:100%;height:38px;cursor:pointer;-webkit-appearance:none;">
+              <optgroup label="── 质量优先">
+                <option value="gpt-5.5-pro" selected>gpt-5.5-pro · SEO标题/简介质量最佳</option>
+                <option value="gpt-5.5">gpt-5.5 · 高质量文案</option>
+                <option value="claude-opus-4.6">claude-opus-4.6 · 长文案与表达润色</option>
+              </optgroup>
+              <optgroup label="── 性价比">
+                <option value="claude-sonnet-4.6">claude-sonnet-4.6 · 质量与成本均衡</option>
+                <option value="gpt-5.4">gpt-5.4 · 稳定文案</option>
+                <option value="qwen3-vl-plus">qwen3-vl-plus · 全部使用千问</option>
+              </optgroup>
+            </select>
+            <p class="ai-setting-note">建议：选图用 qwen3-vl-plus；SEO 用 gpt-5.5-pro。SEO 输出很短，用高质量模型对成本影响小。</p>
           </div>
-
-          <!-- 拼图标准说明：系统按批次类型自动套用不同标准（无需手动选） -->
-          <div style="margin-bottom:10px;">
-            <div style="font-size:11px;color:var(--tm);margin-bottom:5px;letter-spacing:1px;">挑图标准（按拼图类型自动套用）</div>
-            <div id="aiStandardInfo" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-              <div style="padding:8px 9px;border-radius:9px;background:var(--card3);border:1px solid var(--b);font-size:11px;line-height:1.4;">
-                <b style="font-size:12px;color:var(--mint-light);">🖼 四宫格 = 封面</b><br>
-                <span style="opacity:.85;color:var(--tm);">展现主题、构图美观、吸引点击</span></div>
-              <div style="padding:8px 9px;border-radius:9px;background:var(--card3);border:1px solid var(--b);font-size:11px;line-height:1.4;">
-                <b style="font-size:12px;color:var(--mint-light);">🔍 九宫格 = 细节</b><br>
-                <span style="opacity:.85;color:var(--tm);">强化主体、展示更多细节</span></div>
-            </div>
-            <div id="aiIntentHint" style="margin-top:6px;font-size:11px;color:var(--tm);line-height:1.5;">🎯 自动：四宫格按封面标准、九宫格按细节标准分别挑图排版，整体覆盖全片以代表整个视频。</div>
-          </div>
-
-          <!-- 推荐数量 + 关键词 同行 -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-            <div>
-              <div style="font-size:11px;color:var(--tm);margin-bottom:4px;letter-spacing:1px;">推荐帧数</div>
-              <input type="number" id="aiN" value="15" min="1" max="100"
-                style="width:100%;height:38px;background:var(--card3);border:1px solid var(--b);border-radius:9px;
-                       padding:0 10px;font-size:var(--fs-md);font-weight:700;color:var(--tp);text-align:center;outline:none;transition:.2s;"
-                onfocus="this.style.borderColor='var(--bs)'" onblur="this.style.borderColor='var(--b)'"/>
-            </div>
-            <div>
-              <div style="font-size:11px;color:var(--tm);margin-bottom:4px;letter-spacing:1px;">额外要求（可选）</div>
-              <input type="text" id="aiPromptHint"
-                value=""
-                placeholder="如：偏暖色 / 有人物 / 风景为主"
-                maxlength="60"
-                style="width:100%;height:38px;background:var(--card3);border:1px solid var(--b);border-radius:9px;
-                       padding:0 10px;font-size:var(--fs-2xs);color:var(--ts);outline:none;transition:.2s;text-overflow:ellipsis;"
-                onfocus="this.style.borderColor='var(--bs)'" onblur="this.style.borderColor='var(--b)'"/>
-            </div>
-          </div>
-
-          <!-- 操作按钮 -->
-          <div style="display:flex;flex-direction:column;gap:7px;">
-            <button class="btn-p" id="aiPickBtn" disabled>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:middle;margin-right:5px;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              AI 自动挑帧
-            </button>
-            <button class="btn-p btn-ghost" id="aiAutoFillBtn" disabled>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M13 2L3 14h7v8l10-12h-7z"/></svg>
-              挑帧并自动填入所有批次
-            </button>
-          </div>
-
-          <!-- Vision AI 进度条 -->
-          <div id="aiProgress" style="display:none;margin-top:10px;">
-            <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--tm);margin-bottom:4px;">
-              <span id="aiProgLabel">正在分析...</span>
-              <span id="aiProgNum">0%</span>
-            </div>
-            <div style="height:4px;background:var(--card3);border-radius:2px;overflow:hidden;">
-              <div id="aiProgFill" style="height:100%;width:0%;background:linear-gradient(to right,var(--mint-dark),var(--mint-light));transition:width .3s;border-radius:2px;"></div>
-            </div>
-          </div>
-
-          <!-- 评分结果 -->
-          <div class="ai-scores" id="aiScores">
-            <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--tm);margin-bottom:8px;letter-spacing:1px;">
-              <span id="aiScoresTitle">最高分帧分析</span>
-              <span id="aiScoresMode" style="font-size:12px;color:var(--mint-dark);padding:1px 5px;border:1px solid var(--b);border-radius:3px;"></span>
-            </div>
-            <div class="ai-score-row">
-              <span class="ai-score-label" id="sl-sharp">清晰度</span>
-              <div class="ai-score-bar"><div class="ai-score-fill" id="sc-sharp" style="background:var(--mint);width:0%"></div></div>
-              <span id="sv-sharp" style="font-size:11px;color:var(--ts);min-width:24px;text-align:right;">—</span>
-            </div>
-            <div class="ai-score-row">
-              <span class="ai-score-label" id="sl-bright">亮度</span>
-              <div class="ai-score-bar"><div class="ai-score-fill" id="sc-bright" style="background:#6ECFAA;width:0%"></div></div>
-              <span id="sv-bright" style="font-size:11px;color:var(--ts);min-width:24px;text-align:right;">—</span>
-            </div>
-            <div class="ai-score-row">
-              <span class="ai-score-label" id="sl-sat">饱和度</span>
-              <div class="ai-score-bar"><div class="ai-score-fill" id="sc-sat" style="background:#A8E6CF;width:0%"></div></div>
-              <span id="sv-sat" style="font-size:11px;color:var(--ts);min-width:24px;text-align:right;">—</span>
-            </div>
-            <div class="ai-score-row">
-              <span class="ai-score-label" id="sl-diff">差异性</span>
-              <div class="ai-score-bar"><div class="ai-score-fill" id="sc-diff" style="background:#3EB489;width:0%"></div></div>
-              <span id="sv-diff" style="font-size:11px;color:var(--ts);min-width:24px;text-align:right;">—</span>
-            </div>
-          </div>
+          </details>
         </div>
 
         <!-- AI挑帧完成后提示（保留但隐藏，逻辑改为自动跳转） -->
         <div id="aiDoneHint" style="display:none;"></div>
 
         <!-- ═══ 偏好记忆面板 ═══ -->
-        <div class="card" id="prefMemoryCard" style="margin-top:10px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-            <div class="ct" style="margin:0;">
-              <div class="ctd"></div>
-              AI 审美记忆
-            </div>
-            <div style="display:flex;gap:5px;align-items:center;">
-              <span id="prefMemCount" style="font-size:11px;color:var(--tm);padding:2px 7px;background:var(--card3);border-radius:10px;border:1px solid var(--b);">0 张</span>
-              <button onclick="openPrefMemPanel()" style="font-size:12px;padding:3px 8px;background:rgba(62,180,137,0.12);border:1px solid rgba(62,180,137,0.35);color:var(--mint);border-radius:6px;cursor:pointer;">管理</button>
-            </div>
-          </div>
-          <div style="font-size:12px;color:var(--tm);line-height:1.7;margin-bottom:10px;">
-            给AI挑出的帧点 <b style="color:var(--accent-2)">赞</b> / <b style="color:#ff8080;">踩</b>，AI会<b style="color:var(--ts)">直接看</b>这些图来学习您的审美偏好，跨视频永久有效。
+        <details class="card advanced-settings-card ai-memory-card" id="prefMemoryCard">
+          <summary><span><div class="ctd"></div>AI 审美记忆 <b id="prefMemCount">0 张</b></span><small>偏好样本与自适应权重</small></summary>
+          <div class="advanced-settings-body">
+          <div class="ai-memory-intro">
+            对 AI 挑出的画面点“赞/踩”后，这里会沉淀你的审美偏好，后续视频会优先学习这些样本。
+            <button onclick="openPrefMemPanel()">管理</button>
           </div>
           <!-- 好图预览条 -->
-          <div style="margin-bottom:8px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
-              <span style="font-size:11px;color:var(--accent-2);letter-spacing:0.5px;font-weight:600;">喜欢的风格</span>
-              <span id="goodMemCount" style="font-size:11px;color:var(--tm);">0 张</span>
+          <div class="memory-strip-block">
+            <div class="memory-strip-title">
+              <span>喜欢的风格</span>
+              <span id="goodMemCount">0 张</span>
             </div>
-            <div id="goodMemStrip" style="display:flex;gap:4px;overflow-x:auto;padding-bottom:3px;min-height:36px;align-items:center;">
+            <div id="goodMemStrip" class="memory-strip">
               <span style="font-size:11px;color:var(--b2);font-style:italic;">暂无，点赞帧后AI将记住此类风格</span>
             </div>
           </div>
           <!-- 坏图预览条 -->
-          <div style="margin-bottom:10px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
-              <span style="font-size:11px;color:#ff8d8d;letter-spacing:0.5px;font-weight:600;">不喜欢的风格</span>
-              <span id="badMemCount" style="font-size:11px;color:var(--tm);">0 张</span>
+          <div class="memory-strip-block">
+            <div class="memory-strip-title bad">
+              <span>不喜欢的风格</span>
+              <span id="badMemCount">0 张</span>
             </div>
-            <div id="badMemStrip" style="display:flex;gap:4px;overflow-x:auto;padding-bottom:3px;min-height:36px;align-items:center;">
+            <div id="badMemStrip" class="memory-strip">
               <span style="font-size:11px;color:var(--b2);font-style:italic;">暂无</span>
             </div>
           </div>
           <!-- 动态权重显示 -->
-          <div id="adaptiveWeightRow" style="display:none;padding:8px 10px;background:var(--card3);border-radius:7px;border:1px solid var(--b);margin-bottom:10px;">
-            <div style="font-size:12px;color:var(--tm);margin-bottom:6px;letter-spacing:0.5px;">自适应评分权重（根据您的喜好自动调整）</div>
+          <div id="adaptiveWeightRow" class="adaptive-weight-row">
+            <div class="adaptive-weight-title">自适应评分权重</div>
             <div style="display:flex;flex-direction:column;gap:4px;">
               <div style="display:flex;align-items:center;gap:6px;">
                 <span style="font-size:11px;color:var(--ts);width:40px;">清晰度</span>
@@ -538,8 +683,9 @@
               </div>
             </div>
           </div>
-          <button onclick="clearPrefs()" style="width:100%;font-size:11px;padding:9px;background:transparent;border:1px solid rgba(255,90,90,0.28);color:rgba(255,120,120,0.85);border-radius:9px;cursor:pointer;">清除所有审美记忆</button>
-        </div>
+          <button onclick="clearPrefs()" class="clear-memory-btn">清除所有审美记忆</button>
+          </div>
+        </details>
 
       </div>
         </div><!-- /panel left (view1) -->
@@ -550,13 +696,13 @@
       </div><!-- /view-body -->
     </section>
 
-    <!-- ════════ 视图 2：填充拼图 ════════ -->
+    <!-- ════════ 视图 2：销售图资产 ════════ -->
     <section class="view" id="view2">
       <div class="view-head">
         <div class="vh-l">
-          <span class="view-eyebrow">Step 03 · Collage</span>
-          <h2 class="view-title">填充 · 拼接出图</h2>
-          <p class="view-sub">将已选帧填入拼图批次，一键生成并导出成品图</p>
+          <span class="view-eyebrow">Step 03 · Assets</span>
+          <h2 class="view-title">封面候选 · 详情展示图</h2>
+          <p class="view-sub">对比封面版本，替换画面，导出适合光厂上架的销售图资产</p>
         </div>
         <div class="vh-r">
           <button class="btn-sm" id="undoBtn" onclick="undo()" disabled title="撤销 (Ctrl+Z)" style="display:inline-flex;align-items:center;gap:5px;opacity:0.4;">
@@ -570,92 +716,64 @@
       </div>
       <div class="view-body split-collage">
 
-        <!-- 左：填充控制面板 -->
+        <!-- 左：销售图控制面板 -->
         <div class="panel scroll">
 
-      <!-- ── Tab 2: 填充拼图 ── -->
+      <!-- ── Tab 2: 销售图资产 ── -->
       <div class="tab-pane" id="tabPane2">
 
-        <div class="card">
-          <div class="ct"><div class="ctd"></div>快速填充</div>
-          <div style="font-size:12px;color:var(--tm);margin-bottom:12px;line-height:1.8;">
-            将 <b style="color:var(--ts)">已选帧</b> 按序填入右侧所有拼图批次，或直接 <b style="color:var(--ts)">拖拽</b> 单帧到指定格子。
-          </div>
-
-          <!-- 已选帧状态 -->
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--card3);border-radius:8px;border:1px solid var(--b);margin-bottom:10px;">
-            <div style="font-size:12px;color:var(--tm);">已选帧</div>
-            <div style="display:flex;align-items:center;gap:4px;">
-              <span id="fillSelN" style="font-size:16px;font-weight:700;color:var(--mint);">0</span>
-              <span style="font-size:12px;color:var(--tm);">/ <span id="fillTotalN">0</span> 帧</span>
+        <div class="card asset-console-card">
+          <div class="asset-console-head">
+            <div>
+              <div class="sales-eyebrow">Asset Studio</div>
+              <h3>把已选画面变成可上架销售图</h3>
+              <p>先生成右侧封面候选和详情展示图，再按需要拖拽替换单个画面。</p>
             </div>
           </div>
 
-          <div style="display:flex;flex-direction:column;gap:8px;">
-            <button class="btn-p" id="fillAllBtn" disabled>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:middle;margin-right:4px;"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-              将已选帧填充到所有拼图
+          <!-- 已选帧状态 -->
+          <div class="asset-count-card">
+            <div>
+              <span>已选画面</span>
+              <strong><span id="fillSelN">0</span><small>/ <span id="fillTotalN">0</span> 张</small></strong>
+            </div>
+            <div class="asset-count-actions">
+              <button id="fillSelAllBtn" class="btn-sm">全选</button>
+              <button id="fillClrSelBtn" class="btn-sm">清除</button>
+            </div>
+          </div>
+
+          <div class="asset-main-actions">
+            <button class="btn-p btn-flow" id="fillAllBtn" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+              生成当前套件画面
             </button>
             <button class="btn-p btn-danger" id="clearAllCellsBtn" onclick="clearAllCells()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
-              清空所有拼图格子
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
+              清空套件画面
             </button>
           </div>
 
           <!-- 挑帧引擎状态：持久展示本次用了哪个模型 / 是否降级 / 失败原因 -->
-          <div id="collageEngineCard" style="display:none;margin-top:10px;padding:10px 12px;background:var(--card3);border:1px solid var(--b);border-radius:8px;">
-            <div style="font-size:11px;color:var(--tm);margin-bottom:6px;letter-spacing:1px;">挑帧引擎</div>
+          <div id="collageEngineCard" class="engine-state-card">
+            <div class="engine-state-title">挑帧引擎</div>
             <div id="collageEngineInfo"></div>
           </div>
-
-          <div class="sep" style="margin:14px 0;"></div>
-
-          <!-- 帧操作快捷 -->
-          <div style="font-size:11px;color:var(--tm);margin-bottom:8px;letter-spacing:1px;">帧选择</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px;">
-            <button id="fillSelAllBtn" class="btn-p" style="font-size:12px;padding:7px 8px;background:rgba(62,180,137,0.12);border:1px solid var(--bs);color:var(--mint-light);box-shadow:none;">全选所有帧</button>
-            <button id="fillClrSelBtn" class="btn-p" style="font-size:12px;padding:7px 8px;background:transparent;border:1px solid var(--b);color:var(--tm);box-shadow:none;">清除选择</button>
-          </div>
         </div>
 
-        <!-- 键盘快捷键提示 -->
-        <div style="padding:10px 12px;background:var(--card2);border:1px solid var(--b);border-radius:10px;">
-          <div style="font-size:11px;color:var(--tm);margin-bottom:10px;letter-spacing:1px;font-weight:600;">键盘快捷键</div>
-          <div style="display:flex;flex-direction:column;gap:5px;">
-            <div style="display:flex;justify-content:space-between;font-size:11px;">
-              <span style="color:var(--tm);">全选帧</span>
-              <span style="background:var(--card3);border:1px solid var(--b);border-radius:3px;padding:1px 6px;color:var(--ts);font-family:monospace;">A</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:11px;">
-              <span style="color:var(--tm);">清除选择</span>
-              <span style="background:var(--card3);border:1px solid var(--b);border-radius:3px;padding:1px 6px;color:var(--ts);font-family:monospace;">D / Esc</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:11px;">
-              <span style="color:var(--tm);">生成所有批次</span>
-              <span style="background:var(--card3);border:1px solid var(--b);border-radius:3px;padding:1px 6px;color:var(--ts);font-family:monospace;">G</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:11px;">
-              <span style="color:var(--tm);">下载所有批次</span>
-              <span style="background:var(--card3);border:1px solid var(--b);border-radius:3px;padding:1px 6px;color:var(--ts);font-family:monospace;">Ctrl+S</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:11px;">
-              <span style="color:var(--tm);">切换到 Tab 1/2/3</span>
-              <span style="background:var(--card3);border:1px solid var(--b);border-radius:3px;padding:1px 6px;color:var(--ts);font-family:monospace;">1 / 2 / 3</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:11px;">
-              <span style="color:var(--tm);">按当前参数直接截帧</span>
-              <span style="background:var(--card3);border:1px solid var(--b);border-radius:3px;padding:1px 6px;color:var(--ts);font-family:monospace;">R</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:11px;">
-              <span style="color:var(--tm);">一键流程（挑帧+填充+生成）</span>
-              <span style="background:var(--card3);border:1px solid var(--b);border-radius:3px;padding:1px 6px;color:var(--ts);font-family:monospace;">Q</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:11px;">
-              <span style="color:var(--tm);">放大预览帧</span>
-              <span style="background:var(--card3);border:1px solid var(--b);border-radius:3px;padding:1px 6px;color:var(--ts);font-family:monospace;">双击</span>
+        <details class="card advanced-settings-card asset-guide-card">
+          <summary><span><div class="ctd"></div>快捷操作</span><small>键盘与画面选择</small></summary>
+          <div class="advanced-settings-body">
+            <div class="shortcut-list">
+              <div><span>全选画面</span><b>A</b></div>
+              <div><span>清除选择</span><b>D / Esc</b></div>
+              <div><span>生成全部销售图</span><b>G</b></div>
+              <div><span>下载全部销售图</span><b>Ctrl+S</b></div>
+              <div><span>切换流程页</span><b>1 / 2 / 3</b></div>
+              <div><span>放大预览画面</span><b>双击</b></div>
             </div>
           </div>
-        </div>
+        </details>
 
       </div>
         </div><!-- /panel left (view2) -->
@@ -663,18 +781,21 @@
         <!-- 中：已选帧墙挂载点（拼图区也可见已选帧，便于拖拽/替换） -->
         <div class="view-slot" id="frameSlot2"></div>
 
-        <!-- 右：拼图批次面板 -->
-  <!-- ===== RIGHT: BATCH PANEL ===== -->
+        <!-- 右：销售图资产面板 -->
+  <!-- ===== RIGHT: SALES ASSET PANEL ===== -->
   <div class="col-right">
     <div class="batches-card">
       <div class="batches-header">
-        <div class="ct" style="margin-bottom:0"><div class="ctd"></div>拼图批次</div>
+        <div>
+          <div class="ct" style="margin-bottom:4px"><div class="ctd"></div>销售图资产</div>
+          <div class="asset-panel-sub">封面候选、详情展示图和自定义长图统一在这里管理。</div>
+        </div>
         <div class="add-batch-btns">
           <button class="btn-add" onclick="addBatch(2,2)">
-            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>2×2
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>封面 2×2
           </button>
           <button class="btn-add" onclick="addBatch(3,3)">
-            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>3×3
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>详情 3×3
           </button>
           <button class="btn-add" onclick="promptCustomBatch()">
             <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>自定义
@@ -684,19 +805,19 @@
       <!-- global actions -->
       <div class="global-actions">
         <button class="btn-global" onclick="generateAll()" id="genAllBtn">
-          <svg viewBox="0 0 24 24"><path d="M5 3l14 9-14 9V3z"/></svg>一键生成全部
+          <svg viewBox="0 0 24 24"><path d="M5 3l14 9-14 9V3z"/></svg>生成整套
         </button>
         <button class="btn-global" onclick="downloadAll()" id="dlAllBtn" disabled>
-          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>一键下载全部
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>下载整套
         </button>
         <button class="btn-global" onclick="openExportOptions()" id="expOptBtn" title="导出格式 / 质量 / 分辨率">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>导出选项
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>规格
         </button>
       </div>
       <div class="batch-list" id="batchList">
         <div class="empty" id="batchEmpty">
           <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-          <p>点击上方按钮添加拼图批次<br/>可同时创建多个不同尺寸的拼图</p>
+          <p>还没有销售图资产<br/>可点击上方版式或回到第一步自动生成</p>
         </div>
       </div>
     </div>
@@ -712,8 +833,8 @@
     <div class="frames-card">
       <div class="frames-header">
         <div class="frames-title-row">
-          <div class="ct" style="margin-bottom:0"><div class="ctd"></div>视频帧预览</div>
-          <span style="color:var(--tm);font-size:11px;">点击选择 / 双击放大 / 拖拽到格子</span>
+          <div class="ct" style="margin-bottom:0"><div class="ctd"></div>候选画面池</div>
+          <span style="color:var(--tm);font-size:11px;">点击选择 / 双击放大 / 拖拽替换销售图画面</span>
         </div>
         <div class="frames-acts">
           <div class="sel-badge"><span id="selN">0</span> 已选 / <span id="totalN">0</span></div>
@@ -749,13 +870,13 @@
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>AI挑帧
             </button>
             <button id="qAiAutoFillBtn" class="btn-sm" style="display:inline-flex;align-items:center;gap:5px;border-color:var(--bs);color:var(--accent);background:var(--accent-soft);" onclick="runAIPick(true)">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h7v8l10-12h-7z"/></svg>AI挑帧并填充
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h7v8l10-12h-7z"/></svg>AI生成销售图
             </button>
             <button id="qSmartFlowBtn" class="btn-sm" style="display:inline-flex;align-items:center;gap:5px;border-color:transparent;color:#fff;background:var(--grad);font-weight:700;" onclick="runSmartFlow()">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg>一键到出图
             </button>
             <button id="qFillAllBtn" class="btn-sm" style="display:none;align-items:center;gap:5px;border-color:var(--bs);color:var(--accent);background:var(--accent-soft);" onclick="doFillAll()">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>顺序填充
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>顺序生成
             </button>
             <button id="aiSmartLayoutBtn" class="btn-sm" style="display:none;align-items:center;gap:5px;border-color:var(--bs);color:var(--accent);background:var(--accent-soft);" onclick="doAISmartLayout()">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>AI智能排版
@@ -773,7 +894,7 @@
           </span>
           <div style="flex:1;"></div>
           <button class="btn-sm" onclick="proceedToCollage()" style="background:rgba(255,255,255,0.95);color:var(--accent-d,#1a6b4f);border:none;font-weight:700;display:inline-flex;align-items:center;gap:5px;">
-            进入拼图并填充 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            进入销售图编辑 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
           </button>
           <button class="btn-sm" onclick="document.getElementById('pickResultBar').style.display='none'" style="background:rgba(255,255,255,0.2);color:#fff;border:none;">关闭</button>
         </div>
@@ -804,8 +925,8 @@
     <div class="help-grid">
       <div class="help-row"><span>全选所有帧</span><div class="help-keys"><span class="kbd">A</span></div></div>
       <div class="help-row"><span>清除选择</span><div class="help-keys"><span class="kbd">D</span><span class="kbd">Esc</span></div></div>
-      <div class="help-row"><span>生成所有批次</span><div class="help-keys"><span class="kbd">G</span></div></div>
-      <div class="help-row"><span>下载所有批次</span><div class="help-keys"><span class="kbd">Ctrl</span><span class="kbd">S</span></div></div>
+      <div class="help-row"><span>生成全部销售图</span><div class="help-keys"><span class="kbd">G</span></div></div>
+      <div class="help-row"><span>下载全部销售图</span><div class="help-keys"><span class="kbd">Ctrl</span><span class="kbd">S</span></div></div>
       <div class="help-row"><span>按当前参数截帧</span><div class="help-keys"><span class="kbd">R</span></div></div>
       <div class="help-row"><span>一键到出图</span><div class="help-keys"><span class="kbd">Q</span></div></div>
       <div class="help-row"><span>切换到面板 1/2/3</span><div class="help-keys"><span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span></div></div>
@@ -1375,7 +1496,7 @@ async function doCapture(){
     toast('截取完成：共 '+captured+' 帧，用时 '+elapsedTotal+'s');
   }
   setTimeout(()=>{ prog.style.display='none'; },1600);
-  capBtn.disabled=false; capBtn.innerHTML='截取视频帧';
+  capBtn.disabled=false; capBtn.innerHTML='分析视频并提取候选画面';
   updateFillBtn();
   updateDlBtns();
   updateAiBtns();
@@ -1486,13 +1607,13 @@ async function doCaptureScene(){
     pLbl.textContent='未检测到场景变化';
     toast('未检测到明显场景切换，可调高灵敏度或改用固定间隔模式','err');
     setTimeout(()=>{ prog.style.display='none'; },1800);
-    capBtn.disabled=false; capBtn.innerHTML='截取视频帧';
+    capBtn.disabled=false; capBtn.innerHTML='分析视频并提取候选画面';
     return;
   }
   pLbl.textContent='场景检测完成：'+captured+' 关键帧 · 用时 '+elapsedTotal+'s';
   toast('场景检测完成：从 '+probeTimes.length+' 个采样点中捕获 '+captured+' 个关键帧');
   setTimeout(()=>{ prog.style.display='none'; },1800);
-  capBtn.disabled=false; capBtn.innerHTML='截取视频帧';
+  capBtn.disabled=false; capBtn.innerHTML='分析视频并提取候选画面';
   updateFillBtn(); updateDlBtns(); updateAiBtns();
   const qb=document.getElementById('quickBar'); if(qb) qb.style.display='';
   updateQuickBar();
@@ -1528,6 +1649,8 @@ function relocateFrameWall(idx){
   else if(idx===1) slot=document.getElementById('frameSlot1');
   else if(idx===2) slot=document.getElementById('frameSlot2');
   if(slot){
+    const empty=document.getElementById('salesEmptyState');
+    if(empty) empty.style.display = (idx===0 && S.frames.length===0) ? '' : 'none';
     if(wall.parentElement!==slot) slot.appendChild(wall);
     wall.style.display='';
   } else {
@@ -1556,7 +1679,7 @@ function updateQuickBar(){
 }
 
 async function runSmartFlow(){
-  if(S.frames.length===0){ toast('请先截取视频帧','err'); return; }
+  if(S.frames.length===0){ toast('请先分析视频并提取候选画面','err'); return; }
   const btn = document.getElementById('qSmartFlowBtn');
   const old = btn ? btn.innerHTML : '';
   if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spin"></span>处理中...'; }
@@ -1564,7 +1687,7 @@ async function runSmartFlow(){
     await runAIPick(true);
     await generateAll();
     switchTab(2);
-    toast('一键流程完成：已挑帧、填充并生成拼图');
+    toast('一键流程完成：已挑选画面并生成销售图');
   }finally{
     if(btn){ btn.disabled = false; btn.innerHTML = old || '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg>一键到出图'; }
   }
@@ -1599,7 +1722,7 @@ async function runSuperFlow(){
   const btn = document.getElementById('superBtn');
   const capBtn = document.getElementById('capBtn');
   if(!btn) return;
-  const steps = ['截取视频帧', 'AI 智能挑帧', '填充到所有批次', '生成拼图'];
+  const steps = ['提取候选画面', 'AI 挖掘卖点画面', '生成销售图资产', '导出前预览'];
   btn.disabled = true; capBtn.disabled = true;
   btn.innerHTML = '<span class="spin"></span>一键流程进行中...';
   S._superFlowRunning = true; // 标记一键流程中，阻止自动tab切换
@@ -1632,13 +1755,13 @@ async function runSuperFlow(){
     // 完成：跳到拼图Tab
     setSuperStep(steps, 4); // all done
     switchTab(2);
-    toast('🎉 一键流程完成！已截帧→挑帧→填充→生成拼图');
+    toast('🎉 一键流程完成！已提取候选画面→挑选卖点画面→生成销售图');
   }catch(e){
     toast('一键流程中断：'+e.message, 'err');
   }finally{
     S._superFlowRunning = false;
     btn.disabled = false; capBtn.disabled = false;
-    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><path d="M13 2L3 14h7v8l10-12h-7z"/></svg>一键截帧 · AI挑帧 · 出图';
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><path d="M13 2L3 14h7v8l10-12h-7z"/></svg>一键生成销售图';
     setTimeout(()=>{ const w=document.getElementById('superSteps'); if(w) w.style.display='none'; }, 4000);
   }
 }
@@ -2082,7 +2205,7 @@ async function buildPrefPrompt(){
 
 // 快捷填充所有批次（顺序填充）
 function doFillAll(){
-  if(S.selected.length===0){ toast('请先选择要填充的帧','err'); return; }
+  if(S.selected.length===0){ toast('请先选择要生成销售图的画面','err'); return; }
   // 没有批次则按选中帧数自动创建合适批次
   if(S.batches.length===0){ autoCreateBatchForSelection(S.selected.length); }
   pushHistory();
@@ -2110,7 +2233,7 @@ function doFillAll(){
 // ===================================================================
 async function doAISmartLayout(){
   if(S.selected.length===0){ toast('请先 AI 挑帧或手动选择帧','err'); return; }
-  if(S.batches.length===0){ toast('请先添加拼图批次','err'); return; }
+  if(S.batches.length===0){ toast('请先添加销售图资产','err'); return; }
 
   const apiKey = document.getElementById('aiApiKey').value.trim();
   const btn = document.getElementById('aiSmartLayoutBtn');
@@ -2597,7 +2720,7 @@ document.getElementById('fillAllBtn').addEventListener('click', ()=>{
     });
   });
   refreshUsageTags();
-  toast('已填充 '+fi+' 个格子');
+  toast('已放入 '+fi+' 张销售图画面');
   updateFillBtn();
 });
 function clearAllCells(){
@@ -3409,7 +3532,7 @@ function proceedToCollage(){
   doFillAll();
   refreshCollageEngineCard();
   switchTab(2);
-  toast('已进入拼图区，已将选中帧填入批次');
+  toast('已进入销售图编辑区，已将选中画面放入资产');
 }
 // 根据选中帧数量智能创建一个合适尺寸的批次
 function autoCreateBatchForSelection(n){
@@ -3425,7 +3548,7 @@ function autoCreateBatchForSelection(n){
 
 // -------- 主入口 --------
 async function runAIPick(autoFill=false){
-  if(S.frames.length===0){ toast('请先截取视频帧','err'); return; }
+  if(S.frames.length===0){ toast('请先分析视频并提取候选画面','err'); return; }
   const N   = Math.min(parseInt(document.getElementById('aiN').value)||15, S.frames.length);
   const btn = document.getElementById('aiPickBtn');
   const btn2= document.getElementById('aiAutoFillBtn');
@@ -3458,7 +3581,7 @@ async function runAIPick(autoFill=false){
       } catch(e2){
         S.lastPick = { engine:'local', model, ok:false, error:(e2&&e2.message)||'未知错误', fallbackFrom:'vision', visionError:reason, count:0, intent:intent.key, intentLabel:intent.preset.label, time:Date.now() };
         toast('挑帧失败：'+e2.message,'err');
-        btn.innerHTML=starSVG+'AI 自动挑帧'; btn.disabled=false; btn2.disabled=false;
+        btn.innerHTML=starSVG+'AI 挑选销售画面'; btn.disabled=false; btn2.disabled=false;
         return;
       }
     }
@@ -3471,7 +3594,7 @@ async function runAIPick(autoFill=false){
     } catch(e){
       S.lastPick = { engine:'local', model:null, ok:false, error:(e&&e.message)||'未知错误', noKey:true, count:0, intent:intent.key, intentLabel:intent.preset.label, time:Date.now() };
       toast('挑帧失败：'+e.message,'err');
-      btn.innerHTML=starSVG+'AI 自动挑帧'; btn.disabled=false; btn2.disabled=false;
+      btn.innerHTML=starSVG+'AI 挑选销售画面'; btn.disabled=false; btn2.disabled=false;
       return;
     }
   }
@@ -3495,7 +3618,7 @@ async function runAIPick(autoFill=false){
     }
   });
 
-  btn.innerHTML=starSVG+'AI 自动挑帧'; btn.disabled=false; btn2.disabled=false;
+  btn.innerHTML=starSVG+'AI 挑选销售画面'; btn.disabled=false; btn2.disabled=false;
   updateQuickBar();
 
   // 自动给 AI 选中的帧挂载反馈按钮（async，fire-and-forget）
@@ -3565,7 +3688,7 @@ function addBatch(cols,rows){
   renderBatch(batch);
   updateFillBtn();
   updateQuickBar();
-  toast('已添加 '+cols+'×'+rows+' 拼图批次 #'+id);
+  toast('已添加 '+cols+'×'+rows+' 销售图 #'+id);
 }
 
 function renderBatch(b){
@@ -3584,8 +3707,8 @@ function batchHTML(b){
     // ── 顶部：标题 + 操作按钮 ──
     '<div class="batch-head">'+
     '  <div class="batch-title">'+
-    '    <span class="batch-tag">'+b.cols+'×'+b.rows+'</span>'+
-    '    <span style="color:var(--tm);font-size:11px;">批次 #'+b.id+'</span>'+
+    '    <span class="batch-tag">'+(b.title?escapeHtmlSafe(b.title):b.cols+'×'+b.rows)+'</span>'+
+    '    <span style="color:var(--tm);font-size:11px;">'+(b.note?escapeHtmlSafe(b.note):'销售图 #'+b.id)+'</span>'+
     '  </div>'+
     '  <div class="batch-actions">'+
     '    <button class="btn-sm" onclick="downloadBatch('+b.id+')" id="dl-'+b.id+'" disabled>'+
@@ -3618,7 +3741,7 @@ function batchHTML(b){
     '      <div class="tog-thumb"></div>'+
     '    </label>'+
     '  </div>'+
-    '  <button class="btn-gen" onclick="generateBatch('+b.id+')" id="gen-'+b.id+'" style="flex:1;min-width:80px;">生成拼图</button>'+
+    '  <button class="btn-gen" onclick="generateBatch('+b.id+')" id="gen-'+b.id+'" style="flex:1;min-width:80px;">生成销售图</button>'+
     '  <button class="btn-dl" onclick="downloadBatch('+b.id+')" id="dl2-'+b.id+'" disabled style="flex:1;min-width:80px;">'+
     '    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>下载 1080P'+
     '  </button>'+
@@ -3677,7 +3800,7 @@ function clearDropTargets(){
 // ===================================================================
 let _pmReplaceMode=false; // 标记帧选择器是否由全屏预览发起（替换后自动重新生成）
 function pickFrame(b, ci, fromPreview=false){
-  if(S.frames.length===0){ toast('请先截取视频帧','err'); return; }
+  if(S.frames.length===0){ toast('请先分析视频并提取候选画面','err'); return; }
   _pmReplaceMode = !!fromPreview;
   showFramePicker(b, ci);
 }
@@ -3698,7 +3821,7 @@ function showFramePicker(b, ci){
     'display:flex;flex-direction:column;gap:12px;box-shadow:0 24px 80px rgba(0,0,0,.7);">'+
     '<div style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">'+
     '<span style="font-size:13px;font-weight:600;color:var(--mint-light);">'+
-    '选择帧 → 格子 #'+(ci+1)+'（批次 #'+b.id+'）'+
+    '选择候选画面 → 位置 #'+(ci+1)+'（销售图 #'+b.id+'）'+
     (current!==null?'<span style="font-size:12px;color:var(--tm);">当前: 第'+(current+1)+'帧</span>':'')+
     '</span>'+
     '<div style="display:flex;gap:8px;align-items:center;">'+
@@ -4029,7 +4152,7 @@ function removeBatch(bid){
   document.getElementById('batch-'+bid)?.remove();
   if(S.batches.length===0) document.getElementById('batchEmpty').style.display='flex';
   updateFillBtn(); refreshUsageTags();
-  toast('已删除批次 #'+bid);
+  toast('已删除销售图 #'+bid);
 }
 
 // ===================================================================
@@ -4141,7 +4264,7 @@ async function generateBatch(bid){
   // Activate global download
   checkDlAllBtn();
   const hasBadge=badgeChk&&badgeChk.checked;
-  toast('批次 #'+bid+' 生成成功（'+W+'×'+H+'）'+(hasBadge?' ✦ 已叠加角标':'')+' — 点击预览图可全屏查看/替换');
+  toast('销售图 #'+bid+' 生成成功（'+W+'×'+H+'）'+(hasBadge?' ✦ 已叠加角标':'')+' — 点击预览图可全屏查看/替换');
   // 不再自动弹出全屏预览，避免打断操作；用户点击预览缩略图即可全屏
 }
 
@@ -4209,14 +4332,14 @@ function exportExt(){ return EXPORT.format==='png'?'png':(EXPORT.format==='webp'
 
 function downloadBatch(bid){
   const b=S.batches.find(x=>x.id===bid);
-  if(!b||!b.canvas){ toast('请先生成拼图','err'); return; }
+  if(!b||!b.canvas){ toast('请先生成销售图','err'); return; }
   const outW=Math.round(b.canvas.width*EXPORT.scale);
   const outH=Math.round(b.canvas.height*EXPORT.scale);
   const a=document.createElement('a');
   a.href=exportCanvasURL(b.canvas);
   a.download='videoframe_'+b.cols+'x'+b.rows+'_batch'+bid+'_'+outW+'x'+outH+'.'+exportExt();
   a.click();
-  toast('批次 #'+bid+' 已下载（'+EXPORT.format.toUpperCase()+' '+outW+'×'+outH+'）');
+  toast('销售图 #'+bid+' 已下载（'+EXPORT.format.toUpperCase()+' '+outW+'×'+outH+'）');
 }
 
 async function generateAll(){
@@ -4226,7 +4349,7 @@ async function generateAll(){
       autoCreateBatchForSelection(S.selected.length);
       doFillAll();
     } else {
-      toast('请先选择帧或添加拼图批次','err'); return;
+      toast('请先选择候选画面或添加销售图资产','err'); return;
     }
   }
   // 若批次全空但有选中帧，先自动填充
@@ -4240,13 +4363,13 @@ async function generateAll(){
   }
   btn.innerHTML='<svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" fill="none" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg>一键生成全部';
   btn.disabled=false;
-  if(ok===0) toast('所有批次均无填充图像','err');
-  else toast('一键生成完成，共 '+ok+' 个批次');
+  if(ok===0) toast('所有销售图均未放入画面','err');
+  else toast('销售图生成完成，共 '+ok+' 个资产');
 }
 
 function downloadAll(){
   const ready=S.batches.filter(b=>b.canvas);
-  if(ready.length===0){ toast('请先生成拼图','err'); return; }
+  if(ready.length===0){ toast('请先生成销售图','err'); return; }
   ready.forEach((b,i)=>{ setTimeout(()=>downloadBatch(b.id), i*300); });
   toast('正在下载全部 '+ready.length+' 个拼图...');
 }
@@ -4261,6 +4384,559 @@ function loadImg(src){
 }
 
 // ===================================================================
+// 光厂上架套件：视频 + 分镜文档 → 销售策略 → 封面候选 → 详情长图 → SEO
+// ===================================================================
+const SALES = {
+  plan: null,
+  detailCanvas: null,
+  detailRows: []
+};
+
+function salesInputs(){
+  return {
+    doc: (document.getElementById('storyDoc')?.value || '').trim(),
+    type: document.getElementById('salesPackType')?.value || '自定义',
+    goal: document.getElementById('salesGoal')?.value || '点击与转化兼顾',
+    useText: !!document.getElementById('salesUseText')?.checked,
+    makeAltCovers: !!document.getElementById('salesMakeAltCovers')?.checked,
+    textStyle: document.getElementById('detailTextStyle')?.value || 'minimal',
+    textPosition: document.getElementById('detailTextPosition')?.value || 'top',
+    textDensity: document.getElementById('detailTextDensity')?.value || 'light',
+	    visualTone: document.getElementById('detailVisualTone')?.value || 'premium',
+	    apiKey: (document.getElementById('aiApiKey')?.value || '').trim(),
+	    model: document.getElementById('aiModel')?.value || 'qwen3-vl-plus',
+	    seoModel: document.getElementById('aiSeoModel')?.value || 'gpt-5.5-pro'
+	  };
+	}
+
+function setSalesProgress(pct, text){
+  const wrap=document.getElementById('salesProgress');
+  const fill=document.getElementById('salesProgressFill');
+  const label=document.getElementById('salesProgressText');
+  if(!wrap||!fill||!label) return;
+  if(pct<0){ wrap.style.display='none'; return; }
+  wrap.style.display='flex';
+  fill.style.width=Math.max(0,Math.min(100,pct))+'%';
+  label.textContent=text||'处理中...';
+}
+
+async function readStoryFile(file){
+  const name=file.name||'文档';
+  const ext=(name.split('.').pop()||'').toLowerCase();
+  const buf=await file.arrayBuffer();
+  let text='';
+  try{
+    text=new TextDecoder('utf-8').decode(buf);
+  }catch(_){
+    text=new TextDecoder('gb18030').decode(buf);
+  }
+  if(ext==='docx'){
+    text=text
+      .replace(/<w:p[^>]*>/g,'\n')
+      .replace(/<[^>]+>/g,' ')
+      .replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
+  } else if(ext==='rtf'){
+    text=text.replace(/\\par[d]?/g,'\n').replace(/\\'[0-9a-fA-F]{2}/g,'').replace(/[{}]\\?[^\\s]+ ?/g,' ');
+  } else if(ext==='doc'){
+    text=text.replace(/[^\u4e00-\u9fa5A-Za-z0-9，。；、,.!?！？：:\n\r\s-]/g,' ');
+  }
+  text=text.replace(/\s+\n/g,'\n').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim();
+  if(!text || text.length<8) throw new Error('未能从文档中提取到足够文本，可复制内容后粘贴到输入框');
+  return text.slice(0,12000);
+}
+
+document.getElementById('storyFileBtn')?.addEventListener('click',()=>document.getElementById('storyFileInput')?.click());
+document.getElementById('storyFileInput')?.addEventListener('change',async e=>{
+  const file=e.target.files&&e.target.files[0];
+  if(!file) return;
+  const label=document.getElementById('storyFileName');
+  try{
+    if(label) label.textContent='正在读取：'+file.name;
+    const text=await readStoryFile(file);
+    const area=document.getElementById('storyDoc');
+    area.value = area.value.trim() ? (area.value.trim()+'\n\n'+text) : text;
+    if(label) label.textContent='已导入：'+file.name+' · '+text.length+' 字';
+    toast('已导入分镜/素材文档');
+  }catch(err){
+    if(label) label.textContent='导入失败：'+file.name;
+    toast(err.message||'文档导入失败','err');
+  }finally{
+    e.target.value='';
+  }
+});
+
+function showSalesResults(plan){
+  SALES.plan = plan;
+  const panel=document.getElementById('salesResultPanel');
+  if(panel) panel.style.display='';
+  const strategy=document.getElementById('salesStrategy');
+	  if(strategy){
+	    strategy.textContent=[
+	      '主题定位：'+plan.theme,
+	      '核心卖点：'+plan.sellingPoints.join(' / '),
+	      '视觉方向：'+plan.visualDirection,
+	      '详情结构：'+plan.detailRows.map(r=>r.label+'（'+r.count+'图）').join(' → '),
+	      plan.visionModelUsed ? ('视觉模型：'+plan.visionModelUsed) : '',
+	      plan.seoModelUsed ? ('SEO模型：'+plan.seoModelUsed) : ''
+	    ].filter(Boolean).join('\n');
+	  }
+  const list=document.getElementById('coverPlanList');
+  if(list){
+    list.innerHTML=plan.coverPlans.map((p,i)=>
+      '<div class="cover-plan"><strong>'+(i+1)+'. '+escapeHtmlSafe(p.name)+' · '+p.score+'分</strong><span>'+escapeHtmlSafe(p.reason)+'</span></div>'
+    ).join('');
+  }
+  document.getElementById('seoTitle').value=plan.seoTitle||'';
+  document.getElementById('seoIntro').value=plan.seoIntro||'';
+  document.getElementById('seoKeywords').value=(plan.keywords||[]).join(' ');
+}
+
+function docKeywords(doc, type){
+  const base=(doc+' '+type).replace(/[，。；、,.!?！？（）()【】\[\]\n\r]/g,' ');
+  const parts=base.split(/\s+/).map(s=>s.trim()).filter(Boolean);
+  const cn=base.match(/[\u4e00-\u9fa5A-Za-z0-9]{2,}/g)||[];
+  return [...new Set([...parts, ...cn])].slice(0,80);
+}
+
+function fallbackSalesPlan(input){
+  const kw=docKeywords(input.doc, input.type);
+  const theme = input.type==='自定义'
+    ? (kw.slice(0,4).join('') || '高质量商业视频素材包')
+    : input.type + '视频素材包';
+  const sellingPoints=[
+    '主题识别清晰，适合一眼判断素材内容',
+    '画面覆盖不同场景与细节，证明素材包内容丰富',
+    '强调商业项目可用性，适合宣传片、展厅、广告与新媒体包装'
+  ];
+  const sceneWords = [...new Set([
+    input.type, '商业宣传', '企业宣传片', '广告包装', '展厅大屏', '短视频剪辑',
+    '科技感', '高级感', '可商用', '高清素材', '视频素材', '素材包',
+    ...kw
+  ])].filter(Boolean);
+  const keywords = buildKeywordList(sceneWords, input.type);
+  return {
+    theme,
+    sellingPoints,
+    visualDirection:'封面用高冲击、主题明确的代表性画面；详情用大图+多图矩阵证明场景丰富、细节可用、商业质感稳定。',
+    coverPlans:[
+      {name:'主题一眼识别版', score:92, reason:'优先选择能立刻说明素材包主题的高光画面，适合作为默认主封面。'},
+      {name:'点击冲击力版', score:88, reason:'强化色彩、光影、主体冲突和视觉节奏，用于测试更高点击。'},
+      {name:'内容丰富证明版', score:85, reason:'让四张图覆盖不同角度和场景，降低买家对素材重复度的顾虑。'}
+    ],
+    detailRows:[
+      {label:'主视觉大图', count:1, text:'核心视觉'},
+      {label:'代表场景', count:2, text:'多场景覆盖'},
+      {label:'主体细节', count:3, text:'细节丰富'},
+      {label:'商用氛围', count:1, text:'适用商业项目'},
+      {label:'更多补充', count:2, text:'内容更完整'}
+    ],
+    seoTitle: makeSeoTitle(theme, sceneWords),
+    seoIntro: makeSeoIntro(theme, sellingPoints, sceneWords),
+    keywords
+  };
+}
+
+function buildKeywordList(words, type){
+  const defaults=[
+    type,'视频素材','4K素材','高清素材','商用素材','素材包','企业宣传','广告片','宣传片','品牌片',
+    '展厅','大屏','新媒体','短视频','剪辑素材','商业项目','科技感','高级感','现代','视觉包装',
+    '背景视频','片头片尾','数字化','产业宣传','产品宣传','项目汇报','发布会','官网视频','海报视觉','详情页'
+  ];
+  const pool=[...new Set([...words, ...defaults].map(x=>String(x||'').trim()).filter(Boolean))];
+  while(pool.length<50) pool.push(['商业应用','高端视觉','场景展示','内容丰富','可商用'][pool.length%5]+(pool.length+1));
+  return pool.slice(0,50);
+}
+
+function makeSeoTitle(theme, words){
+  const tail=words.includes('4K素材')?'':'4K视频素材';
+  return (theme+' '+words.slice(0,4).filter(w=>!theme.includes(w)).join(' ')+' '+tail).replace(/\s+/g,' ').trim();
+}
+
+function makeSeoIntro(theme, sellingPoints, words){
+  const scenes=words.slice(0,12).join('、');
+  return theme+'围绕'+scenes+'等画面内容展开，画面适合用于企业宣传片、商业广告、科技展厅、品牌包装、短视频剪辑、项目汇报和新媒体视觉设计等场景。'+
+    '素材重点呈现'+sellingPoints.join('，')+'，可帮助项目快速建立清晰主题、高级质感和丰富的画面延展。';
+}
+
+async function aiSalesPlan(input){
+  if(!input.apiKey) return fallbackSalesPlan(input);
+  const sampleIdx = pickEvenFrames(Math.min(S.frames.length, 8));
+  const content=[{
+    type:'text',
+    text:
+      '你是光厂视频素材包的高级产品经理、视觉策划和SEO运营。请结合分镜文档、素材类型、销售目标和视频抽样画面，输出适合光厂售卖的上架方案。\n'+
+      '必须严格输出纯JSON，不要代码块。JSON字段：theme(string), sellingPoints(string[3-6]), visualDirection(string), coverPlans([{name,score,reason}] 3个), detailRows([{label,count,text}] 4-7行，每行count为1-4), seoTitle(string), seoIntro(string，不写时长，重点写内容/适用场景/商业用途), keywords(string[50])。\n'+
+      '封面目标：一眼表达素材包主题、四宫格有点击冲击力。详情目标：证明内容丰富、可商用、值得买，可用长图结构，不局限九宫格。\n'+
+      '素材类型：'+input.type+'\n销售目标：'+input.goal+'\n是否允许详情图文字：'+(input.useText?'允许少量文字':'尽量纯图')+'\n分镜/素材文档：\n'+(input.doc||'用户未提供文档，请根据视频画面和素材类型判断。')
+  }];
+  for(const fi of sampleIdx){
+    const b64=await compressFrameForVision(S.frames[fi].dataUrl);
+    if(b64){
+      content.push({type:'text', text:'视频抽样帧 #'+(fi+1)+'，时间 '+S.frames[fi].time.toFixed(1)+'s'});
+      content.push({type:'image_url', image_url:{url:'data:image/jpeg;base64,'+b64, detail:'low'}});
+    }
+  }
+  const resp=await fetch('https://llm-api.mcisaas.com/v1/chat/completions',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+input.apiKey},
+    body:JSON.stringify({
+      model:input.model,
+      messages:[{role:'user', content}],
+      max_tokens:1800,
+      temperature:.35
+    })
+  });
+  if(!resp.ok) throw new Error('销售策略AI失败 '+resp.status+': '+(await resp.text()).slice(0,180));
+  const raw=(await resp.json()).choices?.[0]?.message?.content?.trim()||'';
+  let parsed=null;
+  try{ parsed=JSON.parse(raw); }catch(_){
+    const a=raw.indexOf('{'), b=raw.lastIndexOf('}');
+    if(a>=0&&b>a) parsed=JSON.parse(raw.slice(a,b+1));
+  }
+  if(!parsed || !parsed.theme) throw new Error('销售策略AI返回格式无法解析');
+  const fallback=fallbackSalesPlan(input);
+  parsed.visionModelUsed=input.model;
+  parsed.sellingPoints=Array.isArray(parsed.sellingPoints)&&parsed.sellingPoints.length?parsed.sellingPoints:fallback.sellingPoints;
+  parsed.coverPlans=Array.isArray(parsed.coverPlans)&&parsed.coverPlans.length?parsed.coverPlans.slice(0,3):fallback.coverPlans;
+  parsed.detailRows=Array.isArray(parsed.detailRows)&&parsed.detailRows.length?parsed.detailRows.slice(0,7):fallback.detailRows;
+  parsed.keywords=Array.isArray(parsed.keywords)&&parsed.keywords.length?parsed.keywords:fallback.keywords;
+  while(parsed.coverPlans.length<3) parsed.coverPlans.push(fallback.coverPlans[parsed.coverPlans.length]);
+  while(parsed.keywords.length<50) parsed.keywords.push(...fallback.keywords);
+  parsed.keywords=[...new Set(parsed.keywords.map(x=>String(x).trim()).filter(Boolean))].slice(0,50);
+  return parsed;
+}
+
+async function aiSeoOptimize(input, plan){
+  if(!input.apiKey) return plan;
+  const prompt =
+    '你是光厂视频素材包上架的资深SEO运营和商业文案总监。请只优化上架文案，不要改变封面/详情图策略。\n'+
+    '目标：提高搜索曝光、点击意愿和购买转化。标题要自然，不堆砌；简介不写时长，重点写内容、适用场景、可商用价值；关键词必须正好50个，用数组返回。\n'+
+    '严格输出纯JSON，不要代码块。JSON字段：seoTitle(string), seoIntro(string), keywords(string[50])。\n\n'+
+    '素材类型：'+input.type+'\n'+
+    '销售目标：'+input.goal+'\n'+
+    '主题定位：'+(plan.theme||'')+'\n'+
+    '核心卖点：'+(plan.sellingPoints||[]).join(' / ')+'\n'+
+    '视觉方向：'+(plan.visualDirection||'')+'\n'+
+    '详情结构：'+(plan.detailRows||[]).map(r=>r.label+' '+(r.text||'')+' '+r.count+'图').join('；')+'\n'+
+    '分镜/素材文档：\n'+(input.doc||'用户未提供文档，请根据素材类型和已有策略生成。');
+  const resp=await fetch('https://llm-api.mcisaas.com/v1/chat/completions',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+input.apiKey},
+    body:JSON.stringify({
+      model:input.seoModel,
+      messages:[{role:'user', content:prompt}],
+      max_tokens:1400,
+      temperature:.42
+    })
+  });
+  if(!resp.ok) throw new Error('SEO文案AI失败 '+resp.status+': '+(await resp.text()).slice(0,180));
+  const raw=(await resp.json()).choices?.[0]?.message?.content?.trim()||'';
+  let parsed=null;
+  try{ parsed=JSON.parse(raw); }catch(_){
+    const a=raw.indexOf('{'), b=raw.lastIndexOf('}');
+    if(a>=0&&b>a) parsed=JSON.parse(raw.slice(a,b+1));
+  }
+  if(!parsed) throw new Error('SEO文案AI返回格式无法解析');
+  const fallback=fallbackSalesPlan(input);
+  const keywords=Array.isArray(parsed.keywords)?parsed.keywords:String(parsed.keywords||'').split(/\s+/);
+  plan.seoTitle=String(parsed.seoTitle||plan.seoTitle||fallback.seoTitle).trim();
+  plan.seoIntro=String(parsed.seoIntro||plan.seoIntro||fallback.seoIntro).trim();
+  plan.keywords=[...new Set(keywords.map(x=>String(x).trim()).filter(Boolean))];
+  while(plan.keywords.length<50) plan.keywords.push(...fallback.keywords);
+  plan.keywords=[...new Set(plan.keywords)].slice(0,50);
+  plan.seoModelUsed=input.seoModel;
+  return plan;
+}
+
+function pickEvenFrames(n){
+  if(S.frames.length===0 || n<=0) return [];
+  if(S.frames.length<=n) return S.frames.map((_,i)=>i);
+  const arr=[];
+  for(let i=0;i<n;i++) arr.push(Math.round(i*(S.frames.length-1)/(n-1)));
+  return [...new Set(arr)];
+}
+
+async function getSalesRankedFrames(){
+  if(S.aiScores && S.aiScores.length){
+    return [...S.aiScores].sort((a,b)=>(b.score||0)-(a.score||0)).map(s=>s.frameIdx);
+  }
+  const analyses=[];
+  for(let i=0;i<S.frames.length;i++){
+    const r=await aiAnalyzeFrame(S.frames[i].dataUrl);
+    analyses.push({frameIdx:i, score:r.sharpness*0.55 + r.brightScore*60 + r.saturation*40, ...r});
+    if(i%8===0) await sleep(0);
+  }
+  return analyses.sort((a,b)=>b.score-a.score).map(a=>a.frameIdx);
+}
+
+function resetSalesBatches(){
+  S.batches=[]; batchIdCnt=0;
+  const list=document.getElementById('batchList');
+  if(list){
+    list.innerHTML='<div class="empty" id="batchEmpty"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><p>还没有销售图资产<br/>可点击上方版式或回到第一步自动生成</p></div>';
+  }
+}
+
+async function createCoverCandidates(plan, ranked){
+  resetSalesBatches();
+  const plans=plan.coverPlans.slice(0, document.getElementById('salesMakeAltCovers').checked ? 3 : 1);
+  const offsets=[0,2,4];
+  for(let i=0;i<plans.length;i++){
+    addBatch(2,2);
+    const b=S.batches[S.batches.length-1];
+    b.title='封面候选 '+String.fromCharCode(65+i);
+    b.note=plans[i].name+' · '+plans[i].score+'分';
+    const picks=ranked.slice(offsets[i], offsets[i]+4);
+    while(picks.length<4 && ranked[picks.length]) picks.push(ranked[picks.length]);
+    placeFramesIntoBatch(b, [...new Set(picks)].slice(0,4), 'cover');
+    renderBatchTitle(b);
+    await generateBatch(b.id);
+  }
+  refreshUsageTags();
+}
+
+function renderBatchTitle(b){
+  const el=document.getElementById('batch-'+b.id);
+  if(!el) return;
+  const tag=el.querySelector('.batch-tag');
+  const meta=el.querySelector('.batch-title span:nth-child(2)');
+  if(tag) tag.textContent=b.title||b.cols+'×'+b.rows;
+  if(meta) meta.textContent=b.note||('销售图 #'+b.id);
+}
+
+function chooseDetailFrames(ranked, need){
+  const byTime=[...ranked].sort((a,b)=>((S.frames[a]?.time)||0)-((S.frames[b]?.time)||0));
+  const mixed=[];
+  let qi=0, ti=0;
+  while(mixed.length<need && (qi<ranked.length || ti<byTime.length)){
+    const q=ranked[qi++]; if(q!==undefined && !mixed.includes(q)) mixed.push(q);
+    const t=byTime[ti++]; if(t!==undefined && !mixed.includes(t) && mixed.length<need) mixed.push(t);
+  }
+  return mixed.slice(0, need);
+}
+
+async function generateSalesDetailImage(plan, ranked, input){
+  const rows=(plan.detailRows||fallbackSalesPlan(input).detailRows)
+    .map(r=>({label:String(r.label||'详情展示'), count:Math.max(1,Math.min(4,parseInt(r.count)||1)), text:String(r.text||r.label||'')}))
+    .slice(0,7);
+  const need=rows.reduce((s,r)=>s+r.count,0);
+  const picks=chooseDetailFrames(ranked, need);
+  const tone=detailTone(input.visualTone);
+  const W=1920, pad=64, gap=18, titleH=168, footerH=72;
+  const rowHs=rows.map(r=>r.count===1?640:(r.count===2?500:420));
+  const H=titleH+footerH+rowHs.reduce((s,h)=>s+h,0)+gap*(rows.length-1)+pad;
+  const canvas=document.createElement('canvas'); canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle=tone.bg; ctx.fillRect(0,0,W,H);
+  const grd=ctx.createLinearGradient(0,0,W,0);
+  grd.addColorStop(0,tone.glowA);
+  grd.addColorStop(.55,tone.glowB);
+  grd.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=grd; ctx.fillRect(0,0,W,240);
+  ctx.fillStyle=tone.title;
+  ctx.font='700 54px Inter, sans-serif';
+  wrapCanvasText(ctx, plan.theme||'光厂视频素材包', pad, 74, W-pad*2, 62, 1);
+  ctx.fillStyle=tone.sub;
+  ctx.font='400 24px Inter, sans-serif';
+  wrapCanvasText(ctx, (plan.sellingPoints||[]).slice(0,2).join(' · '), pad, 124, W-pad*2, 34, 2);
+  let y=titleH, k=0;
+  for(const row of rows){
+    const rh=rowHs[rows.indexOf(row)];
+    const count=row.count;
+    const labelH=(input.useText && input.textPosition==='top' && input.textStyle!=='none')?64:0;
+    if(input.useText && input.textPosition==='top' && input.textStyle!=='none'){
+      drawDetailTextBlock(ctx, row, pad, y, W-pad*2, 52, input, tone, rows.indexOf(row)+1);
+    }
+    const imgY=y+labelH;
+    const imgH=rh-labelH;
+    const sideW=(input.useText && input.textPosition==='side' && input.textStyle!=='none')?260:0;
+    if(sideW){
+      drawDetailTextBlock(ctx, row, pad, imgY, sideW-22, imgH, input, tone, rows.indexOf(row)+1);
+    }
+    const gridX=pad+sideW;
+    const gridW=W-pad*2-sideW;
+    const cellW=(gridW-gap*(count-1))/count;
+    for(let c=0;c<count;c++){
+      const fi=picks[k++]; if(fi===undefined) continue;
+      const img=await loadImg(S.frames[fi].dataUrl);
+      const x=gridX+c*(cellW+gap);
+      drawCoverImage(ctx,img,x,imgY,cellW,imgH);
+      if(input.useText && input.textPosition==='overlay' && input.textStyle!=='none' && c===0){
+        drawOverlayText(ctx,row,x,imgY,cellW,imgH,input,tone,rows.indexOf(row)+1);
+      }
+      ctx.strokeStyle=tone.stroke; ctx.lineWidth=1;
+      ctx.strokeRect(x+.5,imgY+.5,cellW-1,imgH-1);
+    }
+    y+=rh+gap;
+  }
+  ctx.fillStyle=tone.sub;
+  ctx.font='400 18px Inter, sans-serif';
+  ctx.fillText('适用于企业宣传片、商业广告、科技展厅、品牌包装、新媒体剪辑等项目', pad, H-42);
+  SALES.detailCanvas=canvas;
+  SALES.detailRows=rows;
+  const block=document.getElementById('detailPreviewBlock');
+  const prev=document.getElementById('salesDetailCanvas');
+  if(block) block.style.display='';
+  if(prev){
+    prev.width=W; prev.height=H;
+    const pctx=prev.getContext('2d');
+    pctx.drawImage(canvas,0,0);
+  }
+  const meta=document.getElementById('detailMeta');
+  if(meta) meta.textContent='详情长图 '+W+'×'+H+' · '+picks.length+' 张图 · '+rows.length+' 行结构';
+}
+
+function detailTone(name){
+  const tones={
+    premium:{bg:'#07090d', title:'#f6f3ff', sub:'rgba(246,243,255,.68)', accent:'#b06bff', chip:'rgba(176,107,255,.22)', stroke:'rgba(255,255,255,.12)', glowA:'rgba(176,107,255,.24)', glowB:'rgba(62,180,137,.14)'},
+    clean:{bg:'#f4f6fb', title:'#111827', sub:'rgba(17,24,39,.62)', accent:'#2563eb', chip:'rgba(37,99,235,.10)', stroke:'rgba(17,24,39,.12)', glowA:'rgba(37,99,235,.14)', glowB:'rgba(16,185,129,.10)'},
+    tech:{bg:'#061018', title:'#ecfeff', sub:'rgba(236,254,255,.64)', accent:'#22d3ee', chip:'rgba(34,211,238,.16)', stroke:'rgba(34,211,238,.20)', glowA:'rgba(34,211,238,.20)', glowB:'rgba(16,185,129,.16)'},
+    warm:{bg:'#120d08', title:'#fff7ed', sub:'rgba(255,247,237,.66)', accent:'#fb923c', chip:'rgba(251,146,60,.18)', stroke:'rgba(251,146,60,.18)', glowA:'rgba(251,146,60,.20)', glowB:'rgba(250,204,21,.10)'}
+  };
+  return tones[name]||tones.premium;
+}
+
+function drawDetailTextBlock(ctx,row,x,y,w,h,input,tone,idx){
+  const style=input.textStyle;
+  ctx.save();
+  if(style==='tech'){
+    ctx.fillStyle=tone.chip; roundRect(ctx,x,y+4,w,Math.min(h-8,48),14); ctx.fill();
+    ctx.fillStyle=tone.accent; ctx.font='700 18px Inter, sans-serif'; ctx.fillText(String(idx).padStart(2,'0'),x+18,y+34);
+    ctx.fillStyle=tone.title; ctx.font='700 26px Inter, sans-serif'; ctx.fillText(row.label,x+64,y+34);
+  } else if(style==='editorial'){
+    ctx.fillStyle=tone.accent; ctx.fillRect(x,y+7,5,Math.min(h-14,42));
+    ctx.fillStyle=tone.title; ctx.font='800 32px Inter, sans-serif'; ctx.fillText(row.label,x+20,y+36);
+  } else {
+    ctx.fillStyle=tone.title; ctx.font='700 28px Inter, sans-serif'; ctx.fillText(row.label,x,y+32);
+  }
+  if(input.textDensity!=='light'){
+    ctx.fillStyle=tone.sub; ctx.font='400 18px Inter, sans-serif';
+    wrapCanvasText(ctx,row.text||'',x+(style==='editorial'?20:0),y+58,w,25,input.textDensity==='rich'?2:1);
+  }
+  if(input.textDensity==='rich'){
+    const tags=String(row.text||row.label).split(/[、,，\s]+/).filter(Boolean).slice(0,3);
+    let tx=x, ty=y+h-22;
+    ctx.font='700 15px Inter, sans-serif';
+    tags.forEach(t=>{
+      const tw=ctx.measureText(t).width+24;
+      ctx.fillStyle=tone.chip; roundRect(ctx,tx,ty-20,tw,28,14); ctx.fill();
+      ctx.fillStyle=tone.accent; ctx.fillText(t,tx+12,ty);
+      tx+=tw+8;
+    });
+  }
+  ctx.restore();
+}
+
+function drawOverlayText(ctx,row,x,y,w,h,input,tone,idx){
+  const boxW=Math.min(w-36,520), boxH=input.textDensity==='light'?58:92;
+  const bx=x+18, by=y+h-boxH-18;
+  ctx.save();
+  ctx.fillStyle='rgba(0,0,0,.48)'; roundRect(ctx,bx,by,boxW,boxH,16); ctx.fill();
+  ctx.fillStyle=tone.accent; ctx.font='700 15px Inter, sans-serif'; ctx.fillText('SCENE '+String(idx).padStart(2,'0'),bx+18,by+24);
+  ctx.fillStyle='#fff'; ctx.font='800 25px Inter, sans-serif'; ctx.fillText(row.label,bx+18,by+56);
+  if(input.textDensity!=='light'){
+    ctx.fillStyle='rgba(255,255,255,.72)'; ctx.font='400 16px Inter, sans-serif'; ctx.fillText(row.text||'',bx+18,by+80);
+  }
+  ctx.restore();
+}
+
+function roundRect(ctx,x,y,w,h,r){
+  const rr=Math.min(r,w/2,h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+rr,y); ctx.arcTo(x+w,y,x+w,y+h,rr); ctx.arcTo(x+w,y+h,x,y+h,rr);
+  ctx.arcTo(x,y+h,x,y,rr); ctx.arcTo(x,y,x+w,y,rr); ctx.closePath();
+}
+
+function drawCoverImage(ctx,img,x,y,w,h){
+  if(!img){ ctx.fillStyle='#111'; ctx.fillRect(x,y,w,h); return; }
+  const sc=Math.max(w/img.width,h/img.height);
+  const sw=img.width*sc, sh=img.height*sc;
+  ctx.drawImage(img,x+(w-sw)/2,y+(h-sh)/2,sw,sh);
+}
+
+function wrapCanvasText(ctx,text,x,y,maxW,lineH,maxLines){
+  const chars=String(text||'').split('');
+  let line='', lines=[];
+  for(const ch of chars){
+    const test=line+ch;
+    if(ctx.measureText(test).width>maxW && line){ lines.push(line); line=ch; }
+    else line=test;
+    if(lines.length>=maxLines) break;
+  }
+  if(line && lines.length<maxLines) lines.push(line);
+  lines.forEach((l,i)=>ctx.fillText(l,x,y+i*lineH));
+}
+
+async function ensureSalesFrames(){
+  if(S.frames.length>0) return true;
+  if(!Number.isFinite(vPrev.duration) || vPrev.duration<=0){
+    toast('请先上传视频，再生成光厂上架套件','err');
+    return false;
+  }
+  await doCapture();
+  return S.frames.length>0;
+}
+
+async function runSalesCopyOnly(){
+  const input=salesInputs();
+  setSalesProgress(20,'正在生成销售策略...');
+  let plan;
+  try{ plan=await aiSalesPlan(input); }
+  catch(e){ console.warn(e); plan=fallbackSalesPlan(input); toast('AI 文案失败，已使用本地策略生成','warn'); }
+  setSalesProgress(68,'正在用 '+input.seoModel+' 优化 SEO 文案...');
+  try{ plan=await aiSeoOptimize(input, plan); }
+  catch(e){ console.warn(e); toast('SEO 模型失败，已保留基础文案','warn'); }
+  showSalesResults(plan);
+  setSalesProgress(-1);
+}
+
+async function runSalesKit(){
+  const input=salesInputs();
+  const btn=document.getElementById('salesKitBtn');
+  const old=btn?btn.innerHTML:'';
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>生成销售套件中...'; }
+  try{
+    setSalesProgress(8,'检查视频与分镜文档...');
+    if(!(await ensureSalesFrames())) return;
+    setSalesProgress(24,'用 '+input.model+' 分析分镜、卖点与画面策略...');
+    let plan;
+    try{ plan=await aiSalesPlan(input); }
+    catch(e){ console.warn(e); plan=fallbackSalesPlan(input); toast('AI 策略失败，已使用本地销售策略继续生成','warn'); }
+    setSalesProgress(36,'用 '+input.seoModel+' 优化标题、简介和关键词...');
+    try{ plan=await aiSeoOptimize(input, plan); }
+    catch(e){ console.warn(e); toast('SEO 模型失败，已保留基础文案继续生成','warn'); }
+    showSalesResults(plan);
+    setSalesProgress(45,'挑选高销售价值画面...');
+    if(!(S.aiScores&&S.aiScores.length) && input.apiKey){
+      try{ await runAIPick(false); }catch(e){ console.warn('AI挑帧失败，改用本地排序', e); }
+    }
+    const ranked=await getSalesRankedFrames();
+    if(!ranked.length){ toast('没有可用帧，请先截帧','err'); return; }
+    setSalesProgress(66,'生成封面候选...');
+    await createCoverCandidates(plan, ranked);
+    setSalesProgress(84,'生成可变结构详情长图...');
+    await generateSalesDetailImage(plan, ranked, input);
+    setSalesProgress(100,'光厂上架套件已生成');
+    switchTab(2);
+    toast('光厂上架套件完成：封面候选、详情长图和 SEO 文案已生成');
+    setTimeout(()=>setSalesProgress(-1),1200);
+  } finally {
+    if(btn){ btn.disabled=false; btn.innerHTML=old; }
+  }
+}
+
+document.getElementById('salesKitBtn')?.addEventListener('click', runSalesKit);
+document.getElementById('salesCopyBtn')?.addEventListener('click', runSalesCopyOnly);
+document.getElementById('downloadDetailBtn')?.addEventListener('click', ()=>{
+  if(!SALES.detailCanvas){ toast('请先生成详情长图','err'); return; }
+  const a=document.createElement('a');
+  a.href=exportCanvasURL(SALES.detailCanvas);
+  a.download='guangchang_detail_'+SALES.detailCanvas.width+'x'+SALES.detailCanvas.height+'.'+exportExt();
+  a.click();
+  toast('详情长图已下载');
+});
+
+// ===================================================================
 // FULL PREVIEW MODAL
 // ===================================================================
 let pmCurrentBatch=null;
@@ -4269,7 +4945,7 @@ function openPreviewModal(b){
   pmCurrentBatch=b;
   const modal=document.getElementById('previewModal');
   const pmCanvas=document.getElementById('pmCanvas');
-  document.getElementById('pmTitle').textContent=b.cols+'×'+b.rows+' 批次 #'+b.id+' 预览';
+  document.getElementById('pmTitle').textContent=(b.title||b.cols+'×'+b.rows)+' · 销售图 #'+b.id+' 预览';
   // Scale canvas to fit screen（按画布真实宽高比，而非写死 16:9）
   const cw=b.canvas.width, ch=b.canvas.height;
   const maxW=window.innerWidth-40;
