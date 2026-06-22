@@ -1149,6 +1149,8 @@ function saveActiveProject(){
   p.imgCache   = S.imgCache;
   p.captureMode= S.captureMode;
   p.batchIdCnt = batchIdCnt;
+  // 分镜/卖点文档随项目保存（清空视频/切换项目时一并隔离、清除）
+  p.storyDoc   = (document.getElementById('storyDoc')?.value || '');
   // 视频源信息（用于切换时恢复预览）
   p.videoUrl   = vPrev.src || p.videoUrl;
 }
@@ -1162,6 +1164,13 @@ function restoreProject(p){
   S.imgCache   = p.imgCache   || new Map();
   S.captureMode= p.captureMode|| 'interval';
   batchIdCnt   = p.batchIdCnt || 0;
+  // 恢复该项目的分镜/卖点文档（无则清空，避免残留上一个视频的文档）
+  const _docEl=document.getElementById('storyDoc');
+  if(_docEl){
+    _docEl.value = p.storyDoc || '';
+    const _fn=document.getElementById('storyFileName');
+    if(_fn && !(p.storyDoc||'').trim()){ _fn.textContent='支持 txt / md / csv / json，doc/docx 会尽量提取可读文本'; _fn.classList.remove('has-file'); }
+  }
   if(S.onlySelected){ S.onlySelected=false; syncOnlySelBtn(); }  // 切换项目时退出「只看已选」
   // 历史栈按项目隔离 → 切换即清空
   if(typeof HISTORY!=='undefined'){ HISTORY.stack.length=0; HISTORY.future.length=0; if(typeof updateUndoRedoUI==='function') updateUndoRedoUI(); }
@@ -1237,7 +1246,7 @@ function createProject(file){
     fileSize: fmtSz(file.size), fileFmt: file.name.split('.').pop().toUpperCase(),
     videoUrl: URL.createObjectURL(file),
     frames:[], selected:[], batches:[], aiScores:[], imgCache:new Map(),
-    captureMode:'interval', batchIdCnt:0,
+    captureMode:'interval', batchIdCnt:0, storyDoc:'',
   };
   PROJECTS.list.push(p);
   return p;
@@ -1300,6 +1309,7 @@ function deleteProjectNoConfirm(id){
   if(PROJECTS.list.length===0){
     PROJECTS.activeId=null;
     S.frames=[];S.selected=[];S.batches=[];S.aiScores=[];S.imgCache=new Map();batchIdCnt=0;
+    clearStoryDoc(); // 视频已全部移除 → 文档一并清除
     vPrev.removeAttribute('src'); vPrev.load();
     document.getElementById('vCon').style.display='none';
     document.getElementById('capBtn').disabled=true;
@@ -1474,6 +1484,7 @@ function loadVideo(file){
       p=createProject(file);
       PROJECTS.activeId=p.id;
       S.frames=[];S.selected=[];S.aiScores=[];S.imgCache=new Map();S.captureMode='interval';batchIdCnt=0;
+      clearStoryDoc(); // 新视频 = 新项目 → 文档清空，不残留上一个视频的分镜/卖点
       // 清空旧批次 DOM，新项目预置默认批次
       S.batches=[];
       document.getElementById('batchList').querySelectorAll('.batch').forEach(el=>el.remove());
@@ -3951,6 +3962,8 @@ function initBatchEvents(el, b){
       pickFrame(b, ci);
     };
     bindDropEvents(cell, b, ci);
+    // 跨批次/跨版本/跨封面：把该格子接入「格子↔格子」自由拖拽交换（仅已填图的格子作为拖拽源更直观，但落点允许空格）
+    bindCrossCellDrag(cell, b.id, 'cell:'+ci);
   });
 }
 
@@ -3971,6 +3984,91 @@ function bindDropEvents(cell, b, ci){
 
 function clearDropTargets(){
   document.querySelectorAll('.cell.drop-target').forEach(c=>c.classList.remove('drop-target'));
+}
+
+// ===================================================================
+// 跨批次 / 跨版本 / 跨封面：格子↔格子 自由拖拽替换
+// 统一格子引用 slotKey：
+//   封面批次  → "cell:<ci>"
+//   长图九宫格 → "grid:<idx>"
+//   长图行     → "row:<ri>:<c>"
+// 任意批次的任意格子，可拖到任意批次的任意格子进行「交换」。
+// ===================================================================
+let _crossDrag=null; // { bid, slotKey, fi }
+
+function parseSlotKey(b, key){
+  const p=String(key).split(':');
+  if(p[0]==='cell') return {kind:'cell', ci:+p[1]};
+  if(p[0]==='grid') return {kind:'grid', idx:+p[1]};
+  if(p[0]==='row')  return {kind:'row', ri:+p[1], c:+p[2]};
+  return null;
+}
+// 读某批次某格子的帧索引
+function getSlotFrameByKey(b, key){
+  const s=parseSlotKey(b,key); if(!s) return null;
+  if(s.kind==='cell') return (b.cells&&b.cells[s.ci]!=null)?b.cells[s.ci]:null;
+  if(s.kind==='grid') return b.detailLayout? b.detailLayout.gridFrames[s.idx] : null;
+  if(s.kind==='row')  return b.detailLayout? b.detailLayout.rows[s.ri].frames[s.c] : null;
+  return null;
+}
+// 写某批次某格子的帧索引
+function setSlotFrameByKey(b, key, fi){
+  const s=parseSlotKey(b,key); if(!s) return;
+  if(s.kind==='cell'){ b.cells[s.ci]=fi; if(fi===null&&b.crops) delete b.crops[s.ci]; }
+  else if(s.kind==='grid'){ b.detailLayout.gridFrames[s.idx]=fi; }
+  else if(s.kind==='row'){ b.detailLayout.rows[s.ri].frames[s.c]=fi; }
+}
+// 重绘某批次（封面 → 重生成画布；长图 → regenDetailLong）
+async function refreshBatchAfterSwap(b){
+  if(!b) return;
+  if(b.isDetailLong){ await regenDetailLong(b); }
+  else {
+    // 封面批次：刷新所有格子缩略 + 清空已生成画布（保持与现有逻辑一致，需用户再点生成；若已有画布则自动重生成）
+    for(let i=0;i<b.cols*b.rows;i++) renderCell(b,i);
+    if(b.canvas){ await generateBatch(b.id, true); } else { clearBatchCanvas(b); }
+  }
+}
+// 执行两个格子之间的「交换」
+async function performCrossSwap(srcBid, srcKey, dstBid, dstKey){
+  const sb=S.batches.find(x=>x.id===srcBid);
+  const db=S.batches.find(x=>x.id===dstBid);
+  if(!sb||!db) return;
+  // 同一格子：忽略
+  if(srcBid===dstBid && srcKey===dstKey) return;
+  pushHistory && pushHistory();
+  const fa=getSlotFrameByKey(sb, srcKey);
+  const fb=getSlotFrameByKey(db, dstKey);
+  // 交换帧
+  setSlotFrameByKey(sb, srcKey, fb);
+  setSlotFrameByKey(db, dstKey, fa);
+  await refreshBatchAfterSwap(sb);
+  if(db!==sb) await refreshBatchAfterSwap(db);
+  refreshUsageTags && refreshUsageTags();
+  toast('已交换两格画面'+(srcBid!==dstBid?'（跨批次）':''));
+}
+// 给一个 DOM 格子元素绑定「作为跨批次拖拽源 + 落点」的事件
+function bindCrossCellDrag(el, bid, slotKey){
+  el.setAttribute('draggable','true');
+  el.dataset.xbid=bid; el.dataset.xkey=slotKey;
+  el.addEventListener('dragstart', (e)=>{
+    const b=S.batches.find(x=>x.id===bid);
+    _crossDrag={ bid, slotKey, fi:getSlotFrameByKey(b, slotKey) };
+    el.classList.add('xdragging');
+    if(e.dataTransfer){ e.dataTransfer.effectAllowed='move'; try{ e.dataTransfer.setData('text/plain', bid+'|'+slotKey); }catch(_){} }
+  });
+  el.addEventListener('dragend', ()=>{ el.classList.remove('xdragging'); document.querySelectorAll('.xdragover').forEach(x=>x.classList.remove('xdragover')); });
+  el.addEventListener('dragover', (e)=>{
+    // 只接受「格子↔格子」拖拽（_crossDrag 存在）；候选帧库拖拽走原 bindDropEvents 逻辑
+    if(_crossDrag){ e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect='move'; el.classList.add('xdragover'); }
+  });
+  el.addEventListener('dragleave', ()=>{ el.classList.remove('xdragover'); });
+  el.addEventListener('drop', async (e)=>{
+    if(!_crossDrag) return; // 交给其它 drop 处理
+    e.preventDefault(); e.stopPropagation();
+    el.classList.remove('xdragover');
+    const src=_crossDrag; _crossDrag=null;
+    await performCrossSwap(src.bid, src.slotKey, bid, slotKey);
+  });
 }
 
 // ===================================================================
@@ -4336,10 +4434,10 @@ function removeBatch(bid){
 // ===================================================================
 // GENERATE
 // ===================================================================
-async function generateBatch(bid){
+async function generateBatch(bid, silent){
   const b=S.batches.find(x=>x.id===bid); if(!b) return;
   const filledCells=b.cells.filter(c=>c!==null);
-  if(filledCells.length===0){ toast('请先为格子添加帧图像','err'); return; }
+  if(filledCells.length===0){ if(!silent) toast('请先为格子添加帧图像','err'); return; }
 
   const genBtn=document.getElementById('gen-'+bid);
   genBtn.innerHTML='<span class="spin"></span>生成中...'; genBtn.disabled=true;
@@ -4572,6 +4670,18 @@ const SALES = {
   detailCanvas: null,
   detailRows: []
 };
+
+// 清空分镜/卖点文档（清空视频 / 新建项目时调用），连带重置上传文件名提示与已生成的销售策略
+function clearStoryDoc(){
+  const area=document.getElementById('storyDoc');
+  if(area) area.value='';
+  const fn=document.getElementById('storyFileName');
+  if(fn){ fn.textContent='支持 txt / md / csv / json，doc/docx 会尽量提取可读文本'; fn.classList.remove('has-file'); }
+  const fi=document.getElementById('storyFileInput');
+  if(fi){ try{ fi.value=''; }catch(_){} }
+  // 重置销售策略缓存，避免残留上一个视频的卖点
+  SALES.plan=null; SALES.detailRows=[]; SALES.usedFrames=null; SALES.lastTotalTime='';
+}
 
 function salesInputs(){
   return {
@@ -4937,39 +5047,49 @@ async function aiSeoOptimize(input, plan){
   return plan;
 }
 
-// 详情长图顶部「卖点简化标题」：专门交给 opus4.8(seoModel) 生成 3 个 ≤8 字 的核心卖点短标题，
-// 目的让顾客一眼看懂视频内容，不是规格/画面描述。返回 string[3]（每个 ≤8 字）。
+// 详情长图顶部「卖点标题」：专门交给 opus4.8(seoModel) 生成 need 个 ~12 字 的核心卖点标题，
+// 格式偏向「主题/IP·内容定位」（如「郑和下西洋·明代海上丝绸之路」），让顾客一眼看懂视频内容。
+// 返回 string[need]（每个 ~12 字、无空话套话）。
+const HERO_TITLE_MAXLEN = 16;   // 标题硬上限（约 12 字为佳，允许到 16）
+function cleanHeroTitle(s, maxLen){
+  maxLen=maxLen||HERO_TITLE_MAXLEN;
+  // 仅去掉首尾空格 / 行尾标点，保留中间的「·」「：」等结构分隔符
+  let t=String(s||'').replace(/\s+/g,'').replace(/^[，。；、,.!?！？：:\/|]+|[，。；、,.!?！？：:\/|]+$/g,'').trim();
+  const TRIM_TAIL=['一','了','的','之','与','和','及','其','在','中','上','下','很','最','超','目','然','着','过','地','得','·'];
+  let c=[...t];
+  if(c.length>maxLen){
+    c=c.slice(0,maxLen);
+    while(c.length>4 && TRIM_TAIL.includes(c[c.length-1])) c.pop();
+  }
+  return c.join('');
+}
 async function aiDetailHeroTitles(input, plan, need){
   need=need||3;
-  // 本地兜底：直接取卖点前 8 字（去标点/空格），稳妥不丢字、无语病
-  // 优雅截断：>8字时优先在四字成语/常见结构词边界回退，避免切出「一目」这类半截词
-  const TRIM_TAIL=['一','了','的','之','与','和','及','其','在','中','上','下','很','最','超','目','然','着','过','地','得']; // 收尾若是孤立虚/半字则回退一格
-  const elegantCut=(s)=>{
-    let c=[...s];
-    if(c.length<=8) return s;
-    c=c.slice(0,8);
-    // 收尾若是孤立虚字（易切出半截词），逐格回退，最少保留 4 字
-    while(c.length>4 && TRIM_TAIL.includes(c[c.length-1])) c.pop();
-    return c.join('');
-  };
   const localFallback=()=>{
     const out=[]; const seen=new Set();
-    const push=(t)=>{ let s=String(t||'').replace(/\s+/g,'').replace(/[，。；、,.!?！？：:\/|·\-—]/g,'').trim();
-      if([...s].length>8) s=elegantCut(s); if(s&&!seen.has(s)){ seen.add(s); out.push(s); } };
+    const push=(t)=>{ let s=cleanHeroTitle(t); if(s&&[...s].length>=4&&!seen.has(s)){ seen.add(s); out.push(s); } };
+    // 优先「主题·卖点」组合，凑到 ~12 字更饱满
+    const theme=cleanHeroTitle(plan.theme, 10);
+    (plan.sellingPoints||[]).forEach(sp=>{
+      const point=cleanHeroTitle(sp, 12);
+      if(theme && point && theme!==point){ push(theme+'·'+point); }
+      else if(point){ push(point); }
+    });
+    if(theme) push(theme);
     (plan.sellingPoints||[]).forEach(push);
-    if(plan.theme) push(plan.theme);
-    ['内容丰富可商用','多镜头全覆盖','直接上架可用'].forEach(push);
+    ['多镜头全覆盖·商用素材','内容丰富·直接上架可用','高光画面·一键拼图出图'].forEach(push);
     const res=[]; for(let i=0;i<need;i++) res.push(out[i%out.length]||('核心卖点'+(i+1))); return res;
   };
   if(!input.apiKey) return localFallback();
   try{
     const prompt=
-      '你是光厂视频素材的卖点提炼专家。请基于下面的主题与核心卖点，为详情长图顶部生成 '+need+' 个「卖点简化标题」。\n'+
+      '你是光厂视频素材的卖点提炼专家。请基于下面的主题与核心卖点，为详情长图顶部生成 '+need+' 个「卖点标题」。\n'+
       '【硬性要求】\n'+
-      '1. 每个标题 **不超过 8 个汉字**，越短越精炼越好（4~8字最佳）。\n'+
-      '2. 目的：让顾客一眼看懂这个视频「内容/卖点」是什么，是简化版的吸睛标题。\n'+
-      '3. **严禁**写画面规格、技术参数、分辨率、镜头数、画面描述（如“画面规格/高清画质/多镜头/4K/竖版”等），只写**内容卖点**。\n'+
-      '4. '+need+' 个标题各有侧重、不要重复。\n'+
+      '1. 每个标题 **控制在 12 个汉字左右**（10~14 字最佳，最多不超过 16 字）。\n'+
+      '2. 推荐格式：「主题/IP·内容定位」，用「·」连接主副两部分。例如：「郑和下西洋·明代海上丝绸之路」「敦煌飞天·千年壁画数字复原」。\n'+
+      '3. 目的：让顾客一眼看懂这个视频讲的是什么内容、什么主题。\n'+
+      '4. **严禁空话套话和无意义词汇**：不要"精美/震撼/高端大气/优质/高清/视频素材/画面规格/4K/竖版/多镜头"等空词与技术参数，只写**有信息量的内容卖点**。\n'+
+      '5. '+need+' 个标题各有侧重、不要重复。\n'+
       '【输出格式】严格输出纯JSON，不要代码块：{"titles": ["标题1","标题2","标题3"]}\n\n'+
       '主题：'+(plan.theme||'')+'\n'+
       '核心卖点：'+(plan.sellingPoints||[]).join(' / ')+'\n'+
@@ -4978,18 +5098,34 @@ async function aiDetailHeroTitles(input, plan, need){
     const resp=await fetch('https://llm-api.mcisaas.com/v1/chat/completions',{
       method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+input.apiKey},
-      body:JSON.stringify({ model:input.seoModel, messages:[{role:'user',content:prompt}], max_tokens:400, temperature:.5 })
+      body:JSON.stringify({ model:input.seoModel, messages:[{role:'user',content:prompt}], max_tokens:500, temperature:.5 })
     });
     if(!resp.ok) throw new Error('标题AI失败 '+resp.status);
     const raw=(await resp.json()).choices?.[0]?.message?.content?.trim()||'';
     const parsed=robustParseJSON(raw);
     let titles=Array.isArray(parsed?.titles)?parsed.titles:(Array.isArray(parsed)?parsed:null);
     if(!titles||!titles.length) throw new Error('标题解析为空');
-    titles=titles.map(t=>{ let s=String(t||'').replace(/\s+/g,'').replace(/[，。；、,.!?！？：:\/|·]/g,'').trim(); return elegantCut(s); }).filter(Boolean);
+    titles=titles.map(t=>cleanHeroTitle(t)).filter(t=>t&&[...t].length>=2);
     if(!titles.length) throw new Error('标题清洗后为空');
     const res=[]; for(let i=0;i<need;i++) res.push(titles[i%titles.length]);
     return res;
   }catch(e){ console.warn('详情卖点标题生成失败，用本地兜底', e); return localFallback(); }
+}
+// 单张长图重新生成一个标题（用于资产卡上「换标题」按钮）
+async function regenOneHeroTitle(b){
+  if(!b || !b.isDetailLong) return;
+  const input=salesInputs();
+  const plan=b.heroPlan||{};
+  toast('正在重新生成标题…');
+  try{
+    const titles=await aiDetailHeroTitles(input, plan, 4);
+    // 尽量取一个和当前不同的
+    let pick=titles.find(t=>t && t!==b.heroTitle) || titles[0];
+    b.heroTitle=pick;
+    await regenDetailLong(b);
+    syncHeroTitleInput(b);
+    toast('✅ 标题已更新：'+pick);
+  }catch(e){ toast('标题生成失败：'+e.message); }
 }
 
 function pickEvenFrames(n){
@@ -5257,7 +5393,7 @@ async function createDetailCandidates(plan, ranked, input){
   // 每个版本帧不足则用整池循环补齐（避免行数过少）
   buckets.forEach(bk=>{ let i=0; while(bk.length<perImg && pool.length){ const cand=pool[i%pool.length]; bk.push(cand); i++; if(i>pool.length*3) break; } });
 
-  // 每张长图一个「卖点简化标题」（≤8字），专门交给 opus4.8(seoModel) 生成，让顾客一眼看懂内容
+  // 每张长图一个「卖点标题」（~12字，主题·内容定位），专门交给 opus4.8(seoModel) 生成，让顾客一眼看懂内容
   const titles=await aiDetailHeroTitles(input, plan, DETAIL_COUNT);
 
   const labels=['详情长图 A','详情长图 B','详情长图 C'];
@@ -5294,15 +5430,52 @@ function renderDetailBatchCard(b){
     '    <span style="color:var(--tm);font-size:11px;">'+escapeHtmlSafe(b.note)+'</span>'+
     '  </div>'+
     '  <div class="batch-actions">'+
+    '    <button class="btn-sm" onclick="openPreviewModal(S.batches.find(x=>x.id==='+b.id+'))" title="全屏放大预览"><i class="fas fa-expand"></i> 放大</button>'+
     '    <button class="btn-sm" id="dl-'+b.id+'" onclick="downloadBatch('+b.id+')" disabled>下载长图</button>'+
     '    <button class="btn-sm" id="gen-'+b.id+'" onclick="regenDetailLong(S.batches.find(x=>x.id==='+b.id+'))">重新生成</button>'+
     '    <button class="btn-del" onclick="removeBatch('+b.id+')">删除</button>'+
     '  </div>'+
     '</div>'+
-    '<div class="prev-thumb" id="prev-'+b.id+'" title="点击全屏预览，可逐格替换 / 拖拽交换画面"><canvas id="pcanvas-'+b.id+'"></canvas></div>';
+    // 标题编辑区：文字与字数都可手动改，也可让 AI 重新生成
+    '<div class="hero-title-edit">'+
+    '  <span class="hero-title-lbl"><i class="fas fa-heading"></i> 卖点标题</span>'+
+    '  <input type="text" class="hero-title-input" id="herotitle-'+b.id+'" maxlength="20" '+
+    '    placeholder="如：郑和下西洋·明代海上丝绸之路" '+
+    '    value="'+escapeHtmlSafe(b.heroTitle||'')+'" '+
+    '    oninput="onHeroTitleInput('+b.id+')" />'+
+    '  <span class="hero-title-count" id="herocount-'+b.id+'"></span>'+
+    '  <button class="btn-sm hero-title-ai" id="herogen-'+b.id+'" onclick="regenOneHeroTitle(S.batches.find(x=>x.id==='+b.id+'))" title="让 opus4.8 重新生成卖点标题"><i class="fas fa-wand-magic-sparkles"></i> AI换标题</button>'+
+    '</div>'+
+    '<div class="prev-thumb" id="prev-'+b.id+'" title="点击任一格子可替换 · 拖拽格子可跨版本/跨封面交换 · 点「放大」全屏预览"><canvas id="pcanvas-'+b.id+'"></canvas></div>';
   document.getElementById('batchList').appendChild(el);
   const prev=el.querySelector('.prev-thumb');
   if(prev) prev.addEventListener('click', ()=>openPreviewModal(b));
+  updateHeroTitleCount(b);
+}
+
+// 标题输入框字数显示（约 12 字提示）
+function updateHeroTitleCount(b){
+  const el=document.getElementById('herocount-'+b.id);
+  if(!el) return;
+  const n=[...String(b.heroTitle||'')].length;
+  el.textContent=n+' 字';
+  el.style.color = (n>=8 && n<=16) ? 'var(--ok,#3eb489)' : 'var(--tm)';
+}
+// 把 b.heroTitle 同步回输入框（AI 换标题后调用）
+function syncHeroTitleInput(b){
+  const inp=document.getElementById('herotitle-'+b.id);
+  if(inp) inp.value=b.heroTitle||'';
+  updateHeroTitleCount(b);
+}
+// 用户手动编辑标题：防抖重绘长图
+let _heroTitleTimer={};
+function onHeroTitleInput(id){
+  const b=S.batches.find(x=>x.id===id); if(!b) return;
+  const inp=document.getElementById('herotitle-'+id); if(!inp) return;
+  b.heroTitle=inp.value;
+  updateHeroTitleCount(b);
+  if(_heroTitleTimer[id]) clearTimeout(_heroTitleTimer[id]);
+  _heroTitleTimer[id]=setTimeout(()=>{ regenDetailLong(b); }, 500);
 }
 
 // 生成/重绘一张详情长图（仅重画，不重新挑帧；改标题样式时复用）
@@ -5318,15 +5491,43 @@ async function regenDetailLong(b){
   const pcanvas=document.getElementById('pcanvas-'+b.id);
   if(prevWrap&&pcanvas){
     prevWrap.style.display='block';
+    // 详情长图为竖向长图：缩略图高度受限，按宽度等比缩放，并允许竖向
+    prevWrap.style.aspectRatio='auto';
     const pw=prevWrap.clientWidth||360;
     const ph=Math.round(pw*canvas.height/canvas.width);
     pcanvas.width=pw; pcanvas.height=ph;
     const pcx=pcanvas.getContext('2d'); pcx.imageSmoothingEnabled=true; pcx.imageSmoothingQuality='high';
     pcx.drawImage(canvas,0,0,pw,ph);
+    // 在缩略图上叠加「格子↔格子」拖拽热区，支持跨批次/跨版本/跨封面直接拖拽替换
+    buildDetailThumbDragOverlay(b, prevWrap);
   }
   const dl=document.getElementById('dl-'+b.id); if(dl) dl.disabled=false;
   if(genBtn){ genBtn.disabled=false; genBtn.innerHTML='重新生成'; }
   checkDlAllBtn();
+}
+
+// 在「资产区」详情长图缩略图上叠加可拖拽的格子热区（跨批次交换 + 点击放大预览）
+function buildDetailThumbDragOverlay(b, prevWrap){
+  if(!prevWrap) return;
+  prevWrap.classList.add('detail-thumb-on');
+  let ov=prevWrap.querySelector('.detail-thumb-overlay');
+  if(ov) ov.remove();
+  ov=document.createElement('div');
+  ov.className='detail-thumb-overlay';
+  ov.style.cssText='position:absolute;inset:0;z-index:3;';
+  const slots=computeDetailLongSlots(b);
+  slots.forEach(s=>{
+    const cell=document.createElement('div');
+    cell.className='dt-slot';
+    cell.style.cssText='position:absolute;left:'+(s.x*100)+'%;top:'+(s.y*100)+'%;width:'+(s.w*100)+'%;height:'+(s.h*100)+'%;';
+    // slotKey
+    const key = s.slot.kind==='grid' ? ('grid:'+s.slot.idx) : ('row:'+s.slot.ri+':'+s.slot.c);
+    bindCrossCellDrag(cell, b.id, key);
+    // 点击格子 → 打开该格替换选择器（双重入口：缩略图也能直接换帧）
+    cell.addEventListener('click', (e)=>{ e.stopPropagation(); openDetailSlotPicker(b, s.slot); });
+    ov.appendChild(cell);
+  });
+  prevWrap.appendChild(ov);
 }
 
 // 读取详情大标题的可调参数（配色/字号/位置）。Q4：去掉透明度下调，渐变默认饱满好看。

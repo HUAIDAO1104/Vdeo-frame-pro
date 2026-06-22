@@ -1357,3 +1357,51 @@ body::before {
   border-color:transparent; box-shadow:0 4px 14px rgba(90,120,255,0.4);
 }
 .app-confirm-ok:hover{filter:brightness(1.08); transform:translateY(-1px);}
+
+/* ── 详情长图：卖点标题编辑区 ────────────────────────── */
+.hero-title-edit{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  margin:8px 0 10px; padding:8px 10px;
+  background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08);
+  border-radius:9px;
+}
+.hero-title-lbl{ font-size:12px; color:var(--tm,#9aa3b5); white-space:nowrap; display:flex; align-items:center; gap:5px; }
+.hero-title-input{
+  flex:1 1 200px; min-width:160px;
+  padding:7px 10px; font-size:13px; line-height:1.4;
+  color:var(--tx,#e7ecf5); background:rgba(0,0,0,0.25);
+  border:1px solid rgba(255,255,255,0.14); border-radius:7px;
+  transition:border-color .15s, box-shadow .15s;
+}
+.hero-title-input:focus{ outline:none; border-color:var(--accent,#3eb489); box-shadow:0 0 0 2px rgba(62,180,137,0.25); }
+.hero-title-count{ font-size:11px; color:var(--tm,#9aa3b5); white-space:nowrap; min-width:34px; text-align:right; }
+.hero-title-ai{ white-space:nowrap; display:flex; align-items:center; gap:5px; }
+
+/* ── 资产区：详情长图缩略图上的可拖拽格子热区 ────────── */
+.prev-thumb.detail-thumb-on { cursor:default; aspect-ratio:auto; max-height:560px; overflow-y:auto; }
+.prev-thumb.detail-thumb-on:hover::after { content:none; }       /* 关闭"点击全屏预览"遮罩，避免盖住格子 */
+.detail-thumb-overlay { pointer-events:none; }
+.detail-thumb-overlay .dt-slot {
+  pointer-events:auto; cursor:grab;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,0.06);
+  transition:background .12s, box-shadow .12s;
+}
+.detail-thumb-overlay .dt-slot:hover {
+  background:rgba(62,180,137,0.18);
+  box-shadow:inset 0 0 0 2px var(--accent,#3eb489);
+}
+.detail-thumb-overlay .dt-slot:active { cursor:grabbing; }
+.detail-thumb-overlay .dt-slot.xdragging { opacity:.35; }
+.detail-thumb-overlay .dt-slot.xdragover {
+  background:rgba(62,180,137,0.40);
+  box-shadow:inset 0 0 0 3px var(--accent,#3eb489);
+}
+
+/* 封面批次格子作为跨批次拖拽源/落点时的视觉反馈 */
+.cell.xdragging { opacity:.4; }
+.cell.xdragover { outline:3px solid var(--accent,#3eb489); outline-offset:-3px; background:rgba(62,180,137,0.18); }
+
+/* 让封面格子整体可拖拽：禁用内部 <img> 的原生拖拽，避免抢占 cell 的 dragstart */
+.cell img { -webkit-user-drag:none; user-drag:none; }
+.cell[draggable="true"] { cursor:grab; }
+.cell[draggable="true"]:active { cursor:grabbing; }

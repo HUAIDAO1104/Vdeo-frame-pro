@@ -13,7 +13,13 @@
 
 ## 功能进度
 
-### ✅ 最新更新 — 卖点标题 / 总用时 / 长图可拖拽编辑（3 项，已完成）
+### ✅ 最新更新 — 标题升级为~12字 / 跨版本自由拖拽 / 清空视频清文档（3 项，已完成）
+按用户最新反馈逐项落地：
+1. **卖点标题默认 ~12 字，可编辑文字与字数、支持单独重新生成**：标题从「≤8 字」升级为 **「约 12 字（10~16）」**，推荐格式「主题/IP·内容定位」（如 **「郑和下西洋·明代海上丝绸之路」「敦煌飞天·千年壁画数字复原」**），让顾客一眼看懂内容。`aiDetailHeroTitles` 由 **`claude-opus-4-8`** 生成、强约束 **去空话套话无意义词**（精美/震撼/高端大气/优质/高清/视频素材/画面规格/4K…）。资产卡新增**「卖点标题」输入框 + 实时字数 + 「AI换标题」按钮**：文字与字数都可手动改（`onHeroTitleInput` 防抖即时重绘）、也可让 AI 重新生成（`regenOneHeroTitle`）。`cleanHeroTitle` 保留中间「·」分隔符、仅修剪首尾，本地兜底用「主题·卖点」拼到 ~12 字。
+2. **所有已填充宫格图片支持跨批次/跨版本/跨封面自由拖拽交换**：建立**统一格子拖拽系统**——任意批次的任意格子可拖到任意批次的任意格子进行**交换**（如「封面 A 的第 1 张」拖到「详情版本 2 的第 2 格」）。核心：`slotKey`（`cell:<ci>` / `grid:<idx>` / `row:<ri>:<c>`）+ `getSlotFrameByKey`/`setSlotFrameByKey` + `performCrossSwap`（交换两格帧并各自重绘）+ `bindCrossCellDrag`（HTML5 拖拽源/落点）。封面批次格子（`.cell`）与详情长图缩略图（叠加 `.detail-thumb-overlay .dt-slot` 热区，`buildDetailThumbDragOverlay`）全部接入；拖拽时 `.xdragging`/`.xdragover` 高亮反馈。
+3. **清空/更换视频时一并清除分镜/卖点文档**：将 `#storyDoc` **纳入项目级数据**——`saveActiveProject` 存 `p.storyDoc`、`restoreProject` 取回（无则清空）、`createProject` 初始化为空；新增 `clearStoryDoc()`（清文档+重置上传文件名提示+清 `SALES.plan/detailRows/usedFrames` 缓存），在「关闭视频(无项目剩余)」与「上传新视频建独立项目」时调用。切换项目时各自文档自动隔离，不再残留上一个视频的文档。
+
+### ✅ 上一版 — 卖点标题 / 总用时 / 长图可拖拽编辑（3 项，已完成）
 按用户最新反馈逐项落地：
 1. **详情长图顶部 = 卖点简化标题（≤8 字，opus4.8 生成）**：彻底纠正"乱写画面规格"的旧问题。新增 `aiDetailHeroTitles(input, plan, need)`，**专门交给 `claude-opus-4-8`（seoModel）** 为每张长图生成一个 **不超过 8 个汉字** 的"卖点简化标题"——目的是让顾客一眼看懂视频内容，**严禁画面规格/分辨率/镜头数/4K 等技术参数**。`createDetailCandidates` 改为 `await aiDetailHeroTitles(...)` 取 3 个不同标题写入 `b.heroTitle`。本地兜底（无 API key 时）直接取卖点做"优雅截断"（`elegantCut`：收尾遇孤立虚/半字逐格回退、最少 4 字），保证**完整通顺、无语病、无半截词**。同时修复 `distillCoreSellingLine` 旧 bug —— 之前 `replace(/[的了和与及]/g,'')` 会把"一目了然"吃成"一目然"，现改为只剔标点/首尾助词、固定词兜底直接返回 literal。
 2. **红色渐变标题带默认整体缩小 15%**：`drawDetailHeroTitle` 的 `bandH` 末乘 `* 0.85`，更精致、不压画面。
