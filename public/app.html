@@ -234,11 +234,11 @@
                 </label>
                 <label class="sales-field">
                   <span>文字位置</span>
-                  <select id="detailTextPosition">
-                    <option value="top">每段顶部</option>
-                    <option value="overlay">图片左下角轻叠加</option>
-                    <option value="side">左侧窄栏</option>
-                  </select>
+	                  <select id="detailTextPosition">
+	                    <option value="side" selected>右侧卖点栏</option>
+	                    <option value="top">每段顶部</option>
+	                    <option value="overlay">图片左下角轻叠加</option>
+	                  </select>
                 </label>
                 <label class="sales-field">
                   <span>文字强度</span>
@@ -275,8 +275,9 @@
             </div>
           </div>
 
-          <div id="salesResultPanel" class="sales-results" style="display:none;">
-            <div class="sales-result-grid">
+	          <div id="salesResultPanel" class="sales-results" style="display:none;">
+	            <div id="salesAiWarning" class="sales-ai-warning" style="display:none;"></div>
+	            <div class="sales-result-grid">
               <div class="sales-result-block">
                 <div class="sales-result-title">销售策略</div>
                 <div id="salesStrategy" class="sales-copy"></div>
@@ -567,8 +568,8 @@
           </div>
 
           <!-- Vision Model -->
-          <div class="ai-input-group">
-            <div class="ai-label-row"><span>视觉选图模型</span></div>
+	          <div class="ai-input-group">
+	            <div class="ai-label-row"><span>视觉选图模型</span><button class="model-refresh-btn" type="button" onclick="refreshModelList()">刷新全部模型</button></div>
             <select id="aiModel"
               style="width:100%;height:38px;cursor:pointer;-webkit-appearance:none;">
               <optgroup label="── Qwen 通义千问 VL（阿里 · 推荐）">
@@ -607,20 +608,44 @@
               </optgroup>
             </select>
             </div>
-          <div class="ai-input-group">
-            <div class="ai-label-row"><span>SEO 文案模型</span></div>
-            <select id="aiSeoModel" style="width:100%;height:38px;cursor:pointer;-webkit-appearance:none;">
-              <optgroup label="── 质量优先">
-                <option value="gpt-5.5-pro" selected>gpt-5.5-pro · SEO标题/简介质量最佳</option>
-                <option value="gpt-5.5">gpt-5.5 · 高质量文案</option>
-                <option value="claude-opus-4.6">claude-opus-4.6 · 长文案与表达润色</option>
-              </optgroup>
-              <optgroup label="── 性价比">
-                <option value="claude-sonnet-4.6">claude-sonnet-4.6 · 质量与成本均衡</option>
-                <option value="gpt-5.4">gpt-5.4 · 稳定文案</option>
-                <option value="qwen3-vl-plus">qwen3-vl-plus · 全部使用千问</option>
-              </optgroup>
-            </select>
+	          <div class="ai-input-group">
+	            <div class="ai-label-row"><span>SEO 文案模型</span><span id="modelListStatus" class="model-list-status">默认推荐列表</span></div>
+	            <select id="aiSeoModel" style="width:100%;height:38px;cursor:pointer;-webkit-appearance:none;">
+	              <optgroup label="── GPT（SEO 文案推荐）">
+	                <option value="gpt-5.5-pro" selected>gpt-5.5-pro · SEO标题/简介质量最佳</option>
+	                <option value="gpt-5.5">gpt-5.5 · 高质量文案</option>
+	                <option value="gpt-5.4">gpt-5.4 · 稳定文案</option>
+	                <option value="gpt-5.4-mini">gpt-5.4-mini · 轻量快速</option>
+	                <option value="gpt-5.4-nano">gpt-5.4-nano · 最便宜</option>
+	                <option value="gpt-5.2">gpt-5.2 · 稳定版</option>
+	                <option value="gpt-4.1">gpt-4.1 · 非推理强模型</option>
+	                <option value="gpt-4.1-mini">gpt-4.1-mini · 均衡版</option>
+	                <option value="gpt-4.1-nano">gpt-4.1-nano · 极速低价</option>
+	              </optgroup>
+	              <optgroup label="── Claude（长文案与表达润色）">
+	                <option value="claude-haiku-4-5-20251001">claude-haiku-4-5 · 快速便宜</option>
+	                <option value="claude-sonnet-4.6">claude-sonnet-4.6 · 质量与成本均衡</option>
+	                <option value="claude-sonnet-4-5-20250929">claude-sonnet-4-5 · 稳定版</option>
+	                <option value="claude-sonnet-4-20250514">claude-sonnet-4 · 经典版</option>
+	                <option value="claude-opus-4.6">claude-opus-4.6 · 旗舰</option>
+	                <option value="claude-opus-4-6">claude-opus-4-6 · 旗舰稳定</option>
+	                <option value="claude-opus-4-7">claude-opus-4-7 · 旗舰新版</option>
+	              </optgroup>
+	              <optgroup label="── Qwen 通义千问">
+	                <option value="qwen3-vl-plus">qwen3-vl-plus · 全部使用千问</option>
+	                <option value="qwen3.6-plus">qwen3.6-plus · 最新一代多模态旗舰</option>
+	                <option value="qwen3-vl-plus-2025-12-19">qwen3-vl-plus-1219 · 最新版</option>
+	                <option value="qwen3-vl-plus-2025-09-23">qwen3-vl-plus-0923 · 稳定版</option>
+	                <option value="qwen3-vl-flash">qwen3-vl-flash · 最快</option>
+	                <option value="qwen3-vl-flash-2026-01-22">qwen3-vl-flash-0122 · 最快新版</option>
+	                <option value="qwen-vl-max-latest">qwen-vl-max-latest · max最强</option>
+	                <option value="qwen-vl-max-2025-04-08">qwen-vl-max-0408 · max稳定</option>
+	                <option value="qwen-vl-plus-latest">qwen-vl-plus-latest · plus稳定</option>
+	                <option value="qwen-vl-plus-2025-08-15">qwen-vl-plus-0815 · plus新版</option>
+	                <option value="qwen2.5-vl-32b-instruct">qwen2.5-vl-32b · 2.5代高精度</option>
+	                <option value="qwen-vl-ocr-latest">qwen-vl-ocr · OCR增强</option>
+	              </optgroup>
+	            </select>
             <p class="ai-setting-note">建议：选图用 qwen3-vl-plus；SEO 用 gpt-5.5-pro。SEO 输出很短，用高质量模型对成本影响小。</p>
           </div>
           </details>
@@ -2803,6 +2828,9 @@ function toggleApiKeyVis(){
 // API KEY 本地存储
 // ===================================================================
 const API_KEY_STORAGE = 'vfp_api_key';
+const MODEL_LIST_STORAGE = 'vfp_available_models';
+const DEFAULT_VISION_MODEL = 'qwen3-vl-plus';
+const DEFAULT_SEO_MODEL = 'gpt-5.5-pro';
 
 function saveApiKey(){
   const val = document.getElementById('aiApiKey').value.trim();
@@ -2810,6 +2838,7 @@ function saveApiKey(){
   localStorage.setItem(API_KEY_STORAGE, val);
   updateApiKeyUI(true);
   toast('API Key 已保存到本地 🔒');
+  refreshModelList(true);
 }
 
 function clearApiKey(){
@@ -2829,11 +2858,67 @@ function updateApiKeyUI(saved){
 // 页面加载时自动读取已保存的 Key
 (function loadSavedApiKey(){
   const saved = localStorage.getItem(API_KEY_STORAGE);
-  if(saved){
-    document.getElementById('aiApiKey').value = saved;
-    updateApiKeyUI(true);
+	  if(saved){
+	    document.getElementById('aiApiKey').value = saved;
+	    updateApiKeyUI(true);
+	    const cached=loadCachedModels();
+	    if(cached.length) applyAvailableModels(cached, true);
+	    refreshModelList(true);
+	  }
+	})();
+
+function loadCachedModels(){
+  try{
+    const arr=JSON.parse(localStorage.getItem(MODEL_LIST_STORAGE)||'[]');
+    return Array.isArray(arr)?arr.filter(Boolean):[];
+  }catch(_){ return []; }
+}
+
+function setModelListStatus(text, isErr=false){
+  const el=document.getElementById('modelListStatus');
+  if(!el) return;
+  el.textContent=text;
+  el.style.color=isErr?'#ff9a9a':'var(--tm)';
+}
+
+async function refreshModelList(silent=false){
+  const key=document.getElementById('aiApiKey')?.value.trim();
+  if(!key){ if(!silent) toast('请先填写并保存 API Key','err'); return; }
+  setModelListStatus('正在拉取模型...');
+  try{
+    const resp=await fetch('https://llm-api.mcisaas.com/v1/models',{
+      headers:{'Authorization':'Bearer '+key}
+    });
+    if(!resp.ok) throw new Error('模型列表接口失败 '+resp.status+': '+(await resp.text()).slice(0,120));
+    const data=await resp.json();
+    const raw=Array.isArray(data.data)?data.data:(Array.isArray(data.models)?data.models:[]);
+    const models=[...new Set(raw.map(m=>m.id||m.model||m.name||m).map(String).filter(Boolean))].sort();
+    if(!models.length) throw new Error('接口未返回可用模型');
+    localStorage.setItem(MODEL_LIST_STORAGE, JSON.stringify(models));
+    applyAvailableModels(models, false);
+    setModelListStatus('已加载 '+models.length+' 个模型');
+    if(!silent) toast('已刷新全部可用模型：'+models.length+' 个');
+  }catch(e){
+    console.warn(e);
+    setModelListStatus('模型列表刷新失败', true);
+    if(!silent) toast(((e&&e.message)||'模型列表刷新失败'),'err');
   }
-})();
+}
+
+function applyAvailableModels(models, fromCache){
+  fillModelSelect('aiModel', models, DEFAULT_VISION_MODEL, '视觉选图推荐');
+  fillModelSelect('aiSeoModel', models, DEFAULT_SEO_MODEL, 'SEO文案推荐');
+  setModelListStatus(fromCache ? '已加载缓存模型 '+models.length+' 个' : '已加载 '+models.length+' 个模型');
+}
+
+function fillModelSelect(id, models, preferred, groupLabel){
+  const sel=document.getElementById(id); if(!sel) return;
+  const current=sel.value || preferred;
+  const unique=[...new Set([preferred, current, ...models].filter(Boolean))];
+  const opts=unique.map(m=>'<option value="'+escapeHtmlSafe(m)+'">'+escapeHtmlSafe(m)+(m===preferred?' · 推荐':'')+'</option>').join('');
+  sel.innerHTML='<optgroup label="── '+escapeHtmlSafe(groupLabel)+'">'+opts+'</optgroup>';
+  sel.value=unique.includes(current)?current:(unique.includes(preferred)?preferred:unique[0]);
+}
 
 // -------- 本地算法：Laplacian + 亮度 + 饱和度 --------
 function aiAnalyzeFrame(dataUrl){
@@ -4469,6 +4554,12 @@ function showSalesResults(plan){
   SALES.plan = plan;
   const panel=document.getElementById('salesResultPanel');
   if(panel) panel.style.display='';
+  const warn=document.getElementById('salesAiWarning');
+  if(warn){
+    const issues=plan.aiIssues||[];
+    warn.style.display=issues.length?'':'none';
+    warn.innerHTML=issues.map(x=>'<div><strong>'+escapeHtmlSafe(x.title)+'</strong><span>'+escapeHtmlSafe(x.message)+'</span></div>').join('');
+  }
   const strategy=document.getElementById('salesStrategy');
 	  if(strategy){
 	    strategy.textContent=[
@@ -4516,6 +4607,7 @@ function fallbackSalesPlan(input){
   const keywords = buildKeywordList(sceneWords, input.type);
   return {
     theme,
+    aiIssues: input.aiIssues||[],
     sellingPoints,
     visualDirection:'封面用高冲击、主题明确的代表性画面；详情用大图+多图矩阵证明场景丰富、细节可用、商业质感稳定。',
     coverPlans:[
@@ -4523,13 +4615,13 @@ function fallbackSalesPlan(input){
       {name:'点击冲击力版', score:88, reason:'强化色彩、光影、主体冲突和视觉节奏，用于测试更高点击。'},
       {name:'内容丰富证明版', score:85, reason:'让四张图覆盖不同角度和场景，降低买家对素材重复度的顾虑。'}
     ],
-    detailRows:[
-      {label:'主视觉大图', count:1, text:'核心视觉'},
-      {label:'代表场景', count:2, text:'多场景覆盖'},
-      {label:'主体细节', count:3, text:'细节丰富'},
-      {label:'商用氛围', count:1, text:'适用商业项目'},
-      {label:'更多补充', count:2, text:'内容更完整'}
-    ],
+	    detailRows:[
+	      {label:'主题清晰', count:3, text:'一眼看懂主题'},
+	      {label:'内容丰富', count:3, text:'多镜头多场景'},
+	      {label:'商用可用', count:3, text:'适配商业项目'},
+	      {label:'细节补充', count:2, text:'展示质感细节'},
+	      {label:'场景延展', count:2, text:'覆盖更多用途'}
+	    ],
     seoTitle: makeSeoTitle(theme, sceneWords),
     seoIntro: makeSeoIntro(theme, sellingPoints, sceneWords),
     keywords
@@ -4565,8 +4657,8 @@ async function aiSalesPlan(input){
     type:'text',
     text:
       '你是光厂视频素材包的高级产品经理、视觉策划和SEO运营。请结合分镜文档、素材类型、销售目标和视频抽样画面，输出适合光厂售卖的上架方案。\n'+
-      '必须严格输出纯JSON，不要代码块。JSON字段：theme(string), sellingPoints(string[3-6]), visualDirection(string), coverPlans([{name,score,reason}] 3个), detailRows([{label,count,text}] 4-7行，每行count为1-4), seoTitle(string), seoIntro(string，不写时长，重点写内容/适用场景/商业用途), keywords(string[50])。\n'+
-      '封面目标：一眼表达素材包主题、四宫格有点击冲击力。详情目标：证明内容丰富、可商用、值得买，可用长图结构，不局限九宫格。\n'+
+	      '必须严格输出纯JSON，不要代码块。JSON字段：theme(string), sellingPoints(string[3-5]), visualDirection(string), coverPlans([{name,score,reason}] 3个), detailRows([{label,count,text}] 4-8行，前三行count必须为3，后续每行count为1-3), seoTitle(string), seoIntro(string，不写时长，重点写内容/适用场景/商业用途), keywords(string[50])。\n'+
+	      '封面目标：一眼表达素材包主题、四宫格有点击冲击力。详情目标：前三行是升级版3×3九宫格基础详情，后续按内容延展；每行文字必须精简，label不超过8字，text不超过18字，突出明确卖点。\n'+
       '素材类型：'+input.type+'\n销售目标：'+input.goal+'\n是否允许详情图文字：'+(input.useText?'允许少量文字':'尽量纯图')+'\n分镜/素材文档：\n'+(input.doc||'用户未提供文档，请根据视频画面和素材类型判断。')
   }];
   for(const fi of sampleIdx){
@@ -4716,15 +4808,20 @@ function chooseDetailFrames(ranked, need){
 }
 
 async function generateSalesDetailImage(plan, ranked, input){
-  const rows=(plan.detailRows||fallbackSalesPlan(input).detailRows)
-    .map(r=>({label:String(r.label||'详情展示'), count:Math.max(1,Math.min(4,parseInt(r.count)||1)), text:String(r.text||r.label||'')}))
-    .slice(0,7);
+  const rows=normalizeDetailRows(plan, input);
   const need=rows.reduce((s,r)=>s+r.count,0);
-  const picks=chooseDetailFrames(ranked, need);
+  const picks=ensureDetailPickCount(chooseDetailFrames(ranked, Math.min(need, ranked.length)), ranked, need);
   const tone=detailTone(input.visualTone);
-  const W=1920, pad=64, gap=18, titleH=168, footerH=72;
-  const rowHs=rows.map(r=>r.count===1?640:(r.count===2?500:420));
-  const H=titleH+footerH+rowHs.reduce((s,h)=>s+h,0)+gap*(rows.length-1)+pad;
+  const W=1920, pad=0, rowGap=0, titleH=190, footerH=0;
+  const sideW=(input.useText && input.textStyle!=='none')?360:0;
+  const gridW=W-sideW;
+  const rowHs=rows.map((r,i)=>{
+    if(i<3) return Math.round((gridW/3)*9/16);
+    if(r.count===1) return 610;
+    if(r.count===2) return 500;
+    return Math.round((gridW/3)*9/16);
+  });
+  const H=titleH+footerH+rowHs.reduce((s,h)=>s+h,0)+rowGap*(rows.length-1);
   const canvas=document.createElement('canvas'); canvas.width=W; canvas.height=H;
   const ctx=canvas.getContext('2d');
   ctx.fillStyle=tone.bg; ctx.fillRect(0,0,W,H);
@@ -4734,44 +4831,35 @@ async function generateSalesDetailImage(plan, ranked, input){
   grd.addColorStop(1,'rgba(255,255,255,0)');
   ctx.fillStyle=grd; ctx.fillRect(0,0,W,240);
   ctx.fillStyle=tone.title;
-  ctx.font='700 54px Inter, sans-serif';
-  wrapCanvasText(ctx, plan.theme||'光厂视频素材包', pad, 74, W-pad*2, 62, 1);
+  ctx.font='800 58px Inter, sans-serif';
+  wrapCanvasText(ctx, plan.theme||'光厂视频素材包', 64, 78, W-128, 64, 1);
   ctx.fillStyle=tone.sub;
-  ctx.font='400 24px Inter, sans-serif';
-  wrapCanvasText(ctx, (plan.sellingPoints||[]).slice(0,2).join(' · '), pad, 124, W-pad*2, 34, 2);
+  ctx.font='500 24px Inter, sans-serif';
+  wrapCanvasText(ctx, compactSalesLine(plan), 64, 134, W-128, 34, 1);
   let y=titleH, k=0;
-  for(const row of rows){
-    const rh=rowHs[rows.indexOf(row)];
+  for(let ri=0; ri<rows.length; ri++){
+    const row=rows[ri];
+    const rh=rowHs[ri];
     const count=row.count;
-    const labelH=(input.useText && input.textPosition==='top' && input.textStyle!=='none')?64:0;
-    if(input.useText && input.textPosition==='top' && input.textStyle!=='none'){
-      drawDetailTextBlock(ctx, row, pad, y, W-pad*2, 52, input, tone, rows.indexOf(row)+1);
-    }
-    const imgY=y+labelH;
-    const imgH=rh-labelH;
-    const sideW=(input.useText && input.textPosition==='side' && input.textStyle!=='none')?260:0;
-    if(sideW){
-      drawDetailTextBlock(ctx, row, pad, imgY, sideW-22, imgH, input, tone, rows.indexOf(row)+1);
-    }
-    const gridX=pad+sideW;
-    const gridW=W-pad*2-sideW;
-    const cellW=(gridW-gap*(count-1))/count;
+    const imgY=y;
+    const imgH=rh;
+    const gridX=0;
+    const cellW=gridW/count;
     for(let c=0;c<count;c++){
       const fi=picks[k++]; if(fi===undefined) continue;
       const img=await loadImg(S.frames[fi].dataUrl);
-      const x=gridX+c*(cellW+gap);
-      drawCoverImage(ctx,img,x,imgY,cellW,imgH);
+      const x=Math.round(gridX+c*cellW);
+      const nextX=(c===count-1)?gridX+gridW:Math.round(gridX+(c+1)*cellW);
+      drawCoverImage(ctx,img,x,imgY,nextX-x,imgH);
       if(input.useText && input.textPosition==='overlay' && input.textStyle!=='none' && c===0){
-        drawOverlayText(ctx,row,x,imgY,cellW,imgH,input,tone,rows.indexOf(row)+1);
+        drawOverlayText(ctx,row,x,imgY,nextX-x,imgH,input,tone,ri+1);
       }
-      ctx.strokeStyle=tone.stroke; ctx.lineWidth=1;
-      ctx.strokeRect(x+.5,imgY+.5,cellW-1,imgH-1);
     }
-    y+=rh+gap;
+    if(sideW){
+      drawDetailTextBlock(ctx, row, gridW, imgY, sideW, imgH, input, tone, ri+1);
+    }
+    y+=rh+rowGap;
   }
-  ctx.fillStyle=tone.sub;
-  ctx.font='400 18px Inter, sans-serif';
-  ctx.fillText('适用于企业宣传片、商业广告、科技展厅、品牌包装、新媒体剪辑等项目', pad, H-42);
   SALES.detailCanvas=canvas;
   SALES.detailRows=rows;
   const block=document.getElementById('detailPreviewBlock');
@@ -4783,7 +4871,34 @@ async function generateSalesDetailImage(plan, ranked, input){
     pctx.drawImage(canvas,0,0);
   }
   const meta=document.getElementById('detailMeta');
-  if(meta) meta.textContent='详情长图 '+W+'×'+H+' · '+picks.length+' 张图 · '+rows.length+' 行结构';
+  if(meta) meta.textContent='详情长图 '+W+'×'+H+' · 前三行3×3基础详情 · 后续'+Math.max(0,rows.length-3)+'行延展';
+}
+
+function normalizeDetailRows(plan, input){
+  const src=(plan.detailRows||fallbackSalesPlan(input).detailRows||[])
+    .map(r=>({label:String(r.label||'详情展示').trim(), count:Math.max(1,Math.min(3,parseInt(r.count)||3)), text:String(r.text||r.label||'').trim()}))
+    .filter(r=>r.label);
+  const selling=(plan.sellingPoints||[]).map(s=>String(s).trim()).filter(Boolean);
+  const base=[
+    {label:src[0]?.label||'主题清晰', count:3, text:selling[0]||src[0]?.text||'一眼看懂素材主题'},
+    {label:src[1]?.label||'内容丰富', count:3, text:selling[1]||src[1]?.text||'多镜头覆盖不同场景'},
+    {label:src[2]?.label||'商用可用', count:3, text:selling[2]||src[2]?.text||'适配宣传片和商业项目'}
+  ];
+  const extras=src.slice(3).map(r=>({...r, count:Math.max(1,Math.min(3,r.count))})).slice(0,5);
+  return [...base, ...extras];
+}
+
+function ensureDetailPickCount(picks, ranked, need){
+  const pool=[...new Set([...(picks||[]), ...(ranked||[]), ...S.frames.map((_,i)=>i)])];
+  if(pool.length===0) return [];
+  const out=[];
+  for(let i=0;i<need;i++) out.push(pool[i%pool.length]);
+  return out;
+}
+
+function compactSalesLine(plan){
+  const points=(plan.sellingPoints||[]).map(s=>String(s).replace(/[，。；,.]/g,' ').trim()).filter(Boolean);
+  return points.slice(0,3).map(s=>s.length>14?s.slice(0,14):s).join(' · ') || '内容丰富 · 可商用 · 适合上架展示';
 }
 
 function detailTone(name){
@@ -4798,33 +4913,36 @@ function detailTone(name){
 
 function drawDetailTextBlock(ctx,row,x,y,w,h,input,tone,idx){
   const style=input.textStyle;
+  const title=shortText(row.label, 8);
+  const point=shortText(row.text||row.label, 18);
   ctx.save();
-  if(style==='tech'){
-    ctx.fillStyle=tone.chip; roundRect(ctx,x,y+4,w,Math.min(h-8,48),14); ctx.fill();
-    ctx.fillStyle=tone.accent; ctx.font='700 18px Inter, sans-serif'; ctx.fillText(String(idx).padStart(2,'0'),x+18,y+34);
-    ctx.fillStyle=tone.title; ctx.font='700 26px Inter, sans-serif'; ctx.fillText(row.label,x+64,y+34);
-  } else if(style==='editorial'){
-    ctx.fillStyle=tone.accent; ctx.fillRect(x,y+7,5,Math.min(h-14,42));
-    ctx.fillStyle=tone.title; ctx.font='800 32px Inter, sans-serif'; ctx.fillText(row.label,x+20,y+36);
-  } else {
-    ctx.fillStyle=tone.title; ctx.font='700 28px Inter, sans-serif'; ctx.fillText(row.label,x,y+32);
-  }
-  if(input.textDensity!=='light'){
-    ctx.fillStyle=tone.sub; ctx.font='400 18px Inter, sans-serif';
-    wrapCanvasText(ctx,row.text||'',x+(style==='editorial'?20:0),y+58,w,25,input.textDensity==='rich'?2:1);
-  }
+  ctx.fillStyle=tone.bg;
+  ctx.fillRect(x,y,w,h);
+  ctx.fillStyle=tone.chip;
+  ctx.fillRect(x,y,6,h);
+  const cx=x+34;
+  const cy=y+Math.max(86, Math.min(h-58, h*.42));
+  ctx.fillStyle=tone.accent;
+  ctx.font='800 22px Inter, sans-serif';
+  ctx.fillText(String(idx).padStart(2,'0'),cx,cy-42);
+  ctx.fillStyle=tone.title;
+  ctx.font=style==='editorial'?'800 40px Inter, sans-serif':'800 34px Inter, sans-serif';
+  wrapCanvasText(ctx,title,cx,cy,w-68,44,2);
+  ctx.fillStyle=tone.sub;
+  ctx.font='500 20px Inter, sans-serif';
+  wrapCanvasText(ctx,point,cx,cy+82,w-68,30,2);
   if(input.textDensity==='rich'){
-    const tags=String(row.text||row.label).split(/[、,，\s]+/).filter(Boolean).slice(0,3);
-    let tx=x, ty=y+h-22;
-    ctx.font='700 15px Inter, sans-serif';
-    tags.forEach(t=>{
-      const tw=ctx.measureText(t).width+24;
-      ctx.fillStyle=tone.chip; roundRect(ctx,tx,ty-20,tw,28,14); ctx.fill();
-      ctx.fillStyle=tone.accent; ctx.fillText(t,tx+12,ty);
-      tx+=tw+8;
-    });
+    const tag=shortText(point, 6);
+    const tw=ctx.measureText(tag).width+28;
+    ctx.fillStyle=tone.chip; roundRect(ctx,cx,y+h-62,tw,34,17); ctx.fill();
+    ctx.fillStyle=tone.accent; ctx.font='800 16px Inter, sans-serif'; ctx.fillText(tag,cx+14,y+h-39);
   }
   ctx.restore();
+}
+
+function shortText(text, max){
+  const s=String(text||'').replace(/\s+/g,'').replace(/[，。；、,.!?！？：:]/g,'').trim();
+  return s.length>max ? s.slice(0,max) : s;
 }
 
 function drawOverlayText(ctx,row,x,y,w,h,input,tone,idx){
@@ -4880,12 +4998,21 @@ async function ensureSalesFrames(){
 async function runSalesCopyOnly(){
   const input=salesInputs();
   setSalesProgress(20,'正在生成销售策略...');
-  let plan;
-  try{ plan=await aiSalesPlan(input); }
-  catch(e){ console.warn(e); plan=fallbackSalesPlan(input); toast('AI 文案失败，已使用本地策略生成','warn'); }
+	    let plan;
+	    try{ plan=await aiSalesPlan(input); }
+	    catch(e){
+	      console.warn(e);
+	      input.aiIssues=[...(input.aiIssues||[]), {title:'视觉/策略模型调用失败', message:((e&&e.message)||'未知错误')+'。当前结果使用本地兜底策略，请检查 API Key、模型权限或刷新模型列表。'}];
+	      plan=fallbackSalesPlan(input);
+	      toast('模型调用失败，已显示失败原因并使用本地兜底','warn');
+	    }
   setSalesProgress(68,'正在用 '+input.seoModel+' 优化 SEO 文案...');
   try{ plan=await aiSeoOptimize(input, plan); }
-  catch(e){ console.warn(e); toast('SEO 模型失败，已保留基础文案','warn'); }
+	  catch(e){
+	    console.warn(e);
+	    plan.aiIssues=[...(plan.aiIssues||[]), {title:'SEO 模型调用失败', message:((e&&e.message)||'未知错误')+'。已保留基础文案，建议换用列表中的可用模型。'}];
+	    toast('SEO 模型失败，已在结果中提示','warn');
+	  }
   showSalesResults(plan);
   setSalesProgress(-1);
 }
@@ -4899,17 +5026,31 @@ async function runSalesKit(){
     setSalesProgress(8,'检查视频与分镜文档...');
     if(!(await ensureSalesFrames())) return;
     setSalesProgress(24,'用 '+input.model+' 分析分镜、卖点与画面策略...');
-    let plan;
-    try{ plan=await aiSalesPlan(input); }
-    catch(e){ console.warn(e); plan=fallbackSalesPlan(input); toast('AI 策略失败，已使用本地销售策略继续生成','warn'); }
+	    let plan;
+	    try{ plan=await aiSalesPlan(input); }
+	    catch(e){
+	      console.warn(e);
+	      input.aiIssues=[...(input.aiIssues||[]), {title:'视觉/策略模型调用失败', message:((e&&e.message)||'未知错误')+'。当前策略为本地兜底生成，不代表模型已成功理解视频。'}];
+	      plan=fallbackSalesPlan(input);
+	      toast('模型调用失败，已显示失败原因并使用本地兜底','warn');
+	    }
     setSalesProgress(36,'用 '+input.seoModel+' 优化标题、简介和关键词...');
     try{ plan=await aiSeoOptimize(input, plan); }
-    catch(e){ console.warn(e); toast('SEO 模型失败，已保留基础文案继续生成','warn'); }
+	    catch(e){
+	      console.warn(e);
+	      plan.aiIssues=[...(plan.aiIssues||[]), {title:'SEO 模型调用失败', message:((e&&e.message)||'未知错误')+'。标题/简介/关键词已保留基础版本，请换模型后可重新生成文案。'}];
+	      toast('SEO 模型失败，已在结果中提示','warn');
+	    }
     showSalesResults(plan);
-    setSalesProgress(45,'挑选高销售价值画面...');
-    if(!(S.aiScores&&S.aiScores.length) && input.apiKey){
-      try{ await runAIPick(false); }catch(e){ console.warn('AI挑帧失败，改用本地排序', e); }
-    }
+	    setSalesProgress(45,'挑选高销售价值画面...');
+	    if(!(S.aiScores&&S.aiScores.length) && input.apiKey){
+	      try{ await runAIPick(false); }
+	      catch(e){
+	        console.warn('AI挑帧失败，改用本地排序', e);
+	        plan.aiIssues=[...(plan.aiIssues||[]), {title:'AI 选图失败', message:((e&&e.message)||'未知错误')+'。封面和详情图已改用本地画面评分排序生成。'}];
+	        showSalesResults(plan);
+	      }
+	    }
     const ranked=await getSalesRankedFrames();
     if(!ranked.length){ toast('没有可用帧，请先截帧','err'); return; }
     setSalesProgress(66,'生成封面候选...');
