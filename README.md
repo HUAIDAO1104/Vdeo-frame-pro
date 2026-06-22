@@ -13,7 +13,16 @@
 
 ## 功能进度
 
-### ✅ 最新更新 — 拼图质量与挑帧逻辑优化（6 项，已完成）
+### ✅ 最新更新 — 详情长图重构 + 模型/状态修复（已完成）
+本次按用户反馈逐项落地：
+1. **详情恢复为「长图」且为 3 个版本**：详情不再是单纯的九宫格，而是 **3 个版本的竖向长图**（像封面一样有 3 张）。每张 = **顶部 3×3 九宫格 + 下方若干自适应行**：重点画面用整行 1 张通栏大图，细节/重复拼成 3~4 张一行；行数随内容自适应。核心函数：`buildDetailLongLayout`（变行布局编排）+ `renderDetailLongCanvas`（无黑边/不变形渲染，cover 裁剪到各单元格，行高按该行中位比例自适应）+ `createDetailCandidates`（3 版本分桶挑帧、与封面去重）。资产卡片由 `renderDetailBatchCard` 渲染，可预览/重生/下载（`regenDetailLong`、`downloadBatch` 命名 `detail_long_vN`）。
+2. **九宫格/详情标题由 AI 按卖点生成**：标题取自 `plan.detailRows[].label` 与 `sellingPoints`（`buildDetailSegmentTitles`），**绝不直接用文档/theme 标题**；3 个版本各取不同标题。
+3. **SEO 文案默认模型 = `claude-opus-4-8`**（已 curl 验证可用，`claude-opus-4.8` 会 model_not_found）。`DEFAULT_SEO_MODEL`、`#aiSeoModel` 默认项、`salesInputs` 兜底全部切换。
+4. **红色渐变标题带更饱满好看**：去掉透明度下调（移除 `heroOpacity` 滑块 UI 与绑定），`drawDetailHeroTitle` 改为**实心 4 色斜向渐变 + 顶部高光 + 边缘柔化**，`HERO_GRADIENTS` 升级为 4 色标。配色/字号/位置仍可在「详情文字设计」调，改动即时重绘（`regenDetailBatches` → `regenDetailLong`）。
+5. **每张详情图都有文字设计**：3 个版本每张顶部都叠加各自的 AI 标题（之前仅第一张有，已修复）。
+6. **修复「模型调用状态矛盾」**：根因是「挑帧」(`runAIPick`/`visionScoreBatch`) 与「销售文案策略」(`aiSalesPlan`) 是**两个互相独立的模型调用**，一个成功不代表另一个成功。新增 `robustParseJSON`（处理 markdown 围栏、尾逗号、智能引号、截断 JSON 自动补全）+ 提高 `max_tokens`，并把失败文案改为明确区分「销售文案策略失败 ≠ 挑帧失败，挑帧状态以拼图区『挑帧引擎』卡片为准」。
+
+### ✅ 上一版 — 拼图质量与挑帧逻辑优化（6 项，已完成）
 针对"拼图质量差、挑选逻辑需优化"的 6 点反馈逐项落地：
 1. **构图更美 + AI 挑帧规则优化**：封面四宫格用「封面意图」重新评分 + 多样性贪心挑选（`selectFramesForIntent` + `greedyDiversePick`），强调构图(composition)/美观(appeal)/主题代表性(theme)/视觉冲击；通过轮询分桶把候选帧分配到各封面，**保证封面之间、封面内部 4 格都互不相似、内容不重复**，并在时间轴上覆盖全片最具代表性的高光画面。
 2. **详情与封面不重复**：封面已用帧记录到 `SALES.usedFrames`，详情挑帧（`createDetailCandidates` / `chooseDetailFrames`）**主动排除封面帧**，帧源充足时实测详情与封面 **0 重叠**。
