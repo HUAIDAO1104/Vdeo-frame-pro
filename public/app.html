@@ -573,12 +573,12 @@
             <select id="aiModel"
               style="width:100%;height:38px;cursor:pointer;-webkit-appearance:none;">
               <optgroup label="── Qwen 通义千问 VL（阿里 · 推荐）">
-                <option value="qwen3-vl-flash-2026-01-22" selected>qwen3-vl-flash-0122 · ⭐推荐（最新版·速度最快·质量稳定）</option>
-                <option value="qwen3-vl-plus-2025-12-19">qwen3-vl-plus-1219 · 新版高质量（速度中等）</option>
-                <option value="qwen3.6-plus">qwen3.6-plus · 最新一代多模态旗舰（效果最佳·速度慢）</option>
-                <option value="qwen3-vl-plus">qwen3-vl-plus · 老版（速度波动·将逐步下线）</option>
-                <option value="qwen3-vl-plus-2025-09-23">qwen3-vl-plus-0923 · 老稳定版（将下线）</option>
-                <option value="qwen3-vl-flash">qwen3-vl-flash · 老快速版（将下线）</option>
+                <option value="qwen3-vl-flash-2026-01-22" selected>qwen3-vl-flash-0122 · ⭐默认（最新快照·最快·质量稳定）</option>
+                <option value="qwen3-vl-plus-2025-12-19">qwen3-vl-plus-1219 · ⭐备选推荐（高质量·稳定·不受9月下线影响）</option>
+                <option value="qwen3.6-plus">qwen3.6-plus · 备选（效果最佳·速度慢）</option>
+                <option value="qwen3-vl-plus-2025-09-23">qwen3-vl-plus-0923 · 稳定快照版</option>
+                <option value="qwen3-vl-flash">qwen3-vl-flash · ⚠️2026-09-08下线（请勿长期使用）</option>
+                <option value="qwen3-vl-plus">qwen3-vl-plus · ⚠️主线老版（建议改用带日期快照）</option>
                 <option value="qwen-vl-max-latest">qwen-vl-max-latest · max最强（需授权）</option>
                 <option value="qwen-vl-max-2025-04-08">qwen-vl-max-0408 · max稳定（需授权）</option>
                 <option value="qwen-vl-plus-latest">qwen-vl-plus-latest · plus稳定（老系列）</option>
@@ -612,8 +612,8 @@
 	            <div class="ai-label-row"><span>SEO 文案模型</span><span id="modelListStatus" class="model-list-status">默认推荐列表</span></div>
 	            <select id="aiSeoModel" style="width:100%;height:38px;cursor:pointer;-webkit-appearance:none;">
 	              <optgroup label="── GPT（SEO 文案推荐）">
-	                <option value="gpt-5.5-pro" selected>gpt-5.5-pro · SEO标题/简介质量最佳</option>
-	                <option value="gpt-5.5">gpt-5.5 · 高质量文案</option>
+	                <option value="gpt-5.5" selected>gpt-5.5 · 推荐（SEO标题/简介高质量）</option>
+	                <option value="gpt-5.5-pro">gpt-5.5-pro · 旗舰Pro（质量最佳·成本更高）</option>
 	                <option value="gpt-5.4">gpt-5.4 · 稳定文案</option>
 	                <option value="gpt-5.4-mini">gpt-5.4-mini · 轻量快速</option>
 	                <option value="gpt-5.4-nano">gpt-5.4-nano · 最便宜</option>
@@ -646,7 +646,7 @@
 	                <option value="qwen-vl-ocr-latest">qwen-vl-ocr · OCR增强</option>
 	              </optgroup>
 	            </select>
-            <p class="ai-setting-note">建议：选图用 qwen3-vl-flash-0122（最新版·最快·质量稳定）；SEO 用 gpt-5.5-pro。SEO 输出很短，用高质量模型对成本影响小。注：qwen3-vl-plus 等老 3 系列将逐步下线，建议优先用新版。</p>
+            <p class="ai-setting-note">建议：选图默认 qwen3-vl-flash-0122（最快），备选 qwen3-vl-plus-1219（高质量·稳定）；SEO 用 gpt-5.5。<b>⚠️ 注意：官方将于 2026-09-08 下线 qwen3-max、qwen3-vl-flash 等历史主线模型</b>，届时请切换到带日期的快照版（如 -0122 / -1219），避免调用超时或失败。</p>
           </div>
           </details>
         </div>
@@ -2884,7 +2884,7 @@ function toggleApiKeyVis(){
 const API_KEY_STORAGE = 'vfp_api_key';
 const MODEL_LIST_STORAGE = 'vfp_available_models';
 const DEFAULT_VISION_MODEL = 'qwen3-vl-flash-2026-01-22';
-const DEFAULT_SEO_MODEL = 'gpt-5.5-pro';
+const DEFAULT_SEO_MODEL = 'gpt-5.5';
 
 function saveApiKey(){
   const val = document.getElementById('aiApiKey').value.trim();
@@ -4544,7 +4544,7 @@ function salesInputs(){
 	    visualTone: document.getElementById('detailVisualTone')?.value || 'premium',
 	    apiKey: (document.getElementById('aiApiKey')?.value || '').trim(),
 	    model: document.getElementById('aiModel')?.value || 'qwen3-vl-flash-2026-01-22',
-	    seoModel: document.getElementById('aiSeoModel')?.value || 'gpt-5.5-pro'
+	    seoModel: document.getElementById('aiSeoModel')?.value || 'gpt-5.5'
 	  };
 	}
 
@@ -4866,54 +4866,36 @@ async function generateSalesDetailImage(plan, ranked, input){
   const need=rows.reduce((s,r)=>s+r.count,0);
   const picks=ensureDetailPickCount(chooseDetailFrames(ranked, Math.min(need, ranked.length)), ranked, need);
   const tone=detailTone(input.visualTone);
-  const W=1920, pad=0, rowGap=0, titleH=190, footerH=0;
-  const sideW=(input.useText && input.textStyle!=='none')?360:0;
-  const gridW=W-sideW;
-  const rowHs=rows.map((r,i)=>{
-    if(i<3) return Math.round((gridW/3)*9/16);
-    if(r.count===1) return 610;
-    if(r.count===2) return 500;
-    return Math.round((gridW/3)*9/16);
-  });
-  const H=titleH+footerH+rowHs.reduce((s,h)=>s+h,0)+rowGap*(rows.length-1);
+  // 统一布局：整图与封面四宫格采用同一套 16:9 网格，无右侧文字栏，无独立标题区。
+  const W=1920;
+  const gridW=W;                          // 满宽，不再为右侧文字栏留 360
+  // 每个格子严格 16:9，与封面四宫格（960×540）比例一致；同一行内每格高度相同
+  const rowHs=rows.map(r=>Math.round((gridW/r.count)*9/16));
+  const H=rowHs.reduce((s,h)=>s+h,0);     // 没有顶部标题区，标题改为叠加在首行图片上
   const canvas=document.createElement('canvas'); canvas.width=W; canvas.height=H;
   const ctx=canvas.getContext('2d');
-  ctx.fillStyle=tone.bg; ctx.fillRect(0,0,W,H);
-  const grd=ctx.createLinearGradient(0,0,W,0);
-  grd.addColorStop(0,tone.glowA);
-  grd.addColorStop(.55,tone.glowB);
-  grd.addColorStop(1,'rgba(255,255,255,0)');
-  ctx.fillStyle=grd; ctx.fillRect(0,0,W,240);
-  ctx.fillStyle=tone.title;
-  ctx.font='800 58px Inter, sans-serif';
-  wrapCanvasText(ctx, plan.theme||'光厂视频素材包', 64, 78, W-128, 64, 1);
-  ctx.fillStyle=tone.sub;
-  ctx.font='500 24px Inter, sans-serif';
-  wrapCanvasText(ctx, compactSalesLine(plan), 64, 134, W-128, 34, 1);
-  let y=titleH, k=0;
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+
+  let y=0, k=0;
   for(let ri=0; ri<rows.length; ri++){
     const row=rows[ri];
     const rh=rowHs[ri];
     const count=row.count;
-    const imgY=y;
-    const imgH=rh;
-    const gridX=0;
     const cellW=gridW/count;
     for(let c=0;c<count;c++){
       const fi=picks[k++]; if(fi===undefined) continue;
       const img=await loadImg(S.frames[fi].dataUrl);
-      const x=Math.round(gridX+c*cellW);
-      const nextX=(c===count-1)?gridX+gridW:Math.round(gridX+(c+1)*cellW);
-      drawCoverImage(ctx,img,x,imgY,nextX-x,imgH);
-      if(input.useText && input.textPosition==='overlay' && input.textStyle!=='none' && c===0){
-        drawOverlayText(ctx,row,x,imgY,nextX-x,imgH,input,tone,ri+1);
-      }
+      const x=Math.round(c*cellW);
+      const nextX=(c===count-1)?gridW:Math.round((c+1)*cellW);
+      // 图片已按 16:9 截图、格子也是 16:9 → cover 填充不会变形或失衡
+      drawCoverImage(ctx,img,x,y,nextX-x,rh);
     }
-    if(sideW){
-      drawDetailTextBlock(ctx, row, gridW, imgY, sideW, imgH, input, tone, ri+1);
-    }
-    y+=rh+rowGap;
+    y+=rh;
   }
+
+  // 顶部核心卖点：红色渐变背景，叠加覆盖在第一行图片上方，文字居中、简洁
+  drawDetailHeroTitle(ctx, plan, W, rowHs[0]||Math.round(W*9/16));
+
   SALES.detailCanvas=canvas;
   SALES.detailRows=rows;
   const block=document.getElementById('detailPreviewBlock');
@@ -4925,7 +4907,41 @@ async function generateSalesDetailImage(plan, ranked, input){
     pctx.drawImage(canvas,0,0);
   }
   const meta=document.getElementById('detailMeta');
-  if(meta) meta.textContent='详情长图 '+W+'×'+H+' · 前三行3×3基础详情 · 后续'+Math.max(0,rows.length-3)+'行延展';
+  if(meta) meta.textContent='详情长图 '+W+'×'+H+' · 全行统一16:9（与封面四宫格一致）· 核心卖点红色渐变居中叠加';
+}
+
+// 顶部核心卖点标题：红色渐变背景，居中，叠加覆盖在首行图片上
+function drawDetailHeroTitle(ctx, plan, W, firstRowH){
+  const core=distillCoreSellingLine(plan, 18);   // 整个视频的核心卖点，已过滤无效词
+  if(!core) return;
+  ctx.save();
+  // 红色渐变带，从左到右、半透明覆盖在图片顶部
+  const bandH=Math.round(Math.min(firstRowH*0.42, 240));
+  const grd=ctx.createLinearGradient(0,0,W,0);
+  grd.addColorStop(0,   'rgba(196,18,30,0.92)');   // 深红
+  grd.addColorStop(0.5, 'rgba(232,40,52,0.86)');   // 正红
+  grd.addColorStop(1,   'rgba(255,86,72,0.92)');   // 橙红
+  ctx.fillStyle=grd;
+  ctx.fillRect(0,0,W,bandH);
+  // 底部细微暗影过渡，让红带与图片衔接更自然
+  const fade=ctx.createLinearGradient(0,bandH-40,0,bandH);
+  fade.addColorStop(0,'rgba(196,18,30,0)');
+  fade.addColorStop(1,'rgba(0,0,0,0.18)');
+  ctx.fillStyle=fade; ctx.fillRect(0,bandH-40,W,40);
+  // 居中文字
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  ctx.fillStyle='#ffffff';
+  ctx.shadowColor='rgba(0,0,0,0.35)';
+  ctx.shadowBlur=12; ctx.shadowOffsetY=2;
+  // 字号自适应：保证一行放下
+  let fs=Math.round(bandH*0.42);
+  ctx.font='900 '+fs+'px Inter, "PingFang SC", "Microsoft YaHei", sans-serif';
+  while(ctx.measureText(core).width > W*0.9 && fs>28){
+    fs-=4; ctx.font='900 '+fs+'px Inter, "PingFang SC", "Microsoft YaHei", sans-serif';
+  }
+  ctx.fillText(core, W/2, Math.round(bandH/2));
+  ctx.restore();
 }
 
 function normalizeDetailRows(plan, input){
@@ -4953,6 +4969,62 @@ function ensureDetailPickCount(picks, ranked, need){
 function compactSalesLine(plan){
   const points=(plan.sellingPoints||[]).map(s=>String(s).replace(/[，。；,.]/g,' ').trim()).filter(Boolean);
   return points.slice(0,3).map(s=>s.length>14?s.slice(0,14):s).join(' · ') || '内容丰富 · 可商用 · 适合上架展示';
+}
+
+// 无效/套话词库：标题里不应出现这些泛词，要的是「整个视频的核心卖点」
+const SALES_STOPWORDS = [
+  'ai视频','ai','人工智能','影视级','电影级','素材包','素材','视频素材','高清素材','4k素材','商用素材',
+  '视频','短视频','片','宣传片','广告片','片头片尾','片头','片尾','合集','合辑','套装','套件',
+  '高清','超清','4k','8k','高质量','高品质','优质','精选','专业','商业','商用','可商用',
+  '系列','版','款','个','张','帧','画面','场景','镜头','分镜','内容','展示','演示','效果',
+  '一眼','适合','用于','适配','包含','覆盖','证明','体现','突出','打造','呈现','的','了','和','与','及'
+];
+
+// 从主题/卖点里提炼「整个视频的核心卖点」——去掉套话，保留有信息量的短词
+function distillCoreSellingLine(plan, maxLen=18){
+  const raw=[];
+  if(plan && plan.theme) raw.push(String(plan.theme));
+  (plan && plan.sellingPoints || []).forEach(s=>raw.push(String(s)));
+  // 较长的停用词优先匹配，避免「高清」先于「高清素材」命中
+  const stops=[...SALES_STOPWORDS].sort((a,b)=>b.length-a.length);
+  // 先按标点切成候选短语
+  let phrases=[];
+  raw.join(' ').split(/[，。；、,.!?！？：:\/\|·\s]+/).forEach(p=>{
+    const t=p.trim(); if(t) phrases.push(t);
+  });
+  // 对每个短语：把出现在任意位置的停用词都剔掉（替换成分隔），再拆成更小的有效片段
+  const cleaned=[];
+  const seen=new Set();
+  for(let p of phrases){
+    let s=p;
+    // 全局剔除停用词（不论前缀/中间/后缀）
+    for(const w of stops){
+      if(w.length<2) continue;
+      const re=new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');
+      s=s.replace(re,'|');
+    }
+    // 拆出剔除后的有效片段
+    s.split('|').forEach(seg=>{
+      let t=seg.replace(/[的了和与及]+/g,'').trim();
+      if(t.length<2) return;
+      if(stops.includes(t.toLowerCase())) return;
+      if(seen.has(t)) return;
+      seen.add(t); cleaned.push(t);
+    });
+  }
+  // 拼接成一句简洁核心卖点，控制总长
+  let line='';
+  for(const s of cleaned){
+    const next = line ? line+' · '+s : s;
+    if(next.length>maxLen) break;
+    line=next;
+  }
+  if(!line){ // 兜底：取主题去套话后的前若干字
+    let t=String((plan&&plan.theme)||'核心卖点一目了然');
+    for(const w of stops){ if(w.length>=2) t=t.replace(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi'),''); }
+    line=t.replace(/[，。；、,.\s的了和与及]/g,'').slice(0,maxLen) || '核心卖点一目了然';
+  }
+  return line;
 }
 
 function detailTone(name){
