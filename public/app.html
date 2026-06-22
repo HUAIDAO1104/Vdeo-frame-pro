@@ -573,17 +573,17 @@
             <select id="aiModel"
               style="width:100%;height:38px;cursor:pointer;-webkit-appearance:none;">
               <optgroup label="── Qwen 通义千问 VL（阿里 · 推荐）">
-                <option value="qwen3-vl-plus" selected>qwen3-vl-plus · 推荐（速度与效果兼顾）</option>
-                <option value="qwen3.6-plus">qwen3.6-plus · 最新一代多模态旗舰（效果最佳）</option>
-                <option value="qwen3-vl-plus-2025-12-19">qwen3-vl-plus-1219 · 最新版</option>
-                <option value="qwen3-vl-plus-2025-09-23">qwen3-vl-plus-0923 · 稳定版</option>
-                <option value="qwen3-vl-flash">qwen3-vl-flash · 最快</option>
-                <option value="qwen3-vl-flash-2026-01-22">qwen3-vl-flash-0122 · 最快新版</option>
-                <option value="qwen-vl-max-latest">qwen-vl-max-latest · max最强</option>
-                <option value="qwen-vl-max-2025-04-08">qwen-vl-max-0408 · max稳定</option>
-                <option value="qwen-vl-plus-latest">qwen-vl-plus-latest · plus稳定</option>
-                <option value="qwen-vl-plus-2025-08-15">qwen-vl-plus-0815 · plus新版</option>
-                <option value="qwen2.5-vl-32b-instruct">qwen2.5-vl-32b · 2.5代高精度</option>
+                <option value="qwen3-vl-flash-2026-01-22" selected>qwen3-vl-flash-0122 · ⭐推荐（最新版·速度最快·质量稳定）</option>
+                <option value="qwen3-vl-plus-2025-12-19">qwen3-vl-plus-1219 · 新版高质量（速度中等）</option>
+                <option value="qwen3.6-plus">qwen3.6-plus · 最新一代多模态旗舰（效果最佳·速度慢）</option>
+                <option value="qwen3-vl-plus">qwen3-vl-plus · 老版（速度波动·将逐步下线）</option>
+                <option value="qwen3-vl-plus-2025-09-23">qwen3-vl-plus-0923 · 老稳定版（将下线）</option>
+                <option value="qwen3-vl-flash">qwen3-vl-flash · 老快速版（将下线）</option>
+                <option value="qwen-vl-max-latest">qwen-vl-max-latest · max最强（需授权）</option>
+                <option value="qwen-vl-max-2025-04-08">qwen-vl-max-0408 · max稳定（需授权）</option>
+                <option value="qwen-vl-plus-latest">qwen-vl-plus-latest · plus稳定（老系列）</option>
+                <option value="qwen-vl-plus-2025-08-15">qwen-vl-plus-0815 · plus新版（老系列）</option>
+                <option value="qwen2.5-vl-32b-instruct">qwen2.5-vl-32b · 2.5代高精度（需授权）</option>
                 <option value="qwen-vl-ocr-latest">qwen-vl-ocr · OCR增强</option>
               </optgroup>
               <optgroup label="── Claude（Anthropic）">
@@ -632,12 +632,12 @@
 	                <option value="claude-opus-4-7">claude-opus-4-7 · 旗舰新版</option>
 	              </optgroup>
 	              <optgroup label="── Qwen 通义千问">
-	                <option value="qwen3-vl-plus">qwen3-vl-plus · 全部使用千问</option>
+	                <option value="qwen3-vl-flash-2026-01-22">qwen3-vl-flash-0122 · 全部使用千问（最快新版）</option>
 	                <option value="qwen3.6-plus">qwen3.6-plus · 最新一代多模态旗舰</option>
-	                <option value="qwen3-vl-plus-2025-12-19">qwen3-vl-plus-1219 · 最新版</option>
-	                <option value="qwen3-vl-plus-2025-09-23">qwen3-vl-plus-0923 · 稳定版</option>
-	                <option value="qwen3-vl-flash">qwen3-vl-flash · 最快</option>
-	                <option value="qwen3-vl-flash-2026-01-22">qwen3-vl-flash-0122 · 最快新版</option>
+	                <option value="qwen3-vl-plus-2025-12-19">qwen3-vl-plus-1219 · 新版高质量</option>
+	                <option value="qwen3-vl-plus">qwen3-vl-plus · 老版（将下线）</option>
+	                <option value="qwen3-vl-plus-2025-09-23">qwen3-vl-plus-0923 · 老稳定版（将下线）</option>
+	                <option value="qwen3-vl-flash">qwen3-vl-flash · 老快速版（将下线）</option>
 	                <option value="qwen-vl-max-latest">qwen-vl-max-latest · max最强</option>
 	                <option value="qwen-vl-max-2025-04-08">qwen-vl-max-0408 · max稳定</option>
 	                <option value="qwen-vl-plus-latest">qwen-vl-plus-latest · plus稳定</option>
@@ -646,7 +646,7 @@
 	                <option value="qwen-vl-ocr-latest">qwen-vl-ocr · OCR增强</option>
 	              </optgroup>
 	            </select>
-            <p class="ai-setting-note">建议：选图用 qwen3-vl-plus；SEO 用 gpt-5.5-pro。SEO 输出很短，用高质量模型对成本影响小。</p>
+            <p class="ai-setting-note">建议：选图用 qwen3-vl-flash-0122（最新版·最快·质量稳定）；SEO 用 gpt-5.5-pro。SEO 输出很短，用高质量模型对成本影响小。注：qwen3-vl-plus 等老 3 系列将逐步下线，建议优先用新版。</p>
           </div>
           </details>
         </div>
@@ -1337,6 +1337,60 @@ function toast(msg, type='ok'){
   el.classList.add('show');
   clearTimeout(toastTm);
   toastTm = setTimeout(()=>el.classList.remove('show'), 3000);
+}
+
+// ===================================================================
+// 轻量确认弹窗（带「不再提示」记忆）
+// 返回 Promise<boolean>：true=继续，false=取消
+// ===================================================================
+const NO_DOC_WARN_KEY = 'vfp_skip_nodoc_warn';
+function appConfirm({title, message, okText='继续', cancelText='取消', showDontAsk=false}){
+  return new Promise(resolve=>{
+    const old=document.getElementById('appConfirmMask');
+    if(old) old.remove();
+    const mask=document.createElement('div');
+    mask.id='appConfirmMask';
+    mask.className='app-confirm-mask';
+    mask.innerHTML=
+      '<div class="app-confirm-box" role="dialog" aria-modal="true">'+
+        '<div class="app-confirm-title">'+escapeHtmlSafe(title||'提示')+'</div>'+
+        '<div class="app-confirm-msg">'+escapeHtmlSafe(message||'')+'</div>'+
+        (showDontAsk
+          ? '<label class="app-confirm-dontask"><input type="checkbox" id="appConfirmDontAsk"> 不再提示</label>'
+          : '')+
+        '<div class="app-confirm-actions">'+
+          '<button type="button" class="app-confirm-cancel" id="appConfirmCancel">'+escapeHtmlSafe(cancelText)+'</button>'+
+          '<button type="button" class="app-confirm-ok" id="appConfirmOk">'+escapeHtmlSafe(okText)+'</button>'+
+        '</div>'+
+      '</div>';
+    document.body.appendChild(mask);
+    const close=(val)=>{
+      if(showDontAsk){
+        const cb=document.getElementById('appConfirmDontAsk');
+        if(cb && cb.checked) localStorage.setItem(NO_DOC_WARN_KEY,'1');
+      }
+      mask.remove();
+      resolve(val);
+    };
+    document.getElementById('appConfirmOk').onclick=()=>close(true);
+    document.getElementById('appConfirmCancel').onclick=()=>close(false);
+    mask.addEventListener('click', e=>{ if(e.target===mask) close(false); });
+  });
+}
+
+// 检查是否提供了分镜/卖点文档或文字；未提供则弹可关闭提示
+// 返回 true 表示可继续生成
+async function warnIfNoDocText(){
+  const doc=(document.getElementById('storyDoc')?.value || '').trim();
+  if(doc.length>0) return true;                       // 已提供文字，直接放行
+  if(localStorage.getItem(NO_DOC_WARN_KEY)==='1') return true; // 用户已选择不再提示
+  return await appConfirm({
+    title:'未提供分镜 / 卖点文档',
+    message:'你还没有粘贴或导入分镜脚本、素材说明或卖点文档。AI 将只能依据视频画面推测主题与卖点，生成的封面文案、详情图和 SEO 标题可能不够精准。建议补充文档后再生成，效果更好。',
+    okText:'仍然继续生成',
+    cancelText:'返回补充文档',
+    showDontAsk:true
+  });
 }
 
 // ===================================================================
@@ -2829,7 +2883,7 @@ function toggleApiKeyVis(){
 // ===================================================================
 const API_KEY_STORAGE = 'vfp_api_key';
 const MODEL_LIST_STORAGE = 'vfp_available_models';
-const DEFAULT_VISION_MODEL = 'qwen3-vl-plus';
+const DEFAULT_VISION_MODEL = 'qwen3-vl-flash-2026-01-22';
 const DEFAULT_SEO_MODEL = 'gpt-5.5-pro';
 
 function saveApiKey(){
@@ -4489,7 +4543,7 @@ function salesInputs(){
     textDensity: document.getElementById('detailTextDensity')?.value || 'light',
 	    visualTone: document.getElementById('detailVisualTone')?.value || 'premium',
 	    apiKey: (document.getElementById('aiApiKey')?.value || '').trim(),
-	    model: document.getElementById('aiModel')?.value || 'qwen3-vl-plus',
+	    model: document.getElementById('aiModel')?.value || 'qwen3-vl-flash-2026-01-22',
 	    seoModel: document.getElementById('aiSeoModel')?.value || 'gpt-5.5-pro'
 	  };
 	}
@@ -4996,6 +5050,7 @@ async function ensureSalesFrames(){
 }
 
 async function runSalesCopyOnly(){
+  if(!(await warnIfNoDocText())) return;
   const input=salesInputs();
   setSalesProgress(20,'正在生成销售策略...');
 	    let plan;
@@ -5018,6 +5073,7 @@ async function runSalesCopyOnly(){
 }
 
 async function runSalesKit(){
+  if(!(await warnIfNoDocText())) return;
   const input=salesInputs();
   const btn=document.getElementById('salesKitBtn');
   const old=btn?btn.innerHTML:'';
