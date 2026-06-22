@@ -258,6 +258,42 @@
                   </select>
                 </label>
               </div>
+
+              <div class="detail-hero-controls">
+                <div class="dhc-title">详情大标题（红色渐变）</div>
+                <div class="text-design-grid">
+                  <label class="sales-field">
+                    <span>渐变配色</span>
+                    <select id="heroGradStyle">
+                      <option value="red" selected>红色经典</option>
+                      <option value="redOrange">红橙活力</option>
+                      <option value="crimson">深红高级</option>
+                      <option value="gold">金红奢华</option>
+                      <option value="blue">科技蓝</option>
+                    </select>
+                  </label>
+                  <label class="sales-field">
+                    <span>文字大小</span>
+                    <select id="heroFontScale">
+                      <option value="0.42">标准</option>
+                      <option value="0.52" selected>大</option>
+                      <option value="0.62">超大</option>
+                    </select>
+                  </label>
+                  <label class="sales-field range-field">
+                    <span>渐变透明度 <b id="heroOpacityVal">62%</b></span>
+                    <input type="range" id="heroOpacity" min="25" max="95" value="62" />
+                  </label>
+                  <label class="sales-field">
+                    <span>标题位置</span>
+                    <select id="heroBandPos">
+                      <option value="top" selected>顶部</option>
+                      <option value="bottom">底部</option>
+                      <option value="center">居中</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
             </details>
 
             <div class="sales-actions">
@@ -271,7 +307,10 @@
             </div>
             <div id="salesProgress" class="sales-progress" style="display:none;">
               <div class="sales-progress-bar"><div id="salesProgressFill"></div></div>
-              <span id="salesProgressText">准备分析...</span>
+              <div class="sales-progress-meta">
+                <span id="salesProgressText">准备分析...</span>
+                <span id="salesProgressTime" class="sales-progress-time">⏱ 0.0s</span>
+              </div>
             </div>
           </div>
 
@@ -290,8 +329,10 @@
             <div class="sales-result-block">
               <div class="sales-result-title">SEO 上架文案</div>
               <div class="seo-output">
-                <label>标题</label>
+                <label>主推标题</label>
                 <textarea id="seoTitle" rows="2" readonly></textarea>
+                <label>备选标题（2 个）</label>
+                <textarea id="seoTitleAlts" rows="3" readonly></textarea>
                 <label>作品简介</label>
                 <textarea id="seoIntro" rows="5" readonly></textarea>
                 <label>50 个关键词（空格分隔）</label>
@@ -299,12 +340,12 @@
               </div>
             </div>
             <div class="sales-result-block" id="detailPreviewBlock" style="display:none;">
-              <div class="sales-result-title">详情长图预览</div>
-              <div class="detail-preview-wrap"><canvas id="salesDetailCanvas"></canvas></div>
+              <div class="sales-result-title">详情图说明</div>
               <div class="detail-actions">
-                <button class="btn-sm btn-primary-sm" id="downloadDetailBtn">下载详情长图</button>
-                <span id="detailMeta" class="detail-meta"></span>
+                <span id="detailMeta" class="detail-meta">3 张详情九宫格已生成在「销售图资产」区，可点击预览、替换单格或调整大标题样式。</span>
               </div>
+              <canvas id="salesDetailCanvas" style="display:none;"></canvas>
+              <button id="downloadDetailBtn" style="display:none;"></button>
             </div>
           </div>
         </div>
@@ -4380,6 +4421,13 @@ async function generateBatch(bid){
     ctx.drawImage(bi, 0, 0, bi.naturalWidth, bi.naturalHeight);
   }
 
+  // 详情图核心卖点大标题（红色渐变，可调）——仅当该批次标记了 heroPlan 时叠加（通常详情第一张）
+  if(b.heroPlan){
+    // 标题带覆盖在整张详情图顶部第一“行”的高度内
+    const firstRowH = Math.round(H / b.rows);
+    drawDetailHeroTitle(ctx, b.heroPlan, W, firstRowH);
+  }
+
   b.canvas=canvas;
 
   // Show thumbnail preview
@@ -4548,15 +4596,37 @@ function salesInputs(){
 	  };
 	}
 
+let _salesProgressStart=0, _salesProgressTimer=null;
 function setSalesProgress(pct, text){
   const wrap=document.getElementById('salesProgress');
   const fill=document.getElementById('salesProgressFill');
   const label=document.getElementById('salesProgressText');
+  const timeEl=document.getElementById('salesProgressTime');
   if(!wrap||!fill||!label) return;
-  if(pct<0){ wrap.style.display='none'; return; }
+  if(pct<0){
+    // 结束：停止计时，显示总耗时
+    if(_salesProgressTimer){ clearInterval(_salesProgressTimer); _salesProgressTimer=null; }
+    if(_salesProgressStart && timeEl){
+      const total=((performance.now()-_salesProgressStart)/1000).toFixed(1);
+      timeEl.textContent='⏱ 共 '+total+'s · 完成';
+    }
+    setTimeout(()=>{ wrap.style.display='none'; }, 50);
+    return;
+  }
   wrap.style.display='flex';
   fill.style.width=Math.max(0,Math.min(100,pct))+'%';
   label.textContent=text||'处理中...';
+  // 启动/维持计时器（实时显示已用时间）
+  if(!_salesProgressTimer){
+    _salesProgressStart=performance.now();
+    const tick=()=>{
+      if(!timeEl) return;
+      const el=((performance.now()-_salesProgressStart)/1000).toFixed(1);
+      timeEl.textContent='⏱ 已用 '+el+'s';
+    };
+    tick();
+    _salesProgressTimer=setInterval(tick, 100);
+  }
 }
 
 async function readStoryFile(file){
@@ -4632,6 +4702,8 @@ function showSalesResults(plan){
     ).join('');
   }
   document.getElementById('seoTitle').value=plan.seoTitle||'';
+  const altsEl=document.getElementById('seoTitleAlts');
+  if(altsEl) altsEl.value=(plan.seoTitleAlts||[]).map((t,i)=>'备选'+(i+1)+'：'+t).join('\n');
   document.getElementById('seoIntro').value=plan.seoIntro||'';
   document.getElementById('seoKeywords').value=(plan.keywords||[]).join(' ');
 }
@@ -4677,6 +4749,7 @@ function fallbackSalesPlan(input){
 	      {label:'场景延展', count:2, text:'覆盖更多用途'}
 	    ],
     seoTitle: makeSeoTitle(theme, sceneWords),
+    seoTitleAlts: makeSeoTitleAlts(theme, sceneWords),
     seoIntro: makeSeoIntro(theme, sellingPoints, sceneWords),
     keywords
   };
@@ -4693,9 +4766,23 @@ function buildKeywordList(words, type){
   return pool.slice(0,50);
 }
 
+// 兜底 SEO 标题：按范例风格 分辨率+主题+主体+风格+场景+可商用素材；尽量去无效词
 function makeSeoTitle(theme, words){
-  const tail=words.includes('4K素材')?'':'4K视频素材';
-  return (theme+' '+words.slice(0,4).filter(w=>!theme.includes(w)).join(' ')+' '+tail).replace(/\s+/g,' ').trim();
+  const cleanWords=(words||[]).map(w=>String(w||'').trim())
+    .filter(w=>w && !/^(精品|精美|优质|高端|大气|震撼|超清|画质|欢迎|选购|本素材|视频素材包)$/.test(w));
+  const body=cleanWords.filter(w=>!theme.includes(w)).slice(0,5).join(' ');
+  return ('4K'+theme+'AI高清视频素材 '+body+' 商业宣传背景片头可商用素材')
+    .replace(/\s+/g,' ').trim();
+}
+// 兜底备选标题（2 个，4K/8K 错开）
+function makeSeoTitleAlts(theme, words){
+  const cleanWords=(words||[]).map(w=>String(w||'').trim())
+    .filter(w=>w && !/^(精品|精美|优质|高端|大气|震撼|超清|画质|欢迎|选购|本素材|视频素材包)$/.test(w));
+  const body=cleanWords.filter(w=>!theme.includes(w)).slice(0,4).join(' ');
+  return [
+    ('8K'+theme+'视频素材 '+body+' 史诗大片背景可商用').replace(/\s+/g,' ').trim(),
+    (theme+'AI视频素材4K '+body+' 宣传片头文旅党政可商用').replace(/\s+/g,' ').trim()
+  ];
 }
 
 function makeSeoIntro(theme, sellingPoints, words){
@@ -4755,9 +4842,26 @@ async function aiSalesPlan(input){
 async function aiSeoOptimize(input, plan){
   if(!input.apiKey) return plan;
   const prompt =
-    '你是光厂视频素材包上架的资深SEO运营和商业文案总监。请只优化上架文案，不要改变封面/详情图策略。\n'+
-    '目标：提高搜索曝光、点击意愿和购买转化。标题要自然，不堆砌；简介不写时长，重点写内容、适用场景、可商用价值；关键词必须正好50个，用数组返回。\n'+
-    '严格输出纯JSON，不要代码块。JSON字段：seoTitle(string), seoIntro(string), keywords(string[50])。\n\n'+
+    '你是光厂（VJ师）视频素材网的金牌SEO标题专家。请严格按下面给出的"标准范例风格"生成上架标题与备选标题。\n\n'+
+    '【标题公式】= 分辨率(4K/8K) + 核心主题/IP + 主体内容/画面 + 风格调色 + 适用场景/用途 + 可商用素材。\n'+
+    '【硬性要求】\n'+
+    '1. 主推标题 1 个 + 备选标题 2 个，每个标题 28~42 个汉字，信息密度高、可直接上架。\n'+
+    '2. 必须包含具体的分辨率（4K 或 8K，二选一开头优先）、主题关键词、画面主体、风格/调色词、应用场景、"可商用素材"或"可商用"收尾。\n'+
+    '3. 用空格分隔语义块，读起来像 4~5 个搜索短语拼接，覆盖多种搜索意图。\n'+
+    '4. 严禁套话空话与无效词：不要出现"精美/震撼/高端大气/优质/精品/欢迎选购/视频素材包/本素材/超清画质"等空泛形容词，所有词必须有检索价值或具体含义。\n'+
+    '5. 主体内容要写"画面里真实有的东西"（如：兵马俑铁骑、抗体中和刺突、红船党徽），不要泛泛而谈。\n\n'+
+    '【标准范例（之后一律以此为准）】\n'+
+    '范例1 主推：4K大秦帝国统一天下AI高清视频素材 秦朝兵马俑铁骑历史史诗大片 黑金铁血秦风长城军阵背景片头 历史纪录片文旅党政可商用素材\n'+
+    '范例1 备选A：8K秦朝大秦帝国视频素材 兵马俑军阵铁骑出征统一六国历史重现 黑金冷峻史诗大片背景\n'+
+    '范例1 备选B：大秦雄风兵马俑长城AI视频素材4K 秦风黑金铁血调色 历史纪录片片头文旅可商用\n'+
+    '范例2 主推：8K医学微观病毒疫苗中和机制AI视频素材 抗体中和刺突3D可视化 免疫疫苗原理科普动画 医院药企生物医疗宣传背景可商用\n'+
+    '范例2 备选A：病毒疫苗免疫机制3D可视化视频素材8K 抗体中和病毒科普动画 制药生物医疗背景可商用\n'+
+    '范例2 备选B：8K抗体中和病毒AI医学动画素材 疫苗免疫屏障微观科普 医院药企宣传背景片头可商用\n'+
+    '范例3 主推：4K建党节红船精神党政片头AI视频素材 红色主旋律史诗大片 建党周年七一党建宣传背景 党徽星火不忘初心可商用素材\n'+
+    '范例3 备选A：红船精神建党节专题片头4K视频素材 七一党建红色主旋律大气背景 党政机关单位宣传可商用\n'+
+    '范例3 备选B：8K红色党建AI视频素材 红船起航星火燎原建党周年片头 不忘初心牢记使命党政宣传背景\n\n'+
+    '【输出格式】严格输出纯JSON，不要代码块、不要任何解释。JSON字段：\n'+
+    'seoTitle(string，主推标题), seoTitleAlts(string[2]，2个备选标题), seoIntro(string，作品简介，不写时长，重点写画面内容/适用场景/可商用价值，去除套话), keywords(string[50]，每个为有检索价值的短词)。\n\n'+
     '素材类型：'+input.type+'\n'+
     '销售目标：'+input.goal+'\n'+
     '主题定位：'+(plan.theme||'')+'\n'+
@@ -4786,6 +4890,11 @@ async function aiSeoOptimize(input, plan){
   const fallback=fallbackSalesPlan(input);
   const keywords=Array.isArray(parsed.keywords)?parsed.keywords:String(parsed.keywords||'').split(/\s+/);
   plan.seoTitle=String(parsed.seoTitle||plan.seoTitle||fallback.seoTitle).trim();
+  // 2 个备选标题
+  let alts=[];
+  if(Array.isArray(parsed.seoTitleAlts)) alts=parsed.seoTitleAlts;
+  else if(parsed.seoTitleAlts) alts=[String(parsed.seoTitleAlts)];
+  plan.seoTitleAlts=alts.map(x=>String(x||'').trim()).filter(Boolean).slice(0,2);
   plan.seoIntro=String(parsed.seoIntro||plan.seoIntro||fallback.seoIntro).trim();
   plan.keywords=[...new Set(keywords.map(x=>String(x).trim()).filter(Boolean))];
   while(plan.keywords.length<50) plan.keywords.push(...fallback.keywords);
@@ -4825,16 +4934,41 @@ function resetSalesBatches(){
 
 async function createCoverCandidates(plan, ranked){
   resetSalesBatches();
+  SALES.usedFrames = new Set();   // 记录封面已用帧，供详情图去重
   const plans=plan.coverPlans.slice(0, document.getElementById('salesMakeAltCovers').checked ? 3 : 1);
-  const offsets=[0,2,4];
-  for(let i=0;i<plans.length;i++){
+  const coverCount = plans.length;
+  const needTotal = coverCount * 4;
+
+  // 用按「封面意图」重新评分 + 多样性挑选的统一池：保证封面之间、封面内部都互不相似，
+  // 且优先主题鲜明 / 构图精美 / 画面震撼的代表帧；时间上铺满全片。
+  let pool;
+  if(S.aiScores && S.aiScores.length){
+    const sel = selectFramesForIntent(S.aiScores, Math.min(needTotal, S.aiScores.length), S.pixCache, 'cover');
+    pool = sel.map(s=>s.frameIdx);
+  } else {
+    pool = [...ranked];
+  }
+  // 去重并补足
+  pool = [...new Set(pool)];
+  for(const fi of ranked){ if(pool.length>=needTotal) break; if(!pool.includes(fi)) pool.push(fi); }
+
+  // 把池子轮流分配给各封面（A取0,3,6,9 ; B取1,4,7,10 ...），让每张封面都拿到跨全片的差异化帧，
+  // 同一张封面内的 4 格也彼此不相似。
+  const buckets = Array.from({length:coverCount}, ()=>[]);
+  pool.forEach((fi, idx)=>{ buckets[idx % coverCount].push(fi); });
+
+  for(let i=0;i<coverCount;i++){
     addBatch(2,2);
     const b=S.batches[S.batches.length-1];
     b.title='封面候选 '+String.fromCharCode(65+i);
     b.note=plans[i].name+' · '+plans[i].score+'分';
-    const picks=ranked.slice(offsets[i], offsets[i]+4);
-    while(picks.length<4 && ranked[picks.length]) picks.push(ranked[picks.length]);
-    placeFramesIntoBatch(b, [...new Set(picks)].slice(0,4), 'cover');
+    let picks=[...new Set(buckets[i])].slice(0,4);
+    // 补足到 4 张（从池子其余帧里取没用过的）
+    if(picks.length<4){
+      for(const fi of pool){ if(picks.length>=4) break; if(!picks.includes(fi)) picks.push(fi); }
+    }
+    picks.slice(0,4).forEach(fi=>SALES.usedFrames.add(fi));
+    placeFramesIntoBatch(b, picks.slice(0,4), 'cover');
     renderBatchTitle(b);
     await generateBatch(b.id);
   }
@@ -4850,97 +4984,145 @@ function renderBatchTitle(b){
   if(meta) meta.textContent=b.note||('销售图 #'+b.id);
 }
 
-function chooseDetailFrames(ranked, need){
-  const byTime=[...ranked].sort((a,b)=>((S.frames[a]?.time)||0)-((S.frames[b]?.time)||0));
+// 详情挑帧：从已排序帧中混合「质量序 + 时间序」，并排除封面已用帧（Task2 去重）
+function chooseDetailFrames(ranked, need, excludeSet){
+  const ex = excludeSet || new Set();
+  const avail = ranked.filter(fi=>!ex.has(fi));
+  const base = avail.length>=need ? avail : ranked; // 排除后不够则放开限制兜底
+  const byTime=[...base].sort((a,b)=>((S.frames[a]?.time)||0)-((S.frames[b]?.time)||0));
   const mixed=[];
   let qi=0, ti=0;
-  while(mixed.length<need && (qi<ranked.length || ti<byTime.length)){
-    const q=ranked[qi++]; if(q!==undefined && !mixed.includes(q)) mixed.push(q);
+  while(mixed.length<need && (qi<base.length || ti<byTime.length)){
+    const q=base[qi++]; if(q!==undefined && !mixed.includes(q)) mixed.push(q);
     const t=byTime[ti++]; if(t!==undefined && !mixed.includes(t) && mixed.length<need) mixed.push(t);
   }
   return mixed.slice(0, need);
 }
 
-async function generateSalesDetailImage(plan, ranked, input){
-  const rows=normalizeDetailRows(plan, input);
-  const need=rows.reduce((s,r)=>s+r.count,0);
-  const picks=ensureDetailPickCount(chooseDetailFrames(ranked, Math.min(need, ranked.length)), ranked, need);
-  const tone=detailTone(input.visualTone);
-  // 统一布局：整图与封面四宫格采用同一套 16:9 网格，无右侧文字栏，无独立标题区。
-  const W=1920;
-  const gridW=W;                          // 满宽，不再为右侧文字栏留 360
-  // 每个格子严格 16:9，与封面四宫格（960×540）比例一致；同一行内每格高度相同
-  const rowHs=rows.map(r=>Math.round((gridW/r.count)*9/16));
-  const H=rowHs.reduce((s,h)=>s+h,0);     // 没有顶部标题区，标题改为叠加在首行图片上
-  const canvas=document.createElement('canvas'); canvas.width=W; canvas.height=H;
-  const ctx=canvas.getContext('2d');
-  ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+// Task4：详情图改为「3 张独立详情图」，作为批次显示在资产区，可像封面一样编辑/替换。
+// 每张详情图都是 3×3 九宫格；第 1 张叠加红色渐变核心卖点大标题（可调）。
+// Task2：详情帧排除封面已用帧（SALES.usedFrames），保证与上方四宫格不重复。
+async function createDetailCandidates(plan, ranked, input){
+  const DETAIL_COUNT=3;       // 固定 3 张详情图
+  const perImg=9;             // 每张 3×3
+  const needTotal=DETAIL_COUNT*perImg;
+  const exclude=SALES.usedFrames || new Set();
 
-  let y=0, k=0;
-  for(let ri=0; ri<rows.length; ri++){
-    const row=rows[ri];
-    const rh=rowHs[ri];
-    const count=row.count;
-    const cellW=gridW/count;
-    for(let c=0;c<count;c++){
-      const fi=picks[k++]; if(fi===undefined) continue;
-      const img=await loadImg(S.frames[fi].dataUrl);
-      const x=Math.round(c*cellW);
-      const nextX=(c===count-1)?gridW:Math.round((c+1)*cellW);
-      // 图片已按 16:9 截图、格子也是 16:9 → cover 填充不会变形或失衡
-      drawCoverImage(ctx,img,x,y,nextX-x,rh);
+  // 用「细节意图」重新评分 + 多样性挑选，并排除封面帧
+  let pool;
+  if(S.aiScores && S.aiScores.length){
+    const sel=selectFramesForIntent(S.aiScores, S.aiScores.length, S.pixCache, 'detail');
+    pool=sel.map(s=>s.frameIdx).filter(fi=>!exclude.has(fi));
+  } else {
+    pool=ranked.filter(fi=>!exclude.has(fi));
+  }
+  pool=[...new Set(pool)];
+  // 排除后帧数不足，再放开（仍优先未用过的）
+  if(pool.length<needTotal){
+    for(const fi of ranked){ if(pool.length>=needTotal) break; if(!pool.includes(fi)) pool.push(fi); }
+  }
+  // 时间维度兜底（确保 3 张图覆盖全片不同阶段）
+  const mixed=chooseDetailFrames(pool, Math.min(needTotal, pool.length||needTotal), new Set());
+  const finalPool=ensureDetailPickCount(mixed, pool, needTotal);
+
+  // 轮流分配给 3 张详情图，保证每张内部互不相似、3 张之间也错开
+  const buckets=Array.from({length:DETAIL_COUNT},()=>[]);
+  finalPool.forEach((fi,idx)=>{ buckets[idx % DETAIL_COUNT].push(fi); });
+
+  const labels=['详情九宫格 A','详情九宫格 B','详情九宫格 C'];
+  for(let i=0;i<DETAIL_COUNT;i++){
+    addBatch(3,3);
+    const b=S.batches[S.batches.length-1];
+    b.isDetail=true;
+    b.detailIndex=i;
+    b.heroPlan=(i===0)?plan:null;   // 仅第一张叠加核心卖点大标题
+    b.title=labels[i];
+    b.note='细节展示 · 与封面去重';
+    let picks=[...new Set(buckets[i])].slice(0,perImg);
+    if(picks.length<perImg){
+      for(const fi of finalPool){ if(picks.length>=perImg) break; if(!picks.includes(fi)) picks.push(fi); }
     }
-    y+=rh;
+    placeFramesIntoBatch(b, picks.slice(0,perImg), 'detail');
+    renderBatchTitle(b);
+    await generateBatch(b.id);
   }
-
-  // 顶部核心卖点：红色渐变背景，叠加覆盖在第一行图片上方，文字居中、简洁
-  drawDetailHeroTitle(ctx, plan, W, rowHs[0]||Math.round(W*9/16));
-
-  SALES.detailCanvas=canvas;
-  SALES.detailRows=rows;
+  SALES.detailRows=normalizeDetailRows(plan, input);
   const block=document.getElementById('detailPreviewBlock');
-  const prev=document.getElementById('salesDetailCanvas');
   if(block) block.style.display='';
-  if(prev){
-    prev.width=W; prev.height=H;
-    const pctx=prev.getContext('2d');
-    pctx.drawImage(canvas,0,0);
-  }
   const meta=document.getElementById('detailMeta');
-  if(meta) meta.textContent='详情长图 '+W+'×'+H+' · 全行统一16:9（与封面四宫格一致）· 核心卖点红色渐变居中叠加';
+  if(meta) meta.textContent='已生成 '+DETAIL_COUNT+' 张详情九宫格（3×3）在右侧「销售图资产」区，均与封面去重，可点击预览替换单格；首图叠加红色渐变核心卖点大标题，样式可在「详情文字设计」中调节。';
+  refreshUsageTags();
 }
 
-// 顶部核心卖点标题：红色渐变背景，居中，叠加覆盖在首行图片上
-function drawDetailHeroTitle(ctx, plan, W, firstRowH){
+// 读取详情大标题的可调参数（配色/字号/透明度/位置）
+function heroTitleOptions(){
+  const gradStyle=document.getElementById('heroGradStyle')?.value || 'red';
+  const fontScale=parseFloat(document.getElementById('heroFontScale')?.value || '0.52');
+  const opacity=(parseInt(document.getElementById('heroOpacity')?.value || '62',10))/100;
+  const bandPos=document.getElementById('heroBandPos')?.value || 'top';
+  return { gradStyle, fontScale, opacity, bandPos };
+}
+// 各种渐变配色（3 个色标），返回 [深, 中, 亮] 的 rgb 三元组
+const HERO_GRADIENTS={
+  red:       [[196,18,30],   [232,40,52],  [255,86,72]],
+  redOrange: [[214,40,30],   [240,80,40],  [255,138,40]],
+  crimson:   [[140,12,28],   [180,22,40],  [214,46,58]],
+  gold:      [[170,18,28],   [218,52,42],  [240,176,72]],
+  blue:      [[20,72,150],   [28,110,200], [40,168,220]]
+};
+// 详情大标题：可调渐变背景 + 居中文字，叠加覆盖在图片上（顶部/底部/居中）
+// 文字默认更大、渐变默认更通透（透明度可调，不再太“实”）
+function drawDetailHeroTitle(ctx, plan, W, rowH, opt){
   const core=distillCoreSellingLine(plan, 18);   // 整个视频的核心卖点，已过滤无效词
   if(!core) return;
+  opt = opt || heroTitleOptions();
+  const cols=HERO_GRADIENTS[opt.gradStyle] || HERO_GRADIENTS.red;
+  const a=Math.max(0.12, Math.min(0.96, opt.opacity)); // 整体透明度
+  const rgba=(c, alpha)=>'rgba('+c[0]+','+c[1]+','+c[2]+','+alpha+')';
   ctx.save();
-  // 红色渐变带，从左到右、半透明覆盖在图片顶部
-  const bandH=Math.round(Math.min(firstRowH*0.42, 240));
+  // 渐变带高度（放大字号也要放得下）
+  const bandH=Math.round(Math.min(rowH*Math.max(0.42, opt.fontScale*0.95), rowH*0.7, 320));
+  // 计算渐变带的纵向起点
+  let bandY;
+  if(opt.bandPos==='bottom') bandY=rowH-bandH;
+  else if(opt.bandPos==='center') bandY=Math.round((rowH-bandH)/2);
+  else bandY=0;
+  // 横向红色渐变（左深→中亮→右亮），两端略透明让画面“透气”、不死板
   const grd=ctx.createLinearGradient(0,0,W,0);
-  grd.addColorStop(0,   'rgba(196,18,30,0.92)');   // 深红
-  grd.addColorStop(0.5, 'rgba(232,40,52,0.86)');   // 正红
-  grd.addColorStop(1,   'rgba(255,86,72,0.92)');   // 橙红
+  grd.addColorStop(0,    rgba(cols[0], a));
+  grd.addColorStop(0.5,  rgba(cols[1], a*0.9));
+  grd.addColorStop(1,    rgba(cols[2], a));
   ctx.fillStyle=grd;
-  ctx.fillRect(0,0,W,bandH);
-  // 底部细微暗影过渡，让红带与图片衔接更自然
-  const fade=ctx.createLinearGradient(0,bandH-40,0,bandH);
-  fade.addColorStop(0,'rgba(196,18,30,0)');
-  fade.addColorStop(1,'rgba(0,0,0,0.18)');
-  ctx.fillStyle=fade; ctx.fillRect(0,bandH-40,W,40);
-  // 居中文字
+  ctx.fillRect(0,bandY,W,bandH);
+  // 上下边缘柔化过渡（让渐变带与图片融合，不太实）
+  const edge=Math.round(bandH*0.28);
+  if(opt.bandPos!=='center'){
+    const fadeDir = opt.bandPos==='bottom' ? 1 : -1;
+    const fy0 = opt.bandPos==='bottom' ? bandY : bandY+bandH;
+    const fade=ctx.createLinearGradient(0, fy0, 0, fy0 - fadeDir*edge);
+    fade.addColorStop(0, rgba(cols[1], a*0.6));
+    fade.addColorStop(1, rgba(cols[1], 0));
+    ctx.fillStyle=fade;
+    ctx.fillRect(0, Math.min(fy0, fy0-fadeDir*edge), W, edge);
+  }
+  // 居中白色文字（更大、加阴影描边，保证在通透渐变上也清晰）
   ctx.textAlign='center';
   ctx.textBaseline='middle';
-  ctx.fillStyle='#ffffff';
-  ctx.shadowColor='rgba(0,0,0,0.35)';
-  ctx.shadowBlur=12; ctx.shadowOffsetY=2;
-  // 字号自适应：保证一行放下
-  let fs=Math.round(bandH*0.42);
+  ctx.shadowColor='rgba(0,0,0,0.45)';
+  ctx.shadowBlur=Math.round(bandH*0.10); ctx.shadowOffsetY=2;
+  let fs=Math.round(bandH*opt.fontScale*1.7);
+  fs=Math.max(28, Math.min(fs, Math.round(bandH*0.74)));
   ctx.font='900 '+fs+'px Inter, "PingFang SC", "Microsoft YaHei", sans-serif';
-  while(ctx.measureText(core).width > W*0.9 && fs>28){
+  while(ctx.measureText(core).width > W*0.92 && fs>26){
     fs-=4; ctx.font='900 '+fs+'px Inter, "PingFang SC", "Microsoft YaHei", sans-serif';
   }
-  ctx.fillText(core, W/2, Math.round(bandH/2));
+  const cy=bandY+Math.round(bandH/2);
+  // 细描边增强可读性
+  ctx.lineWidth=Math.max(2, Math.round(fs*0.05));
+  ctx.strokeStyle='rgba(80,0,6,0.55)';
+  ctx.strokeText(core, W/2, cy);
+  ctx.fillStyle='#ffffff';
+  ctx.fillText(core, W/2, cy);
   ctx.restore();
 }
 
@@ -5181,13 +5363,13 @@ async function runSalesKit(){
 	    }
     const ranked=await getSalesRankedFrames();
     if(!ranked.length){ toast('没有可用帧，请先截帧','err'); return; }
-    setSalesProgress(66,'生成封面候选...');
+    setSalesProgress(66,'生成封面候选（覆盖全片·互不相似）...');
     await createCoverCandidates(plan, ranked);
-    setSalesProgress(84,'生成可变结构详情长图...');
-    await generateSalesDetailImage(plan, ranked, input);
+    setSalesProgress(84,'生成 3 张详情图（与封面去重）...');
+    await createDetailCandidates(plan, ranked, input);
     setSalesProgress(100,'光厂上架套件已生成');
     switchTab(2);
-    toast('光厂上架套件完成：封面候选、详情长图和 SEO 文案已生成');
+    toast('光厂上架套件完成：封面候选(4宫格) + 3张详情图均已进入资产区，可编辑替换');
     setTimeout(()=>setSalesProgress(-1),1200);
   } finally {
     if(btn){ btn.disabled=false; btn.innerHTML=old; }
@@ -5196,6 +5378,17 @@ async function runSalesKit(){
 
 document.getElementById('salesKitBtn')?.addEventListener('click', runSalesKit);
 document.getElementById('salesCopyBtn')?.addEventListener('click', runSalesCopyOnly);
+// 渐变透明度滑块实时标签 + 改动后重绘已有详情批次
+document.getElementById('heroOpacity')?.addEventListener('input', e=>{
+  const v=document.getElementById('heroOpacityVal'); if(v) v.textContent=e.target.value+'%';
+});
+['heroGradStyle','heroFontScale','heroOpacity','heroBandPos'].forEach(id=>{
+  document.getElementById(id)?.addEventListener('change', ()=>regenDetailBatches());
+});
+// 详情控件改动后，重绘所有详情批次（仅重画标题层，不重新挑帧）
+function regenDetailBatches(){
+  (S.batches||[]).filter(b=>b.isDetail && b.canvas).forEach(b=>{ generateBatch(b.id); });
+}
 document.getElementById('downloadDetailBtn')?.addEventListener('click', ()=>{
   if(!SALES.detailCanvas){ toast('请先生成详情长图','err'); return; }
   const a=document.createElement('a');

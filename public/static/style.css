@@ -360,6 +360,14 @@ body::before {
 .sales-progress { display:flex; align-items:center; gap:10px; color:var(--tm); font-size:var(--fs-xs); }
 .sales-progress-bar { flex:1; height:6px; background:var(--card3); border-radius:999px; overflow:hidden; border:1px solid var(--b); }
 #salesProgressFill { height:100%; width:0%; background:var(--grad); border-radius:999px; transition:width .25s ease; }
+.sales-progress-meta { display:flex; flex-direction:column; align-items:flex-end; gap:2px; min-width:120px; }
+.sales-progress-time { font-variant-numeric:tabular-nums; color:var(--accent-2); font-weight:700; white-space:nowrap; }
+/* 详情大标题可调控件 */
+.detail-hero-controls { border-top:1px dashed var(--b); margin-top:6px; padding-top:8px; }
+.detail-hero-controls .dhc-title { padding:0 12px 6px; font-size:var(--fs-xs); font-weight:800; color:var(--accent-2); }
+.range-field { gap:6px !important; }
+.range-field input[type=range] { width:100%; accent-color:var(--accent-2); }
+.range-field span b { color:var(--accent-2); font-variant-numeric:tabular-nums; }
 .sales-results { margin-top:16px; display:flex; flex-direction:column; gap:12px; }
 .sales-ai-warning {
   display:flex; flex-direction:column; gap:8px;
