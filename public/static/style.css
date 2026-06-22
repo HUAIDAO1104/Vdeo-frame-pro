@@ -1166,6 +1166,13 @@ body::before {
 .pm-cell-btn:hover { background:var(--accent); border-color:var(--accent); }
 .pm-cell-crop:hover { background:var(--sapphire,#3b82f6); border-color:var(--sapphire,#3b82f6); }
 .pm-cell-clear:hover { background:rgba(220,60,60,0.9); border-color:rgba(220,60,60,0.9); }
+/* 详情长图各格：可点击替换 + 可拖拽交换 */
+.pm-cell-long { box-shadow:inset 0 0 0 1px rgba(255,255,255,0.08); flex-direction:column; gap:4px; }
+.pm-cell-long:hover { background:rgba(62,180,137,0.20); box-shadow:inset 0 0 0 2px var(--accent); }
+.pm-drag-hint { display:none; font-size:10px; color:#fff; background:rgba(0,0,0,0.6); padding:2px 7px; border-radius:6px; pointer-events:none; }
+.pm-cell-long:hover .pm-drag-hint { display:block; }
+.pm-cell-long.pm-dragging { opacity:.4; }
+.pm-cell-long.pm-dragover { background:rgba(62,180,137,0.38); box-shadow:inset 0 0 0 3px var(--accent); }
 
 /* ===================================================================
    LIGHTBOX

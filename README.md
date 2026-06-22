@@ -13,7 +13,14 @@
 
 ## 功能进度
 
-### ✅ 最新更新 — 详情长图重构 + 模型/状态修复（已完成）
+### ✅ 最新更新 — 卖点标题 / 总用时 / 长图可拖拽编辑（3 项，已完成）
+按用户最新反馈逐项落地：
+1. **详情长图顶部 = 卖点简化标题（≤8 字，opus4.8 生成）**：彻底纠正"乱写画面规格"的旧问题。新增 `aiDetailHeroTitles(input, plan, need)`，**专门交给 `claude-opus-4-8`（seoModel）** 为每张长图生成一个 **不超过 8 个汉字** 的"卖点简化标题"——目的是让顾客一眼看懂视频内容，**严禁画面规格/分辨率/镜头数/4K 等技术参数**。`createDetailCandidates` 改为 `await aiDetailHeroTitles(...)` 取 3 个不同标题写入 `b.heroTitle`。本地兜底（无 API key 时）直接取卖点做"优雅截断"（`elegantCut`：收尾遇孤立虚/半字逐格回退、最少 4 字），保证**完整通顺、无语病、无半截词**。同时修复 `distillCoreSellingLine` 旧 bug —— 之前 `replace(/[的了和与及]/g,'')` 会把"一目了然"吃成"一目然"，现改为只剔标点/首尾助词、固定词兜底直接返回 literal。
+2. **红色渐变标题带默认整体缩小 15%**：`drawDetailHeroTitle` 的 `bandH` 末乘 `* 0.85`，更精致、不压画面。
+3. **完成后显示本次总用时**：`setSalesProgress(-1)` 结束分支保留进度条 6 秒并显示 **「⏱ 本次总用时 X.Xs · 已完成」**，`SALES.lastTotalTime` 记录；`runSalesKit` / `runSalesCopyOnly` 完成 toast 追加"本次总用时 Xs"。
+4. **资产区长图支持逐格拖拽 / 替换（全部版本、每个宫格）**：新增 `computeDetailLongSlots`（按渲染几何算出每格归一化矩形）、`getDetailSlotFrame` / `setDetailSlotFrame`（读写九宫格 `gridFrames` 与各行 `rows[].frames`）、`buildDetailLongOverlay`（绝对定位热区，**点击换帧 + HTML5 拖拽交换两格**）、`showDetailFramePicker` / `detailSlotPickDone`（弹出全部帧选择器替换）。`openPreviewModal` 长图分支改为挂载可编辑 overlay，编辑后 `regenDetailLong` 即时重绘。配套 CSS：`.pm-cell-long` / `.pm-drag-hint` / `.pm-dragging` / `.pm-dragover`。
+
+### ✅ 上一版 — 详情长图重构 + 模型/状态修复（已完成）
 本次按用户反馈逐项落地：
 1. **详情恢复为「长图」且为 3 个版本**：详情不再是单纯的九宫格，而是 **3 个版本的竖向长图**（像封面一样有 3 张）。每张 = **顶部 3×3 九宫格 + 下方若干自适应行**：重点画面用整行 1 张通栏大图，细节/重复拼成 3~4 张一行；行数随内容自适应。核心函数：`buildDetailLongLayout`（变行布局编排）+ `renderDetailLongCanvas`（无黑边/不变形渲染，cover 裁剪到各单元格，行高按该行中位比例自适应）+ `createDetailCandidates`（3 版本分桶挑帧、与封面去重）。资产卡片由 `renderDetailBatchCard` 渲染，可预览/重生/下载（`regenDetailLong`、`downloadBatch` 命名 `detail_long_vN`）。
 2. **九宫格/详情标题由 AI 按卖点生成**：标题取自 `plan.detailRows[].label` 与 `sellingPoints`（`buildDetailSegmentTitles`），**绝不直接用文档/theme 标题**；3 个版本各取不同标题。
