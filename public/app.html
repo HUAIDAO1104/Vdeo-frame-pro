@@ -77,17 +77,17 @@
     <div class="rail-sep"></div>
 
     <!-- 主视图切换 -->
-    <button class="rail-btn active" id="railBtn0" onclick="switchTab(0)" title="导入截帧">
+    <button class="rail-btn active" id="railBtn0" onclick="switchTab(0)" title="生成上架套件">
       <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 9h20M8 4v5M16 4v5"/></svg>
-      <span class="rail-lbl">截帧</span>
+      <span class="rail-lbl">生成</span>
     </button>
-    <button class="rail-btn" id="railBtn1" onclick="switchTab(1)" title="AI 挑帧">
+    <button class="rail-btn" id="railBtn1" onclick="switchTab(1)" title="统一结果页">
       <svg viewBox="0 0 24 24"><path d="M12 2l2.4 5.2L20 8l-4 4 1 6-5-3-5 3 1-6-4-4 5.6-.8z"/></svg>
-      <span class="rail-lbl">AI</span>
+      <span class="rail-lbl">结果</span>
     </button>
-    <button class="rail-btn" id="railBtn2" onclick="switchTab(2)" title="销售图资产">
+    <button class="rail-btn rail-advanced" id="railBtn2" onclick="switchTab(2)" title="高级微调">
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
-      <span class="rail-lbl">资产</span>
+      <span class="rail-lbl">高级</span>
     </button>
 
     <div class="rail-spacer"></div>
@@ -144,8 +144,8 @@
       <div class="view-head">
         <div class="vh-l">
           <span class="view-eyebrow">Step 01 · Sales Kit</span>
-          <h2 class="view-title">上传视频 · 生成光厂上架套件</h2>
-          <p class="view-sub">先理解素材包主题与卖点，再生成封面候选、详情展示图和 SEO 文案</p>
+          <h2 class="view-title">从素材包视频到光厂上架套件</h2>
+          <p class="view-sub">导入视频和分镜文档，一次生成封面候选、详情长图、标题、简介与关键词</p>
         </div>
         <div class="vh-r">
           <div class="badge-pill"><div class="dot"></div><span>全本地处理 · 隐私安全</span></div>
@@ -326,13 +326,13 @@
               <div class="sales-result-title">SEO 上架文案</div>
               <div class="seo-output">
                 <label>主推标题</label>
-                <textarea id="seoTitle" rows="2" readonly></textarea>
+                <textarea id="seoTitle" rows="2" oninput="onSeoManualEdit()"></textarea>
                 <label>备选标题（2 个）</label>
-                <textarea id="seoTitleAlts" rows="3" readonly></textarea>
+                <textarea id="seoTitleAlts" rows="3" oninput="onSeoManualEdit()"></textarea>
                 <label>作品简介</label>
-                <textarea id="seoIntro" rows="5" readonly></textarea>
+                <textarea id="seoIntro" rows="5" oninput="onSeoManualEdit()"></textarea>
                 <label>50 个关键词（空格分隔）</label>
-                <textarea id="seoKeywords" rows="5" readonly></textarea>
+                <textarea id="seoKeywords" rows="5" oninput="onSeoManualEdit()"></textarea>
               </div>
             </div>
             <div class="sales-result-block" id="detailPreviewBlock" style="display:none;">
@@ -463,31 +463,74 @@
 
         <!-- 右：帧墙挂载点（共享帧墙将被移动到此） -->
         <div class="view-slot sales-workspace" id="frameSlot0">
-          <div class="sales-empty-state" id="salesEmptyState">
-            <div class="sales-empty-icon">
-              <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 10h16M9 5v14"/><path d="M14 14l2 2 4-5"/></svg>
-            </div>
-            <h3>等待生成光厂上架套件</h3>
-            <p>上传视频，粘贴或导入分镜文档，然后点击左侧主按钮。这里会展示候选画面、封面方案和详情图结果。</p>
-          </div>
+          <div class="sales-empty-state" id="salesEmptyState" style="display:none;"></div>
         </div>
 
       </div><!-- /view-body -->
     </section>
 
-    <!-- ════════ 视图 1：AI 销售画面策划 ════════ -->
+    <!-- ════════ 视图 1：统一结果页 ════════ -->
     <section class="view" id="view1">
       <div class="view-head">
         <div class="vh-l">
-          <span class="view-eyebrow">Step 02 · Selling Points</span>
-          <h2 class="view-title">AI 挖掘卖点与高光画面</h2>
-          <p class="view-sub">结合销售目标为封面和详情展示挑选最有转化价值的画面</p>
+          <span class="view-eyebrow">Step 02 · Unified Results</span>
+          <h2 class="view-title">统一结果页 · 封面 / 详情 / SEO</h2>
+          <p class="view-sub">把封面候选、详情长图、标题、简介和关键词集中检查，确认后直接导出上架套件</p>
         </div>
         <div class="vh-r">
-          <span class="badge-pill"><div class="dot"></div><span>Vision AI 评分</span></span>
+          <span class="badge-pill"><div class="dot"></div><span>可检查 · 可编辑 · 可导出</span></span>
         </div>
       </div>
-      <div class="view-body split-ai">
+      <div class="view-body split-results">
+        <div class="panel scroll unified-copy-panel">
+          <div class="unified-result-card">
+            <div class="unified-head">
+              <div>
+                <div class="sales-eyebrow">Listing Output</div>
+                <h3>上架文案与策略</h3>
+                <p>这里集中展示 AI 给出的销售判断、SEO 标题、作品简介和关键词；文案可直接手动修改。</p>
+              </div>
+              <button class="btn-sm" onclick="switchTab(0)">重新生成</button>
+            </div>
+            <div id="unifiedResultSlot">
+              <div class="unified-empty">
+                <strong>还没有生成结果</strong>
+                <span>回到「生成」页上传视频和分镜文档，点击主按钮后会自动来到这里。</span>
+              </div>
+            </div>
+          </div>
+
+          <details class="advanced-settings-card unified-ai-settings">
+            <summary><span><div class="ctd"></div>高级 AI 设置</span><small>模型、API Key、审美记忆</small></summary>
+            <div id="aiLegacySlot" class="advanced-settings-body"></div>
+          </details>
+        </div>
+
+        <div class="panel scroll unified-asset-panel">
+          <div class="unified-export-card">
+            <div class="unified-head">
+              <div>
+                <div class="sales-eyebrow">Export Check</div>
+                <h3>光厂上架检查</h3>
+                <p>封面和详情图支持跨批次拖拽互换，详情标题和 SEO 文案都可编辑。</p>
+              </div>
+              <button class="btn-p btn-flow unified-download-main" id="unifiedDownloadBtn" onclick="downloadAll()" disabled>下载整套</button>
+            </div>
+            <div class="listing-checklist" id="listingChecklist">
+              <div class="listing-check-item" id="checkCover"><b>封面候选</b><span>待生成</span></div>
+              <div class="listing-check-item" id="checkDetail"><b>详情长图</b><span>待生成</span></div>
+              <div class="listing-check-item" id="checkSeo"><b>标题/简介</b><span>待生成</span></div>
+              <div class="listing-check-item" id="checkKeywords"><b>关键词</b><span>待生成</span></div>
+            </div>
+            <div class="unified-action-row">
+              <button class="btn-sm" onclick="openExportOptions()">导出规格</button>
+              <button class="btn-sm" onclick="runSalesKit()">重新生成套件</button>
+            </div>
+          </div>
+          <div id="unifiedAssetSlot" class="asset-slot"></div>
+        </div>
+      </div>
+      <div class="view-body split-ai legacy-ai-body">
 
         <!-- 左：AI 设置面板 -->
         <div class="panel scroll">
@@ -775,7 +818,7 @@
           <button class="btn-sm" id="redoBtn" onclick="redo()" disabled title="重做 (Ctrl+Shift+Z)" style="display:inline-flex;align-items:center;gap:5px;opacity:0.4;">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3L21 13"/></svg>重做
           </button>
-          <button class="btn-sm" onclick="switchTab(0)" style="border-color:var(--bs);color:var(--accent);">← 回到帧墙</button>
+          <button class="btn-sm" onclick="switchTab(0)" style="border-color:var(--bs);color:var(--accent);">← 回到生成</button>
         </div>
       </div>
       <div class="view-body split-collage">
@@ -833,7 +876,7 @@
               <div><span>清除选择</span><b>D / Esc</b></div>
               <div><span>生成全部销售图</span><b>G</b></div>
               <div><span>下载全部销售图</span><b>Ctrl+S</b></div>
-              <div><span>切换流程页</span><b>1 / 2 / 3</b></div>
+              <div><span>切换流程页</span><b>1 / 2</b></div>
               <div><span>放大预览画面</span><b>双击</b></div>
             </div>
           </div>
@@ -847,12 +890,12 @@
 
         <!-- 右：销售图资产面板 -->
   <!-- ===== RIGHT: SALES ASSET PANEL ===== -->
-  <div class="col-right">
+  <div class="col-right" id="assetPanel">
     <div class="batches-card">
       <div class="batches-header">
         <div>
           <div class="ct" style="margin-bottom:4px"><div class="ctd"></div>销售图资产</div>
-          <div class="asset-panel-sub">封面候选、详情展示图和自定义长图统一在这里管理。</div>
+          <div class="asset-panel-sub">封面候选、详情展示图和自定义长图统一管理；已填充画面可跨批次拖拽互换。</div>
         </div>
         <div class="add-batch-btns">
           <button class="btn-add" onclick="addBatch(2,2)">
@@ -993,7 +1036,7 @@
       <div class="help-row"><span>下载全部销售图</span><div class="help-keys"><span class="kbd">Ctrl</span><span class="kbd">S</span></div></div>
       <div class="help-row"><span>按当前参数截帧</span><div class="help-keys"><span class="kbd">R</span></div></div>
       <div class="help-row"><span>一键到出图</span><div class="help-keys"><span class="kbd">Q</span></div></div>
-      <div class="help-row"><span>切换到面板 1/2/3</span><div class="help-keys"><span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span></div></div>
+      <div class="help-row"><span>切换生成 / 结果</span><div class="help-keys"><span class="kbd">1</span><span class="kbd">2</span></div></div>
       <div class="help-row"><span>放大预览帧</span><div class="help-keys"><span class="kbd">双击</span></div></div>
       <div class="help-row"><span>撤销 / 重做</span><div class="help-keys"><span class="kbd">Ctrl</span><span class="kbd">Z</span> / <span class="kbd">Y</span></div></div>
       <div class="help-row"><span>打开此帮助</span><div class="help-keys"><span class="kbd">?</span></div></div>
@@ -1629,7 +1672,7 @@ async function doCapture(){
   updateFillBtn();
   updateDlBtns();
   updateAiBtns();
-  toast('截取完成：成功 '+captured+' 帧，失败 '+failed+' 帧 —— 已自动跳到 AI 挑帧');
+  toast('截取完成：成功 '+captured+' 帧，失败 '+failed+' 帧 —— 可继续生成上架套件');
   // 显示快捷操作栏
   const qb=document.getElementById('quickBar'); if(qb) qb.style.display='';
   updateQuickBar();
@@ -1763,10 +1806,72 @@ function switchTab(idx){
     const tb=document.getElementById('tabBtn'+i);
     if(tb) tb.classList.toggle('active', i===idx);
   }
-  // 将共享帧墙移动到当前视图的挂载点（视图0/1 显示帧墙）
+  relocateUnifiedPanels(idx);
+  // 将共享帧墙移动到当前视图的挂载点
   relocateFrameWall(idx);
-  if(idx===1){ updateAiBtns(); }
+  if(idx===1){ updateAiBtns(); updateListingChecklist(); }
   if(idx===2){ updateSelBadge(); refreshCollageEngineCard(); }
+}
+
+function relocateUnifiedPanels(idx){
+  const aiSlot=document.getElementById('aiLegacySlot');
+  const aiPane=document.getElementById('tabPane1');
+  if(aiSlot && aiPane && aiPane.parentElement!==aiSlot) aiSlot.appendChild(aiPane);
+
+  const resultPanel=document.getElementById('salesResultPanel');
+  const resultSlot=document.getElementById('unifiedResultSlot');
+  if(resultPanel && resultSlot && idx===1 && resultPanel.parentElement!==resultSlot){
+    resultSlot.appendChild(resultPanel);
+  }
+  const empty=resultSlot?.querySelector('.unified-empty');
+  if(empty && resultPanel){
+    const hasResult=resultPanel.style.display!=='none';
+    empty.style.display=hasResult?'none':'';
+  }
+
+  const assetPanel=document.getElementById('assetPanel');
+  const unifiedSlot=document.getElementById('unifiedAssetSlot');
+  const editSlot=document.querySelector('#view2 .view-body.split-collage');
+  if(assetPanel && idx===1 && unifiedSlot && assetPanel.parentElement!==unifiedSlot){
+    unifiedSlot.appendChild(assetPanel);
+  }
+  if(assetPanel && idx===2 && editSlot && assetPanel.parentElement!==editSlot){
+    editSlot.appendChild(assetPanel);
+  }
+  updateListingChecklist();
+}
+
+function setListingCheck(id, ok, text){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.classList.toggle('is-ok', !!ok);
+  const span=el.querySelector('span');
+  if(span) span.textContent=text;
+}
+
+function updateListingChecklist(){
+  const batches=S.batches||[];
+  const coverCount=batches.filter(b=>!b.isDetailLong).length;
+  const detailCount=batches.filter(b=>b.isDetailLong || b.isDetail).length;
+  const readyCount=batches.filter(b=>b.canvas).length;
+  const title=(document.getElementById('seoTitle')?.value||'').trim();
+  const intro=(document.getElementById('seoIntro')?.value||'').trim();
+  const keywords=(document.getElementById('seoKeywords')?.value||'').trim().split(/\s+/).filter(Boolean);
+  setListingCheck('checkCover', coverCount>0, coverCount>0 ? coverCount+' 版封面候选' : '待生成');
+  setListingCheck('checkDetail', detailCount>0, detailCount>0 ? detailCount+' 张详情长图' : '待生成');
+  setListingCheck('checkSeo', !!(title&&intro), title&&intro ? '标题和简介已生成' : '待生成');
+  setListingCheck('checkKeywords', keywords.length>=50, keywords.length ? keywords.length+' 个关键词' : '待生成');
+  const unifiedBtn=document.getElementById('unifiedDownloadBtn');
+  if(unifiedBtn) unifiedBtn.disabled=readyCount===0;
+}
+
+function onSeoManualEdit(){
+  if(SALES.plan){
+    SALES.plan.seoTitle=document.getElementById('seoTitle')?.value||'';
+    SALES.plan.seoIntro=document.getElementById('seoIntro')?.value||'';
+    SALES.plan.keywords=(document.getElementById('seoKeywords')?.value||'').trim().split(/\s+/).filter(Boolean);
+  }
+  updateListingChecklist();
 }
 
 // 把共享帧墙(#sharedFrameWall)移动到目标视图的帧挂载点
@@ -1815,7 +1920,7 @@ async function runSmartFlow(){
   try{
     await runAIPick(true);
     await generateAll();
-    switchTab(2);
+    switchTab(1);
     toast('一键流程完成：已挑选画面并生成销售图');
   }finally{
     if(btn){ btn.disabled = false; btn.innerHTML = old || '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg>一键到出图'; }
@@ -1851,7 +1956,7 @@ async function runSuperFlow(){
   const btn = document.getElementById('superBtn');
   const capBtn = document.getElementById('capBtn');
   if(!btn) return;
-  const steps = ['提取候选画面', 'AI 挖掘卖点画面', '生成销售图资产', '导出前预览'];
+  const steps = ['提取候选画面', 'AI 挖掘卖点画面', '生成销售图资产', '统一结果检查'];
   btn.disabled = true; capBtn.disabled = true;
   btn.innerHTML = '<span class="spin"></span>一键流程进行中...';
   S._superFlowRunning = true; // 标记一键流程中，阻止自动tab切换
@@ -1881,9 +1986,9 @@ async function runSuperFlow(){
     setSuperStep(steps, 3);
     await generateAll();
 
-    // 完成：跳到拼图Tab
+    // 完成：跳到统一结果页
     setSuperStep(steps, 4); // all done
-    switchTab(2);
+    switchTab(1);
     toast('🎉 一键流程完成！已提取候选画面→挑选卖点画面→生成销售图');
   }catch(e){
     toast('一键流程中断：'+e.message, 'err');
@@ -3709,7 +3814,7 @@ function showPickResultBar(n){
   if(info){ info.innerHTML = pickEngineHTML('bar'); }
   bar.style.display='block';
 }
-// 进入拼图区：确保有批次 → 填充已选帧 → 切到拼图工作区
+// 进入结果页：确保有批次 → 填充已选帧 → 回到统一结果页查看
 function proceedToCollage(){
   document.getElementById('pickResultBar').style.display='none';
   if(S.selected.length===0){ toast('请先选择帧','err'); switchTab(1); return; }
@@ -3720,8 +3825,8 @@ function proceedToCollage(){
   // 顺序填充
   doFillAll();
   refreshCollageEngineCard();
-  switchTab(2);
-  toast('已进入销售图编辑区，已将选中画面放入资产');
+  switchTab(1);
+  toast('已将选中画面放入结果页资产区');
 }
 // 根据选中帧数量智能创建一个合适尺寸的批次
 function autoCreateBatchForSelection(n){
@@ -3848,8 +3953,8 @@ async function runAIPick(autoFill=false){
     renderSel(); updateSelBadge(); updateFillBtn(); updateDlBtns();
     refreshUsageTags();
     refreshCollageEngineCard();
-    // 一键流程中不切换（由 runSmartFlow 控制），否则进入拼图区查看
-    if(!S._superFlowRunning){ switchTab(2); }
+    // 一键流程中不切换（由 runSmartFlow 控制），否则进入结果页查看
+    if(!S._superFlowRunning){ switchTab(1); }
     toast('AI 挑帧完成：'+[...usedIntents].join('、')+'，共填入 '+total+' 个格子');
   }
 }
@@ -3877,6 +3982,7 @@ function addBatch(cols,rows){
   renderBatch(batch);
   updateFillBtn();
   updateQuickBar();
+  updateListingChecklist();
   toast('已添加 '+cols+'×'+rows+' 销售图 #'+id);
 }
 
@@ -4427,7 +4533,7 @@ function removeBatch(bid){
   S.batches.splice(idx,1);
   document.getElementById('batch-'+bid)?.remove();
   if(S.batches.length===0) document.getElementById('batchEmpty').style.display='flex';
-  updateFillBtn(); refreshUsageTags();
+  updateFillBtn(); refreshUsageTags(); checkDlAllBtn();
   toast('已删除销售图 #'+bid);
 }
 
@@ -4550,6 +4656,7 @@ function checkDlAllBtn(){
   const anyCanvas=S.batches.some(b=>b.canvas);
   const dlAllBtn=document.getElementById('dlAllBtn');
   if(dlAllBtn) dlAllBtn.disabled=!anyCanvas;
+  updateListingChecklist();
 }
 
 // ── 导出选项 ──
@@ -4815,6 +4922,7 @@ function showSalesResults(plan){
   if(altsEl) altsEl.value=(plan.seoTitleAlts||[]).map((t,i)=>'备选'+(i+1)+'：'+t).join('\n');
   document.getElementById('seoIntro').value=plan.seoIntro||'';
   document.getElementById('seoKeywords').value=(plan.keywords||[]).join(' ');
+  updateListingChecklist();
 }
 
 function docKeywords(doc, type){
@@ -5850,7 +5958,8 @@ async function runSalesKit(){
     setSalesProgress(84,'生成 3 张详情图（与封面去重）...');
     await createDetailCandidates(plan, ranked, input);
     setSalesProgress(100,'光厂上架套件已生成');
-    switchTab(2);
+    updateListingChecklist();
+    switchTab(1);
     const _tt=_salesProgressStart?((performance.now()-_salesProgressStart)/1000).toFixed(1):'';
     toast('✅ 光厂上架套件完成'+(_tt?('，本次总用时 '+_tt+'s'):'')+'：封面候选(4宫格) + 3 张详情长图均已进入资产区，可编辑替换');
     setTimeout(()=>setSalesProgress(-1),300);
@@ -6406,7 +6515,6 @@ document.addEventListener('keydown', e=>{
   }
   if(e.key==='1') switchTab(0);
   if(e.key==='2') switchTab(1);
-  if(e.key==='3') switchTab(2);
   if(e.key==='r'||e.key==='R') doCapture();
   if(e.key==='q'||e.key==='Q') runSmartFlow();
   if(e.key==='g'||e.key==='G') generateAll();
