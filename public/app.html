@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="aurora" data-mode="dark">
+<html lang="zh-CN" data-theme="crimson" data-mode="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VideoFrame Pro — 视频帧截取拼接工具</title>
+  <title>光厂上架助手 — 封面、详情与 SEO 一次完成</title>
   <link rel="icon" href="/static/favicon.ico" type="image/x-icon"/>
-  <meta name="theme-color" content="#0C0818" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <meta name="theme-color" content="#F2F3F5" />
   <link href="/static/style.css" rel="stylesheet" />
+  <script src="/static/vendor/fflate.min.js"></script>
+  <script src="/static/vendor/mammoth.browser.min.js"></script>
 </head>
 <body>
 
@@ -68,9 +68,13 @@
   <nav class="rail" id="rail">
 
     <!-- 品牌标识 -->
-    <div class="rail-brand" title="VideoFrame Pro · 视频帧截取拼接">
+    <div class="rail-brand" title="光厂素材包上架助手">
       <div class="rail-logo">
         <svg viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+      </div>
+      <div class="rail-brand-copy">
+        <strong>光厂上架助手</strong>
+        <span>Sales Kit Studio</span>
       </div>
     </div>
 
@@ -81,7 +85,7 @@
       <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 9h20M8 4v5M16 4v5"/></svg>
       <span class="rail-lbl">生成</span>
     </button>
-    <button class="rail-btn" id="railBtn1" onclick="switchTab(1)" title="统一结果页">
+    <button class="rail-btn" id="railBtn1" onclick="switchTab(1)" title="生成完成后可查看结果" disabled aria-disabled="true">
       <svg viewBox="0 0 24 24"><path d="M12 2l2.4 5.2L20 8l-4 4 1 6-5-3-5 3 1-6-4-4 5.6-.8z"/></svg>
       <span class="rail-lbl">结果</span>
     </button>
@@ -91,16 +95,24 @@
     </button>
 
     <div class="rail-spacer"></div>
+    <button type="button" class="rail-save-state" id="railSaveState" aria-live="polite" onclick="openDraftManager()" title="查看本机草稿">
+      <span class="rail-save-dot"></span>
+      <span>已自动保存</span>
+    </button>
 
     <!-- 辅助操作 -->
     <div class="rail-sep"></div>
-    <button class="rail-btn ghost" onclick="openHelp()" title="快捷键帮助">
+    <button class="rail-btn ghost rail-help-entry" onclick="openHelp()" title="快捷键帮助">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <span class="rail-lbl">帮助</span>
     </button>
-    <button class="rail-btn ghost" id="themeBtn" onclick="toggleThemePop(event)" title="主题与外观">
+    <button class="rail-btn ghost rail-settings-entry" id="settingsBtn" onclick="openSettingsDrawer()" title="设置">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <span class="rail-lbl">设置</span>
+    </button>
+    <button class="rail-btn ghost rail-theme-entry" id="themeBtn" onclick="toggleThemePop(event)" title="外观设置">
       <svg viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/><path d="M12 2a10 10 0 100 20c.55 0 1-.45 1-1 0-.6-.4-1-.5-1.5-.1-.5.3-1 .9-1H15a5 5 0 005-5c0-5-4.5-9-8-9z"/></svg>
-      <span class="rail-lbl">主题</span>
+      <span class="rail-lbl">外观</span>
     </button>
   </nav>
 
@@ -136,6 +148,23 @@
     </div>
   </div>
 
+  <div class="settings-scrim" id="settingsScrim" onclick="closeSettingsDrawer()"></div>
+  <aside class="settings-drawer" id="settingsDrawer" aria-hidden="true" aria-label="产品设置" inert>
+    <div class="settings-drawer-head">
+      <div>
+        <span class="settings-kicker">工作台设置</span>
+        <h2>AI 与生成设置</h2>
+        <p>默认使用推荐配置，只有需要精细控制时才调整。</p>
+      </div>
+      <button type="button" class="settings-close" onclick="closeSettingsDrawer()" aria-label="关闭设置">×</button>
+    </div>
+    <div class="settings-drawer-body" id="settingsLegacySlot"></div>
+    <div class="settings-drawer-foot">
+      <button type="button" class="settings-help-link" onclick="closeSettingsDrawer();openHelp()">查看使用帮助</button>
+      <span>设置会保存在当前浏览器</span>
+    </div>
+  </aside>
+
   <!-- ===== 主工作区（三个全屏视图） ===== -->
   <div class="stage">
 
@@ -143,14 +172,21 @@
     <section class="view active" id="view0">
       <div class="view-head">
         <div class="vh-l">
-          <span class="view-eyebrow">Step 01 · Sales Kit</span>
-          <h2 class="view-title">从素材包视频到光厂上架套件</h2>
-          <p class="view-sub">导入视频和分镜文档，一次生成封面候选、详情长图、标题、简介与关键词</p>
+          <span class="view-eyebrow">01 · 提供素材</span>
+          <h2 class="view-title">新建上架任务</h2>
+          <p class="view-sub">上传视频与内容说明，自动生成封面、详情长图和 SEO 文案。</p>
         </div>
         <div class="vh-r">
-          <div class="badge-pill"><div class="dot"></div><span>全本地处理 · 隐私安全</span></div>
+          <button type="button" class="privacy-pill" onclick="openPrivacyNotice()" title="查看数据处理说明">
+            <span class="privacy-dot"></span><span>原始视频留在本机</span><small>启用 AI 会上传压缩画面和文档</small>
+          </button>
         </div>
       </div>
+      <ol class="task-steps" aria-label="上架任务进度">
+        <li class="is-active" id="taskStepSource"><b>1</b><span>提供素材</span></li>
+        <li id="taskStepGenerate"><b>2</b><span>生成套件</span></li>
+        <li id="taskStepResult"><b>3</b><span>确认结果</span></li>
+      </ol>
       <div class="view-body split-capture">
 
         <!-- 左：导入 + 参数控制面板 -->
@@ -163,15 +199,15 @@
         <div class="card sales-kit-card">
           <div class="sales-kit-head">
             <div>
-              <div class="sales-eyebrow">Guangchang Sales Kit</div>
-              <div class="sales-title">光厂素材包上架套件</div>
-              <div class="sales-sub">上传视频并粘贴分镜/卖点文档，AI 会先理解素材包卖点，再生成封面候选、详情长图和 SEO 文案。</div>
+              <div class="sales-eyebrow">内容说明</div>
+              <div class="sales-title">这套素材主要展示什么</div>
+              <div class="sales-sub">粘贴内容说明或导入分镜文档，系统会自动判断素材类型与主要卖点。</div>
             </div>
             <div class="sales-badge">封面 + 详情 + SEO</div>
           </div>
 
           <div class="sales-form">
-            <div class="sales-row">
+            <div class="sales-row legacy-sales-selects">
               <label class="sales-field">
 	                <span>素材包类型</span>
 	                <select id="salesPackType">
@@ -187,6 +223,7 @@
               <label class="sales-field">
                 <span>主销售目标</span>
                 <select id="salesGoal">
+                  <option value="由AI自动判断" selected>由 AI 自动判断</option>
                   <option value="点击与转化兼顾">点击与转化兼顾</option>
                   <option value="提高封面点击">提高封面点击</option>
                   <option value="证明内容丰富">证明内容丰富</option>
@@ -196,88 +233,64 @@
               </label>
             </div>
 
-            <label class="sales-field sales-doc">
-              <span>分镜脚本 / 素材说明 / 卖点文档</span>
-              <textarea id="storyDoc" rows="6" placeholder="粘贴分镜、镜头内容、素材包主题、目标行业、使用场景、客户要求等。例：智慧工厂自动化生产线，包含机械臂、AGV、产线设备、数据大屏、工人巡检、无人工厂全景..."></textarea>
-            </label>
             <div class="doc-upload-row">
               <input type="file" id="storyFileInput" accept=".txt,.md,.csv,.json,.doc,.docx,.rtf,text/plain,text/markdown,application/json" style="display:none"/>
               <button class="doc-upload-btn" type="button" id="storyFileBtn">
                 <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6M9 15l3 3 3-3"/></svg>
                 上传文档
               </button>
-              <span id="storyFileName" class="doc-file-name">支持 txt / md / csv / json，doc/docx 会尽量提取可读文本</span>
+              <span id="storyFileName" class="doc-file-name">支持 TXT、Markdown、CSV、JSON、RTF、DOC、DOCX</span>
             </div>
+            <label class="sales-field sales-doc">
+              <span>分镜脚本 / 素材说明 / 卖点文档</span>
+              <textarea id="storyDoc" rows="6" placeholder="也可以直接粘贴分镜、镜头内容、素材包主题、目标行业、使用场景或客户要求..."></textarea>
+            </label>
 
-            <div class="sales-row compact">
+            <details class="task-more-settings">
+              <summary><span>更多要求</span><small>默认由 AI 自动判断，无需设置</small></summary>
+              <div class="task-more-settings-body">
+            <div class="sales-focus-control">
+              <div class="sales-focus-label"><span>销售重点</span><small>不确定时保持自动判断</small></div>
+              <div class="focus-segment" role="group" aria-label="销售重点">
+                <button type="button" class="is-active" data-sales-goal="由AI自动判断" onclick="setSalesGoal('由AI自动判断',this)"><b>自动判断</b><small>根据视频与文档决定</small></button>
+                <button type="button" data-sales-goal="点击与转化兼顾" onclick="setSalesGoal('点击与转化兼顾',this)"><b>均衡</b><small>点击与信息完整性</small></button>
+                <button type="button" data-sales-goal="提高封面点击" onclick="setSalesGoal('提高封面点击',this)"><b>点击优先</b><small>突出主题与冲击力</small></button>
+                <button type="button" data-sales-goal="证明内容丰富" onclick="setSalesGoal('证明内容丰富',this)"><b>丰富度优先</b><small>覆盖更多镜头与场景</small></button>
+              </div>
+            </div>
+            <div class="sales-row compact sales-preferences">
               <label class="sales-check">
                 <input type="checkbox" id="salesUseText" checked />
-                <span>详情图允许少量文字卖点</span>
+                <span>详情图显示卖点标题</span>
               </label>
               <label class="sales-check">
                 <input type="checkbox" id="salesMakeAltCovers" checked />
-                <span>生成 3 版封面候选并评分</span>
+                <span>生成 3 版封面用于比较</span>
+              </label>
+              <label class="sales-check">
+                <input type="checkbox" id="salesAiGenerated" />
+                <span>这套视频由 AI 生成</span>
               </label>
             </div>
 
             <details class="text-design-panel" id="textDesignPanel">
-              <summary>详情文字设计</summary>
-              <div class="text-design-grid">
-                <label class="sales-field">
-                  <span>文字风格</span>
-                  <select id="detailTextStyle">
-                    <option value="minimal">极简高级</option>
-                    <option value="editorial">杂志标题</option>
-                    <option value="tech">科技标签</option>
-                    <option value="none">不加文字</option>
-                  </select>
-                </label>
-                <label class="sales-field">
-                  <span>文字位置</span>
-	                  <select id="detailTextPosition">
-	                    <option value="side" selected>右侧卖点栏</option>
-	                    <option value="top">每段顶部</option>
-	                    <option value="overlay">图片左下角轻叠加</option>
-	                  </select>
-                </label>
-                <label class="sales-field">
-                  <span>文字强度</span>
-                  <select id="detailTextDensity">
-                    <option value="light">轻量：只放分区标题</option>
-                    <option value="medium">适中：标题 + 短卖点</option>
-                    <option value="rich">丰富：标题 + 标签 + 场景说明</option>
-                  </select>
-                </label>
-                <label class="sales-field">
-                  <span>视觉基调</span>
-                  <select id="detailVisualTone">
-                    <option value="premium">高级暗色</option>
-                    <option value="clean">干净浅色</option>
-                    <option value="tech">科技蓝绿</option>
-                    <option value="warm">暖色商业</option>
-                  </select>
-                </label>
-              </div>
-
+              <summary>详情标题样式 <small>可在结果页继续改文字</small></summary>
               <div class="detail-hero-controls">
-                <div class="dhc-title">详情大标题（红色渐变）</div>
                 <div class="text-design-grid">
                   <label class="sales-field">
                     <span>渐变配色</span>
                     <select id="heroGradStyle">
-                      <option value="red" selected>红色经典</option>
-                      <option value="redOrange">红橙活力</option>
-                      <option value="crimson">深红高级</option>
-                      <option value="gold">金红奢华</option>
+                      <option value="red" selected>品牌红</option>
+                      <option value="crimson">深红</option>
+                      <option value="gold">金红</option>
                       <option value="blue">科技蓝</option>
                     </select>
                   </label>
                   <label class="sales-field">
                     <span>文字大小</span>
                     <select id="heroFontScale">
-                      <option value="0.42">标准</option>
-                      <option value="0.52" selected>大</option>
-                      <option value="0.62">超大</option>
+                      <option value="0.42" selected>标准</option>
+                      <option value="0.52">醒目</option>
                     </select>
                   </label>
                   <label class="sales-field">
@@ -291,29 +304,45 @@
                 </div>
               </div>
             </details>
+              </div>
+            </details>
+
+            <div class="ai-connection-bar" id="aiConnectionBar">
+              <div class="ai-connection-state">
+                <span class="ai-connection-dot"></span>
+                <div><strong id="aiConnectionTitle">正在检查 AI</strong><small id="aiConnectionMeta">请稍候</small></div>
+              </div>
+              <button type="button" class="text-action" onclick="openSettingsDrawer()">设置</button>
+            </div>
+
+            <div class="generation-readiness" id="generationReadiness" aria-live="polite">
+              <span id="readyVideo" class="is-missing">未添加视频</span>
+              <span id="readyContext">内容说明可选</span>
+            </div>
 
             <div class="sales-actions">
-              <button class="btn-p sales-primary" id="salesKitBtn">
+              <button class="btn-p sales-primary" id="salesKitBtn" disabled title="请先上传视频">
                 <svg viewBox="0 0 24 24"><path d="M13 2L3 14h7v8l10-12h-7z"/></svg>
-                生成光厂上架套件
+                <span id="salesKitBtnLabel">生成上架套件</span>
               </button>
               <button class="btn-p btn-ghost sales-secondary" id="salesCopyBtn" type="button">
                 生成文案
               </button>
             </div>
-            <div id="salesProgress" class="sales-progress" style="display:none;">
+            <div id="salesProgress" class="sales-progress" style="display:none;" role="status" aria-live="polite">
               <div class="sales-progress-bar"><div id="salesProgressFill"></div></div>
               <div class="sales-progress-meta">
                 <span id="salesProgressText">准备分析...</span>
-                <span id="salesProgressTime" class="sales-progress-time">⏱ 0.0s</span>
+                <span id="salesProgressTime" class="sales-progress-time">0.0s</span>
               </div>
+              <button type="button" class="sales-cancel-btn" id="salesCancelBtn" onclick="cancelSalesRun()">取消生成</button>
             </div>
           </div>
 
 	          <div id="salesResultPanel" class="sales-results" style="display:none;">
 	            <div id="salesAiWarning" class="sales-ai-warning" style="display:none;"></div>
 	            <div class="sales-result-grid">
-              <div class="sales-result-block">
+              <div class="sales-result-block cover-plan-summary">
                 <div class="sales-result-title">销售策略</div>
                 <div id="salesStrategy" class="sales-copy"></div>
               </div>
@@ -325,13 +354,13 @@
             <div class="sales-result-block">
               <div class="sales-result-title">SEO 上架文案</div>
               <div class="seo-output">
-                <label>主推标题</label>
+                <div class="seo-label-row"><label for="seoTitle">主推标题</label><span id="titleCount" class="field-counter">0 / 80</span><button type="button" class="copy-action" onclick="copySeoField('seoTitle')">复制</button></div>
                 <textarea id="seoTitle" rows="2" oninput="onSeoManualEdit()"></textarea>
-                <label>备选标题（2 个）</label>
+                <div class="seo-label-row"><label for="seoTitleAlts">备选标题（2 个）</label><button type="button" class="copy-action" onclick="copySeoField('seoTitleAlts')">复制</button></div>
                 <textarea id="seoTitleAlts" rows="3" oninput="onSeoManualEdit()"></textarea>
-                <label>作品简介</label>
+                <div class="seo-label-row"><label for="seoIntro">作品简介</label><span id="introCount" class="field-counter">0 字</span><button type="button" class="copy-action" onclick="copySeoField('seoIntro')">复制</button></div>
                 <textarea id="seoIntro" rows="5" oninput="onSeoManualEdit()"></textarea>
-                <label>50 个关键词（空格分隔）</label>
+                <div class="seo-label-row"><label for="seoKeywords">关键词（空格分隔）</label><span id="keywordCount" class="field-counter">0 / 50</span><button type="button" class="copy-action" onclick="copySeoField('seoKeywords')">复制</button></div>
                 <textarea id="seoKeywords" rows="5" oninput="onSeoManualEdit()"></textarea>
               </div>
             </div>
@@ -358,7 +387,7 @@
         <!-- Upload -->
         <div class="card upload-compact-card">
           <div class="ct"><div class="ctd"></div>视频素材</div>
-          <div class="upzone" id="upzone">
+          <div class="upzone" id="upzone" role="button" tabindex="0" aria-label="选择或拖拽上传视频文件">
             <div class="up-icon">
               <svg viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
             </div>
@@ -437,7 +466,7 @@
           <button class="btn-p subtle-action" id="capBtn" disabled>仅提取候选画面</button>
 
           <!-- 一键到出图超级按钮 -->
-          <button class="btn-p btn-flow subtle-action" id="superBtn" disabled style="margin-top:8px;">
+          <button class="btn-p btn-flow subtle-action" id="superBtn" disabled style="display:none;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><path d="M13 2L3 14h7v8l10-12h-7z"/></svg>
             老流程：一键生成销售图
           </button>
@@ -471,34 +500,45 @@
 
     <!-- ════════ 视图 1：统一结果页 ════════ -->
     <section class="view" id="view1">
-      <div class="view-head">
+      <div class="view-head result-view-head">
         <div class="vh-l">
-          <span class="view-eyebrow">Step 02 · Unified Results</span>
-          <h2 class="view-title">统一结果页 · 封面 / 详情 / SEO</h2>
-          <p class="view-sub">把封面候选、详情长图、标题、简介和关键词集中检查，确认后直接导出上架套件</p>
+          <span class="view-eyebrow">统一结果工作台</span>
+          <h2 class="view-title">确认上架结果</h2>
+          <p class="view-sub">选择主封面，确认详情与文案，然后导出完整上架包。</p>
         </div>
-        <div class="vh-r">
-          <span class="badge-pill"><div class="dot"></div><span>可检查 · 可编辑 · 可导出</span></span>
+        <div class="vh-r result-head-actions">
+          <span class="result-completion"><b id="resultCompletionCount">0 / 6</b><span id="resultReadyBadge">等待生成</span></span>
+          <button type="button" class="btn-p unified-download-main" id="unifiedDownloadBtn" onclick="exportListingPackage()" disabled>导出上架包</button>
         </div>
       </div>
+      <nav class="result-anchor-nav" aria-label="结果区导航">
+        <button type="button" class="is-active" data-result-target="resultAssetSection" onclick="scrollResultTo('resultAssetSection',this)">视觉资产</button>
+        <button type="button" data-result-target="resultCopySection" onclick="scrollResultTo('resultCopySection',this)">SEO 文案</button>
+        <button type="button" data-result-target="resultExportSection" onclick="scrollResultTo('resultExportSection',this)">检查与导出</button>
+      </nav>
       <div class="view-body split-results">
-        <div class="panel scroll unified-copy-panel">
-          <div class="unified-result-card">
+        <div class="panel scroll unified-copy-panel" id="resultCopySection">
+          <section class="unified-result-card result-section">
             <div class="unified-head">
               <div>
-                <div class="sales-eyebrow">Listing Output</div>
-                <h3>上架文案与策略</h3>
-                <p>这里集中展示 AI 给出的销售判断、SEO 标题、作品简介和关键词；文案可直接手动修改。</p>
+                <div class="sales-eyebrow">销售表达</div>
+                <h3>校正标题、简介与关键词</h3>
+                <p>确认画面表达与文案一致；每一项都可以修改、复制或单独重写。</p>
               </div>
-              <button class="btn-sm" onclick="switchTab(0)">重新生成</button>
+              <div class="result-inline-actions">
+                <span class="result-source-badge" id="resultSourceBadge">等待生成</span>
+                <button type="button" class="btn-sm" onclick="retrySalesPart('copy',this)">重新生成文案</button>
+                <button type="button" class="btn-sm" onclick="copyAllSeo()">复制全部文案</button>
+              </div>
             </div>
             <div id="unifiedResultSlot">
               <div class="unified-empty">
                 <strong>还没有生成结果</strong>
-                <span>回到「生成」页上传视频和分镜文档，点击主按钮后会自动来到这里。</span>
+                <span>添加视频和内容说明后，封面、详情与文案会集中显示在这里。</span>
+                <button type="button" class="empty-primary-action" onclick="switchTab(0)">返回上传素材</button>
               </div>
             </div>
-          </div>
+          </section>
 
           <details class="advanced-settings-card unified-ai-settings">
             <summary><span><div class="ctd"></div>高级 AI 设置</span><small>模型、API Key、审美记忆</small></summary>
@@ -507,27 +547,49 @@
         </div>
 
         <div class="panel scroll unified-asset-panel">
-          <div class="unified-export-card">
+          <section class="unified-export-card result-section" id="resultExportSection">
             <div class="unified-head">
               <div>
-                <div class="sales-eyebrow">Export Check</div>
-                <h3>光厂上架检查</h3>
-                <p>封面和详情图支持跨批次拖拽互换，详情标题和 SEO 文案都可编辑。</p>
+                <div class="sales-eyebrow">完成度</div>
+                <h3>上架检查与导出</h3>
+                <p id="listingSummary">生成后会检查真实规格、文案完整度和最终版本。</p>
               </div>
-              <button class="btn-p btn-flow unified-download-main" id="unifiedDownloadBtn" onclick="downloadAll()" disabled>下载整套</button>
             </div>
             <div class="listing-checklist" id="listingChecklist">
+              <div class="listing-check-item" id="checkSource"><b>素材规格</b><span>待上传</span></div>
               <div class="listing-check-item" id="checkCover"><b>封面候选</b><span>待生成</span></div>
               <div class="listing-check-item" id="checkDetail"><b>详情长图</b><span>待生成</span></div>
               <div class="listing-check-item" id="checkSeo"><b>标题/简介</b><span>待生成</span></div>
               <div class="listing-check-item" id="checkKeywords"><b>关键词</b><span>待生成</span></div>
+              <div class="listing-check-item" id="checkFinal"><b>最终版本</b><span>待选择</span></div>
             </div>
             <div class="unified-action-row">
-              <button class="btn-sm" onclick="openExportOptions()">导出规格</button>
-              <button class="btn-sm" onclick="runSalesKit()">重新生成套件</button>
+              <button type="button" class="btn-sm" onclick="openExportOptions()">输出规格</button>
+              <button type="button" class="btn-sm" id="restoreVersionBtn" onclick="restorePreviousVersion()" style="display:none;">恢复上一版</button>
+              <button type="button" class="btn-sm" onclick="prepareRegenerate()">生成新版本</button>
             </div>
-          </div>
-          <div id="unifiedAssetSlot" class="asset-slot"></div>
+            <details class="sales-feedback-card">
+              <summary><span>记录售卖表现</span><small>可选，用于后续比较封面效果</small></summary>
+              <div class="sales-feedback-grid">
+                <label><span>曝光</span><input type="number" id="feedbackViews" min="0" step="1" placeholder="0"></label>
+                <label><span>点击</span><input type="number" id="feedbackClicks" min="0" step="1" placeholder="0"></label>
+                <label><span>成交</span><input type="number" id="feedbackOrders" min="0" step="1" placeholder="0"></label>
+                <button type="button" class="btn-sm" onclick="saveSalesFeedback()">保存数据</button>
+              </div>
+              <p id="feedbackSummary">尚未记录表现数据</p>
+            </details>
+          </section>
+          <section class="result-section asset-result-section" id="resultAssetSection">
+            <div class="section-heading">
+              <div><div class="sales-eyebrow">视觉决策</div><h3>选择主封面与详情版本</h3><p>直接拖拽任意画面到另一格即可交换；点击详情画面可从候选库替换。</p></div>
+              <div class="result-inline-actions">
+                <button type="button" class="btn-sm" onclick="retrySalesPart('cover',this)">重做封面</button>
+                <button type="button" class="btn-sm" onclick="retrySalesPart('detail',this)">重做详情</button>
+                <button type="button" class="btn-sm" id="swapModeBtn" onclick="toggleSwapMode()">点选交换</button>
+              </div>
+            </div>
+            <div id="unifiedAssetSlot" class="asset-slot"></div>
+          </section>
         </div>
       </div>
       <div class="view-body split-ai legacy-ai-body">
@@ -545,7 +607,7 @@
               <h3>让 AI 先判断哪些画面更好卖</h3>
               <p>按封面点击力、详情证明力和素材包卖点，挑出适合做销售图的候选画面。</p>
             </div>
-            <span class="ai-status-chip">自动降级可用</span>
+            <span class="ai-status-chip">失败会明确提示</span>
           </div>
 
           <div class="ai-strategy-grid" id="aiStandardInfo">
@@ -560,16 +622,29 @@
           </div>
           <div id="aiIntentHint" class="ai-intent-line">自动按资产类型分别挑图：封面重点击，详情重证明。</div>
 
-          <div class="ai-field-grid">
-            <label class="sales-field">
-              <span>候选画面数量</span>
-              <input type="number" id="aiN" value="15" min="1" max="100"/>
-            </label>
-            <label class="sales-field">
-              <span>额外要求</span>
-              <input type="text" id="aiPromptHint" value="" placeholder="如：偏暖色 / 有人物 / 风景为主" maxlength="60"/>
-            </label>
+          <div class="model-preset-control">
+            <div class="model-preset-label"><span>模型档位</span><small>可在“全部模型”中精细选择</small></div>
+            <div class="model-preset-segment" role="group" aria-label="模型档位">
+              <button type="button" class="is-active" data-model-preset="recommended" onclick="setModelPreset('recommended',this)"><b>推荐</b><small>质量与成本均衡</small></button>
+              <button type="button" data-model-preset="quality" onclick="setModelPreset('quality',this)"><b>高质量</b><small>更强选图与文案</small></button>
+              <button type="button" data-model-preset="saving" onclick="setModelPreset('saving',this)"><b>省成本</b><small>适合批量处理</small></button>
+            </div>
+            <div class="model-preset-meta" id="modelPresetMeta">推荐档：选图响应快，SEO 使用高质量模型；适合日常上架。</div>
           </div>
+
+          <details class="advanced-settings-card ai-generation-advanced">
+            <summary><span><div class="ctd"></div>生成偏好</span><small>候选数量与额外要求</small></summary>
+            <div class="advanced-settings-body ai-field-grid">
+              <label class="sales-field">
+                <span>候选画面数量</span>
+                <input type="number" id="aiN" value="15" min="1" max="100"/>
+              </label>
+              <label class="sales-field">
+                <span>额外要求</span>
+                <input type="text" id="aiPromptHint" value="" placeholder="如：偏暖色 / 有人物 / 风景为主" maxlength="60"/>
+              </label>
+            </div>
+          </details>
 
           <div class="ai-action-stack">
             <button class="btn-p btn-flow" id="aiAutoFillBtn" disabled>
@@ -622,7 +697,7 @@
           </div>
 
           <details class="advanced-settings-card ai-engine-settings">
-            <summary><span><div class="ctd"></div>AI 引擎设置</span><small>API Key、模型与本地保存</small></summary>
+            <summary><span><div class="ctd"></div>全部模型与 API Key</span><small>连接、模型与本地保存</small></summary>
             <div class="advanced-settings-body">
 
           <!-- API Key -->
@@ -641,6 +716,7 @@
               </button>
               <button class="save-key-btn" onclick="saveApiKey()" title="保存到本地">保存</button>
             </div>
+            <label class="api-persist-option"><input type="checkbox" id="persistApiKey"/> 在此浏览器长期保存 <small>仅建议个人设备使用</small></label>
             <!-- 已保存时显示清除入口 -->
             <div id="apiKeyClearRow" class="api-key-clear-row">
               <button onclick="clearApiKey()">清除已保存的 Key</button>
@@ -738,7 +814,7 @@
 
         <!-- ═══ 偏好记忆面板 ═══ -->
         <details class="card advanced-settings-card ai-memory-card" id="prefMemoryCard">
-          <summary><span><div class="ctd"></div>AI 审美记忆 <b id="prefMemCount">0 张</b></span><small>偏好样本与自适应权重</small></summary>
+          <summary><span><div class="ctd"></div>个性化画面偏好 <b id="prefMemCount">0 张</b></span><small>仅在需要时管理</small></summary>
           <div class="advanced-settings-body">
           <div class="ai-memory-intro">
             对 AI 挑出的画面点“赞/踩”后，这里会沉淀你的审美偏好，后续视频会优先学习这些样本。
@@ -894,23 +970,20 @@
     <div class="batches-card">
       <div class="batches-header">
         <div>
-          <div class="ct" style="margin-bottom:4px"><div class="ctd"></div>销售图资产</div>
-          <div class="asset-panel-sub">封面候选、详情展示图和自定义长图统一管理；已填充画面可跨批次拖拽互换。</div>
+          <div class="ct" style="margin-bottom:4px"><div class="ctd"></div>生成结果</div>
+          <div class="asset-panel-sub">点击卡片可放大精修；拖拽画面可跨封面与详情交换。</div>
         </div>
-        <div class="add-batch-btns">
-          <button class="btn-add" onclick="addBatch(2,2)">
-            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>封面 2×2
-          </button>
-          <button class="btn-add" onclick="addBatch(3,3)">
-            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>详情 3×3
-          </button>
-          <button class="btn-add" onclick="promptCustomBatch()">
-            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>自定义
-          </button>
-        </div>
+        <details class="asset-advanced-menu">
+          <summary>添加自定义资产</summary>
+          <div class="add-batch-btns">
+            <button type="button" class="btn-add" onclick="addBatch(2,2)">封面 2×2</button>
+            <button type="button" class="btn-add" onclick="addBatch(3,3)">详情 3×3</button>
+            <button type="button" class="btn-add" onclick="promptCustomBatch()">自定义</button>
+          </div>
+        </details>
       </div>
       <!-- global actions -->
-      <div class="global-actions">
+      <div class="global-actions legacy-asset-actions">
         <button class="btn-global" onclick="generateAll()" id="genAllBtn">
           <svg viewBox="0 0 24 24"><path d="M5 3l14 9-14 9V3z"/></svg>生成整套
         </button>
@@ -1032,10 +1105,7 @@
     <div class="help-grid">
       <div class="help-row"><span>全选所有帧</span><div class="help-keys"><span class="kbd">A</span></div></div>
       <div class="help-row"><span>清除选择</span><div class="help-keys"><span class="kbd">D</span><span class="kbd">Esc</span></div></div>
-      <div class="help-row"><span>生成全部销售图</span><div class="help-keys"><span class="kbd">G</span></div></div>
-      <div class="help-row"><span>下载全部销售图</span><div class="help-keys"><span class="kbd">Ctrl</span><span class="kbd">S</span></div></div>
-      <div class="help-row"><span>按当前参数截帧</span><div class="help-keys"><span class="kbd">R</span></div></div>
-      <div class="help-row"><span>一键到出图</span><div class="help-keys"><span class="kbd">Q</span></div></div>
+      <div class="help-row"><span>导出上架包</span><div class="help-keys"><span class="kbd">Ctrl</span><span class="kbd">S</span></div></div>
       <div class="help-row"><span>切换生成 / 结果</span><div class="help-keys"><span class="kbd">1</span><span class="kbd">2</span></div></div>
       <div class="help-row"><span>放大预览帧</span><div class="help-keys"><span class="kbd">双击</span></div></div>
       <div class="help-row"><span>撤销 / 重做</span><div class="help-keys"><span class="kbd">Ctrl</span><span class="kbd">Z</span> / <span class="kbd">Y</span></div></div>
@@ -1081,13 +1151,143 @@ function toggleThemePop(e){
 }
 function openHelp(){ document.getElementById('helpOverlay').classList.add('open'); }
 function closeHelp(){ document.getElementById('helpOverlay').classList.remove('open'); }
+let settingsReturnFocus=null;
+function openSettingsDrawer(){
+  settingsReturnFocus=document.activeElement;
+  const drawer=document.getElementById('settingsDrawer');
+  const scrim=document.getElementById('settingsScrim');
+  if(!drawer||!scrim) return;
+  const slot=document.getElementById('settingsLegacySlot');
+  const pane=document.getElementById('tabPane1');
+  if(slot&&pane&&pane.parentElement!==slot) slot.appendChild(pane);
+  syncModelPresetUI();
+  drawer.inert=false;
+  drawer.querySelectorAll('details').forEach(el=>{ el.open=false; });
+  drawer.classList.add('open');
+  drawer.setAttribute('aria-hidden','false');
+  scrim.classList.add('open');
+  document.body.classList.add('settings-open');
+  setTimeout(()=>drawer.querySelector('button,input,select,summary')?.focus(),40);
+}
+function closeSettingsDrawer(){
+  const drawer=document.getElementById('settingsDrawer');
+  const scrim=document.getElementById('settingsScrim');
+  drawer?.classList.remove('open');
+  drawer?.setAttribute('aria-hidden','true');
+  if(drawer) drawer.inert=true;
+  scrim?.classList.remove('open');
+  document.body.classList.remove('settings-open');
+  if(settingsReturnFocus && typeof settingsReturnFocus.focus==='function') settingsReturnFocus.focus();
+}
+function setSalesGoal(value,button){
+  const select=document.getElementById('salesGoal');
+  if(select) select.value=value;
+  document.querySelectorAll('[data-sales-goal]').forEach(el=>el.classList.toggle('is-active',el===button));
+  if(typeof S!=='undefined') S.dirty=true;
+  if(typeof scheduleWorkspaceSave==='function') scheduleWorkspaceSave();
+}
+function syncSalesGoalUI(){
+  const value=document.getElementById('salesGoal')?.value||'由AI自动判断';
+  document.querySelectorAll('[data-sales-goal]').forEach(el=>el.classList.toggle('is-active',el.dataset.salesGoal===value));
+}
+
+function hasResultContent(){
+  const planReady=!!globalThis.__vfpSalesState?.plan;
+  const assetReady=typeof S!=='undefined' && (S.batches||[]).some(b=>b.canvas&&(b.assetKind==='cover'||b.assetKind==='detail'));
+  return planReady||assetReady;
+}
+
+function updateResultNavigationState(){
+  const running=typeof RUN_STATE!=='undefined'&&!!RUN_STATE.active;
+  const ready=hasResultContent()&&!running;
+  const btn=document.getElementById('railBtn1');
+  if(btn){
+    btn.disabled=!ready;
+    btn.setAttribute('aria-disabled',String(!ready));
+    btn.title=ready?'查看并确认上架结果':'生成完成后可查看结果';
+  }
+  return ready;
+}
+
+function updateTaskFlowState(){
+  if(typeof S==='undefined') return;
+  const video=document.getElementById('vPrev');
+  const videoReady=!!(video?.src&&Number.isFinite(video.duration)&&video.duration>0)||(S.frames&&S.frames.length>0);
+  const docReady=!!(document.getElementById('storyDoc')?.value||'').trim();
+  const resultReady=updateResultNavigationState();
+  const running=typeof RUN_STATE!=='undefined'&&!!RUN_STATE.active;
+  const source=document.getElementById('taskStepSource');
+  const generate=document.getElementById('taskStepGenerate');
+  const result=document.getElementById('taskStepResult');
+  [source,generate,result].forEach(el=>el?.classList.remove('is-active','is-done'));
+  if(resultReady){ source?.classList.add('is-done'); generate?.classList.add('is-done'); result?.classList.add('is-active'); }
+  else if(running){ source?.classList.add('is-done'); generate?.classList.add('is-active'); }
+  else { source?.classList.add('is-active'); }
+  const key=(document.getElementById('aiApiKey')?.value||sessionStorage.getItem('vfp_api_key')||localStorage.getItem('vfp_api_key')||'').trim();
+  const rv=document.getElementById('readyVideo');
+  const rc=document.getElementById('readyContext');
+  const rm=document.getElementById('readyMode');
+  if(rv){ rv.textContent=videoReady?'视频已就绪':'未添加视频'; rv.classList.toggle('is-missing',!videoReady); rv.classList.toggle('is-ready',videoReady); }
+  if(rc){ rc.textContent=docReady?'内容说明已补充':'内容说明可选'; rc.classList.toggle('is-ready',docReady); }
+  if(rm){ rm.textContent=key?'AI 智能模式':'本地基础模式'; rm.classList.toggle('is-ready',!!key); rm.classList.toggle('is-warning',!key); }
+  const label=document.getElementById('salesKitBtnLabel');
+  if(label) label.textContent=key?'AI 生成上架套件':'生成基础上架套件';
+}
+
+function updateSalesPrimaryState(forceReady){
+  const btn=document.getElementById('salesKitBtn');
+  if(!btn || RUN_STATE.active) return;
+  const video=document.getElementById('vPrev');
+  const videoReady=!!(video?.src && Number.isFinite(video.duration) && video.duration>0);
+  const frameReady=!!(S.frames && S.frames.length);
+  const ready=typeof forceReady==='boolean' ? forceReady : (videoReady || frameReady);
+  btn.disabled=!ready;
+  btn.title=ready ? '生成封面、详情图与 SEO 文案' : '请先上传视频';
+  btn.setAttribute('aria-disabled',String(!ready));
+  updateTaskFlowState();
+}
+function setModelPreset(preset,button){
+  const presets={
+    recommended:{vision:'qwen3-vl-flash-2026-01-22',seo:'claude-opus-4-8'},
+    quality:{vision:'qwen3-vl-plus-2025-12-19',seo:'claude-opus-4-8'},
+    saving:{vision:'qwen3-vl-flash-2026-01-22',seo:'claude-sonnet-4.6'}
+  };
+  const cfg=presets[preset]||presets.recommended;
+  const vision=document.getElementById('aiModel');
+  const seo=document.getElementById('aiSeoModel');
+  if(vision&&[...vision.options].some(o=>o.value===cfg.vision)) vision.value=cfg.vision;
+  if(seo&&[...seo.options].some(o=>o.value===cfg.seo)) seo.value=cfg.seo;
+  document.querySelectorAll('[data-model-preset]').forEach(el=>el.classList.toggle('is-active',el===button));
+  updateModelPresetMeta(preset);
+  if(typeof scheduleWorkspaceSave==='function') scheduleWorkspaceSave();
+}
+function updateModelPresetMeta(preset){
+  const messages={
+    recommended:'推荐档：选图响应快，SEO 使用高质量模型；适合日常上架。',
+    quality:'高质量档：选图理解更细，SEO 保持旗舰质量；耗时和调用成本更高。',
+    saving:'省成本档：选图和文案均使用更快模型；适合大量素材的初筛。',
+    custom:'自定义档：当前使用手动选择的模型组合。'
+  };
+  const el=document.getElementById('modelPresetMeta');
+  if(el) el.textContent=messages[preset]||messages.custom;
+}
+function syncModelPresetUI(){
+  const vision=document.getElementById('aiModel')?.value||'';
+  const seo=document.getElementById('aiSeoModel')?.value||'';
+  let preset='';
+  if(vision==='qwen3-vl-plus-2025-12-19'&&seo==='claude-opus-4-8') preset='quality';
+  else if(vision==='qwen3-vl-flash-2026-01-22'&&seo==='claude-sonnet-4.6') preset='saving';
+  else if(vision==='qwen3-vl-flash-2026-01-22'&&seo==='claude-opus-4-8') preset='recommended';
+  document.querySelectorAll('[data-model-preset]').forEach(el=>el.classList.toggle('is-active',el.dataset.modelPreset===preset));
+  updateModelPresetMeta(preset||'custom');
+}
 // 初始化：读取本地偏好
 (function initTheme(){
   try{
-    const t = localStorage.getItem(THEME_KEY);
-    const m = localStorage.getItem(MODE_KEY);
-    if(t) document.documentElement.setAttribute('data-theme', t);
-    if(m) document.documentElement.setAttribute('data-mode', m);
+    document.documentElement.setAttribute('data-theme', 'crimson');
+    document.documentElement.setAttribute('data-mode', 'light');
+    localStorage.setItem(THEME_KEY, 'crimson');
+    localStorage.setItem(MODE_KEY, 'light');
   }catch(_){}
   applyThemeUI();
   // 点击空白关闭主题弹层
@@ -1118,8 +1318,136 @@ const S = {
   lastPick: null,   // 最近一次挑帧的引擎状态 {engine:'vision'|'local', model, ok, error, count, time}
   aiIntent: 'auto', // 拼图目标意图：'auto'|'cover'(封面四宫格)|'detail'(细节九宫格)
   onlySelected: false, // 帧墙是否只显示已选中的帧（AI/手动选图结果）
+  finalCoverId: null,
+  finalDetailId: null,
+  dirty: false,
 };
 let batchIdCnt = 0;
+
+const RUN_STATE = { seq:0, active:null };
+
+function beginSalesRun(){
+  const projectId=PROJECTS.activeId;
+  const run={ id:++RUN_STATE.seq, projectId, controller:new AbortController(), cancelled:false };
+  RUN_STATE.active=run;
+  document.body.classList.add('generation-running');
+  updateTaskFlowState();
+  return run;
+}
+
+function finishSalesRun(run){
+  if(RUN_STATE.active===run) RUN_STATE.active=null;
+  document.body.classList.remove('generation-running');
+  updateTaskFlowState();
+}
+
+function ensureRunCurrent(run){
+  if(!run || run.cancelled || run.controller.signal.aborted) throw new DOMException('生成已取消','AbortError');
+  if(PROJECTS.activeId!==run.projectId) throw new Error('项目已切换，本次生成已停止以保护项目数据');
+}
+
+function currentRunSignal(){ return RUN_STATE.active?.controller?.signal; }
+
+function cancelSalesRun(){
+  const run=RUN_STATE.active;
+  if(!run) return;
+  run.cancelled=true;
+  run.controller.abort();
+  finishSalesRun(run);
+  setSalesProgress(-2,'已取消生成，现有内容已保留');
+  toast('已取消生成，现有内容已保留','warn');
+}
+
+const AI_CONSENT_STORAGE = 'vfp_ai_data_consent_v1';
+
+function getSourceMeta(){
+  const p=PROJECTS.list.find(x=>x.id===PROJECTS.activeId);
+  const width=Number((typeof vPrev!=='undefined' && vPrev.videoWidth)||p?.sourceMeta?.width||0);
+  const height=Number((typeof vPrev!=='undefined' && vPrev.videoHeight)||p?.sourceMeta?.height||0);
+  const duration=Number((typeof vPrev!=='undefined' && vPrev.duration)||p?.sourceMeta?.duration||0);
+  return {
+    width, height, duration,
+    fileName:p?.fileName||'', fileSize:p?.fileSize||'', fileFmt:p?.fileFmt||'',
+    isAiGenerated:!!document.getElementById('salesAiGenerated')?.checked
+  };
+}
+
+function getResolutionInfo(meta=getSourceMeta()){
+  const long=Math.max(meta.width||0,meta.height||0);
+  const short=Math.min(meta.width||0,meta.height||0);
+  const is8K=long>=7680 && short>=4320;
+  const is4K=long>=3840 && short>=2160;
+  const isHD=long>=1920 && short>=1080;
+  return {
+    is8K, is4K, isHD,
+    label:is8K?'8K':is4K?'4K':isHD?'高清':(long?'标清':'规格未知'),
+    size:meta.width&&meta.height ? meta.width+'×'+meta.height : '未知'
+  };
+}
+
+function sourceResolutionToken(){
+  const info=getResolutionInfo();
+  return info.is8K?'8K':info.is4K?'4K':info.isHD?'高清':'';
+}
+
+function updateAiConnectionUI(){
+  const key=(document.getElementById('aiApiKey')?.value||sessionStorage.getItem(API_KEY_STORAGE)||localStorage.getItem(API_KEY_STORAGE)||'').trim();
+  const bar=document.getElementById('aiConnectionBar');
+  const title=document.getElementById('aiConnectionTitle');
+  const meta=document.getElementById('aiConnectionMeta');
+  if(bar) bar.classList.toggle('is-connected',!!key);
+  if(title) title.textContent=key?'AI 已连接':'当前为本地试用模式';
+  if(meta) meta.textContent=key?'智能选图与 SEO 模型可用':'可生成基础结果，配置 AI 后理解更准确';
+  updateTaskFlowState();
+}
+
+function openPrivacyNotice(){
+  document.getElementById('privacyNoticeMask')?.remove();
+  const mask=document.createElement('div');
+  mask.id='privacyNoticeMask'; mask.className='app-confirm-mask';
+  mask.innerHTML='<div class="app-confirm-box privacy-notice" role="dialog" aria-modal="true" aria-labelledby="privacyNoticeTitle">'+
+    '<div class="app-confirm-title" id="privacyNoticeTitle">数据处理说明</div>'+
+    '<div class="privacy-list">'+
+      '<div><strong>留在本机</strong><span>视频解码、候选帧提取、画面拼接和文件导出均在浏览器中完成。</span></div>'+
+      '<div><strong>启用 AI 时上传</strong><span>压缩后的抽样画面、分镜文档和你的补充要求会发送到当前配置的 AI 接口，用于选图与生成文案。</span></div>'+
+      '<div><strong>API Key</strong><span>默认仅在当前会话使用；勾选长期保存后才写入此浏览器的本地存储。</span></div>'+
+    '</div><div class="app-confirm-actions"><button type="button" class="app-confirm-ok" id="privacyNoticeClose">我知道了</button></div></div>';
+  document.body.appendChild(mask);
+  const close=()=>mask.remove();
+  mask.querySelector('#privacyNoticeClose').onclick=close;
+  mask.addEventListener('click',e=>{if(e.target===mask) close();});
+}
+
+async function ensureAiDataConsent(){
+  if(localStorage.getItem(AI_CONSENT_STORAGE)==='1') return true;
+  const ok=await appConfirm({
+    title:'启用 AI 前请确认',
+    message:'为完成智能选图和 SEO 文案，系统会把压缩后的抽样画面、分镜文档及补充要求发送到你配置的 AI 接口。原始视频不会上传。',
+    okText:'同意并继续', cancelText:'暂不启用 AI'
+  });
+  if(ok) localStorage.setItem(AI_CONSENT_STORAGE,'1');
+  return ok;
+}
+
+async function resolveSalesGenerationMode(input){
+  if(input.apiKey){
+    if(!(await ensureAiDataConsent())){
+      toast('已取消 AI 生成，未上传任何画面或文档','warn');
+      return null;
+    }
+    input.generationMode='ai';
+    return input;
+  }
+  const useLocal=await appConfirm({
+    title:'使用本地基础模式？',
+    message:'当前未配置 API Key。本地模式可以完成基础选图、拼图和文案模板，但不会真正理解视频与分镜，结果会明确标记为“本地草稿”。',
+    okText:'继续生成基础结果',
+    cancelText:'去设置 AI'
+  });
+  if(!useLocal){ openSettingsDrawer(); return null; }
+  input.generationMode='local';
+  return input;
+}
 
 // ── 拼图意图配置：决定评分维度权重 / 选图标准 / 排版逻辑 ──
 // cover(封面四宫格)：展现主题、吸引点击 → 重 appeal + theme + composition，时间覆盖适中
@@ -1146,7 +1474,7 @@ const INTENT_PRESETS = {
   },
   auto: {
     label: '自动',
-    hint: '🎯 自动：四宫格按封面标准、九宫格按细节标准分别挑图排版，整体覆盖全片以代表整个视频。',
+    hint: '自动：四宫格按封面标准、九宫格按细节标准分别挑图排版，并覆盖全片代表整体内容。',
     weights: { appeal:0.20, composition:0.20, theme:0.16, clarity:0.16, subject:0.18, detail:0.10 },
     coverage: 0.45,
     qualityVsDiversity: 0.55,
@@ -1192,10 +1520,25 @@ function saveActiveProject(){
   p.imgCache   = S.imgCache;
   p.captureMode= S.captureMode;
   p.batchIdCnt = batchIdCnt;
+  p.finalCoverId = S.finalCoverId;
+  p.finalDetailId = S.finalDetailId;
+  p.salesPlan = (typeof SALES!=='undefined' && SALES.plan) ? JSON.parse(JSON.stringify(SALES.plan)) : (p.salesPlan||null);
+  p.salesFeedback=readSalesFeedbackInputs();
   // 分镜/卖点文档随项目保存（清空视频/切换项目时一并隔离、清除）
   p.storyDoc   = (document.getElementById('storyDoc')?.value || '');
   // 视频源信息（用于切换时恢复预览）
   p.videoUrl   = vPrev.src || p.videoUrl;
+  p.sourceMeta = getSourceMeta();
+  p.formState={
+    salesPackType:document.getElementById('salesPackType')?.value||'自定义',
+    salesGoal:document.getElementById('salesGoal')?.value||'',
+    salesUseText:!!document.getElementById('salesUseText')?.checked,
+    salesMakeAltCovers:!!document.getElementById('salesMakeAltCovers')?.checked,
+    salesAiGenerated:!!document.getElementById('salesAiGenerated')?.checked,
+    heroGradStyle:document.getElementById('heroGradStyle')?.value||'red',
+    heroFontScale:document.getElementById('heroFontScale')?.value||'0.52',
+    heroBandPos:document.getElementById('heroBandPos')?.value||'top'
+  };
 }
 
 // 从项目载回到全局 S 并整体重渲染
@@ -1206,19 +1549,27 @@ function restoreProject(p){
   S.aiScores   = p.aiScores   || [];
   S.imgCache   = p.imgCache   || new Map();
   S.captureMode= p.captureMode|| 'interval';
+  S.finalCoverId=p.finalCoverId||null;
+  S.finalDetailId=p.finalDetailId||null;
   batchIdCnt   = p.batchIdCnt || 0;
   // 恢复该项目的分镜/卖点文档（无则清空，避免残留上一个视频的文档）
   const _docEl=document.getElementById('storyDoc');
   if(_docEl){
     _docEl.value = p.storyDoc || '';
     const _fn=document.getElementById('storyFileName');
-    if(_fn && !(p.storyDoc||'').trim()){ _fn.textContent='支持 txt / md / csv / json，doc/docx 会尽量提取可读文本'; _fn.classList.remove('has-file'); }
+    if(_fn && !(p.storyDoc||'').trim()){ _fn.textContent='支持 TXT、Markdown、CSV、JSON、RTF、DOC、DOCX'; _fn.classList.remove('has-file'); }
   }
+  if(p.formState){
+    ['salesPackType','salesGoal','heroGradStyle','heroFontScale','heroBandPos'].forEach(id=>{ const el=document.getElementById(id); if(el&&p.formState[id]!=null) el.value=p.formState[id]; });
+    ['salesUseText','salesMakeAltCovers','salesAiGenerated'].forEach(id=>{ const el=document.getElementById(id); if(el&&p.formState[id]!=null) el.checked=!!p.formState[id]; });
+  }
+  syncSalesGoalUI();
   if(S.onlySelected){ S.onlySelected=false; syncOnlySelBtn(); }  // 切换项目时退出「只看已选」
   // 历史栈按项目隔离 → 切换即清空
   if(typeof HISTORY!=='undefined'){ HISTORY.stack.length=0; HISTORY.future.length=0; if(typeof updateUndoRedoUI==='function') updateUndoRedoUI(); }
 
   // 视频预览
+  updateSalesPrimaryState(false);
   if(p.videoUrl){
     vPrev.src = p.videoUrl;
     document.getElementById('vCon').style.display='block';
@@ -1230,6 +1581,7 @@ function restoreProject(p){
       document.getElementById('edt').placeholder  = Math.floor(vPrev.duration)+'s';
       document.getElementById('capBtn').disabled  = false;
       document.getElementById('superBtn').disabled= false;
+      updateSalesPrimaryState(true);
     };
   }
   // 截帧模式 UI
@@ -1246,6 +1598,16 @@ function restoreProject(p){
   if(S.aiScores && S.aiScores.length) renderFrameScores();
   refreshUsageTags();
   updateQuickBar();
+  if(typeof SALES!=='undefined'){
+    SALES.plan=p.salesPlan||null;
+    if(SALES.plan) showSalesResults(SALES.plan);
+    else{
+      const panel=document.getElementById('salesResultPanel'); if(panel) panel.style.display='none';
+      relocateUnifiedPanels(0);
+    }
+  }
+  updateFinalAssetUI();
+  loadSalesFeedback(p.salesFeedback);
 }
 
 // 整体重建帧缩略图墙
@@ -1266,16 +1628,19 @@ function renderAllFrames(){
 function renderAllBatches(){
   const list=document.getElementById('batchList');
   if(list) list.innerHTML='';
-  const emptyEl=document.getElementById('batchEmpty');
   if(S.batches.length===0){
-    if(emptyEl) emptyEl.style.display='flex';
+    if(list) list.innerHTML='<div class="empty" id="batchEmpty"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><p>还没有销售图资产<br/>生成后会在这里比较并精修</p></div>';
     return;
   }
-  if(emptyEl) emptyEl.style.display='none';
   S.batches.forEach(b=>{
-    renderBatch(b);
-    // 恢复每格图像 + 裁剪
-    b.cells.forEach((_,ci)=>renderCell(b,ci));
+    if(b.isDetailLong){
+      renderDetailBatchCard(b);
+      regenDetailLong(b).catch(()=>{});
+    }else{
+      renderBatch(b);
+      // 恢复每格图像 + 裁剪
+      b.cells.forEach((_,ci)=>renderCell(b,ci));
+    }
   });
   checkDlAllBtn();
 }
@@ -1287,9 +1652,10 @@ function createProject(file){
   const p={
     id, name, fileName:file.name,
     fileSize: fmtSz(file.size), fileFmt: file.name.split('.').pop().toUpperCase(),
-    videoUrl: URL.createObjectURL(file),
+    videoUrl: URL.createObjectURL(file), videoBlob:file,
     frames:[], selected:[], batches:[], aiScores:[], imgCache:new Map(),
-    captureMode:'interval', batchIdCnt:0, storyDoc:'',
+    captureMode:'interval', batchIdCnt:0, storyDoc:'', sourceMeta:null,
+    finalCoverId:null, finalDetailId:null, salesPlan:null,
   };
   PROJECTS.list.push(p);
   return p;
@@ -1297,6 +1663,7 @@ function createProject(file){
 
 // 切换到指定项目
 function switchProject(id){
+  if(RUN_STATE.active){ toast('生成进行中，请先取消后再切换项目','warn'); return; }
   if(id===PROJECTS.activeId) return;
   saveActiveProject();
   const p=PROJECTS.list.find(x=>x.id===id);
@@ -1308,22 +1675,25 @@ function switchProject(id){
 }
 
 // 删除项目（带确认）
-function deleteProject(id){
+async function deleteProject(id){
+  if(RUN_STATE.active){ toast('生成进行中，暂不能删除项目','warn'); return; }
   const p=PROJECTS.list.find(x=>x.id===id); if(!p) return;
-  if(!confirm('删除项目「'+p.name+'」？该视频的帧与拼图将一并移除。')) return;
+  if(!(await appConfirm({title:'删除项目',message:'删除「'+p.name+'」后，该视频的候选画面、封面、详情和文案草稿都会移除。',okText:'确认删除',cancelText:'保留项目'}))) return;
   const willEmpty = PROJECTS.list.length===1;
   deleteProjectNoConfirm(id);
   toast(willEmpty ? '已删除全部项目' : '已删除项目');
 }
 
 // 关闭/更换当前视频：移除当前活动项目（含其帧/拼图），回到上传态以便重新上传
-function closeCurrentVideo(){
+async function closeCurrentVideo(){
+  if(RUN_STATE.active){ toast('生成进行中，请先取消后再更换视频','warn'); return; }
   if(PROJECTS.activeId==null){
     // 无项目记录但可能残留预览 → 直接清空预览
     vPrev.removeAttribute('src'); vPrev.load();
     document.getElementById('vCon').style.display='none';
     document.getElementById('capBtn').disabled=true;
     document.getElementById('superBtn').disabled=true;
+    updateSalesPrimaryState(false);
     return;
   }
   const p=PROJECTS.list.find(x=>x.id===PROJECTS.activeId);
@@ -1334,7 +1704,7 @@ function closeCurrentVideo(){
   const msg = hasContent
     ? '关闭并移除当前视频「'+p.name+'」？该视频已截取的帧与拼图将一并清除，可重新上传新视频。'
     : '关闭当前视频「'+p.name+'」？可重新上传新视频。';
-  if(!confirm(msg)) return;
+  if(!(await appConfirm({title:'关闭当前视频',message:msg,okText:'关闭并移除',cancelText:'继续编辑'}))) return;
   // 复用 deleteProject 的清理逻辑，但跳过它内部的二次确认
   deleteProjectNoConfirm(PROJECTS.activeId);
   // 重置文件 input，确保再次选择同一文件也能触发 change
@@ -1357,10 +1727,12 @@ function deleteProjectNoConfirm(id){
     document.getElementById('vCon').style.display='none';
     document.getElementById('capBtn').disabled=true;
     document.getElementById('superBtn').disabled=true;
+    updateSalesPrimaryState(false);
     renderAllFrames(); renderAllBatches();
     updateSelBadge(); updateDlBtns(); updateAiBtns();
     document.getElementById('totalN').textContent='0';
     renderProjectTabs();
+    scheduleWorkspaceSave();
     return;
   }
   if(wasActive){
@@ -1369,6 +1741,7 @@ function deleteProjectNoConfirm(id){
     restoreProject(np);
   }
   renderProjectTabs();
+  scheduleWorkspaceSave();
 }
 
 // 重命名项目
@@ -1491,6 +1864,9 @@ async function warnIfNoDocText(){
 const upzone = document.getElementById('upzone');
 const vInput = document.getElementById('vInput');
 upzone.addEventListener('click', ()=>vInput.click());
+upzone.addEventListener('keydown',e=>{
+  if(e.key==='Enter'||e.key===' '){ e.preventDefault(); vInput.click(); }
+});
 upzone.addEventListener('dragover', e=>{e.preventDefault();upzone.classList.add('drag');});
 upzone.addEventListener('dragleave', ()=>upzone.classList.remove('drag'));
 upzone.addEventListener('drop', e=>{
@@ -1519,6 +1895,7 @@ function loadVideo(file){
       if(cur.videoUrl){ try{ URL.revokeObjectURL(cur.videoUrl); }catch(e){} }
       cur.fileName=file.name; cur.fileSize=fmtSz(file.size); cur.fileFmt=file.name.split('.').pop().toUpperCase();
       cur.videoUrl=URL.createObjectURL(file);
+      cur.videoBlob=file;
       cur.name=file.name.replace(/\.[^.]+$/,'').slice(0,24)||cur.name;
       p=cur;
     } else {
@@ -1528,11 +1905,10 @@ function loadVideo(file){
       PROJECTS.activeId=p.id;
       S.frames=[];S.selected=[];S.aiScores=[];S.imgCache=new Map();S.captureMode='interval';batchIdCnt=0;
       clearStoryDoc(); // 新视频 = 新项目 → 文档清空，不残留上一个视频的分镜/卖点
-      // 清空旧批次 DOM，新项目预置默认批次
+      // 清空旧批次 DOM，生成套件时再创建真实资产
       S.batches=[];
       document.getElementById('batchList').querySelectorAll('.batch').forEach(el=>el.remove());
-      document.getElementById('batchEmpty').style.display='none';
-      addBatch(2,2); addBatch(3,3);
+      const empty=document.getElementById('batchEmpty'); if(empty) empty.style.display='none';
       if(typeof HISTORY!=='undefined'){HISTORY.stack.length=0;HISTORY.future.length=0;if(typeof updateUndoRedoUI==='function')updateUndoRedoUI();}
       renderAllFrames();
       updateSelBadge(); updateDlBtns(); updateAiBtns();
@@ -1541,6 +1917,7 @@ function loadVideo(file){
   }
 
   vPrev.src = p.videoUrl;
+  updateSalesPrimaryState(false);
   document.getElementById('vCon').style.display = 'block';
   document.getElementById('iSz').textContent  = p.fileSize;
   document.getElementById('iFmt').textContent = p.fileFmt;
@@ -1550,6 +1927,10 @@ function loadVideo(file){
     document.getElementById('edt').placeholder  = Math.floor(vPrev.duration)+'s';
     document.getElementById('capBtn').disabled  = false;
     document.getElementById('superBtn').disabled = false;
+    updateSalesPrimaryState(true);
+    p.sourceMeta=getSourceMeta();
+    scheduleWorkspaceSave();
+    updateListingChecklist();
     toast('视频「'+p.name+'」加载成功，可开始截帧');
   };
   renderProjectTabs();
@@ -1676,10 +2057,7 @@ async function doCapture(){
   // 显示快捷操作栏
   const qb=document.getElementById('quickBar'); if(qb) qb.style.display='';
   updateQuickBar();
-  // 自动切到 AI 挑帧 Tab（一键流程中跳过，避免打断）
-  if(!S._superFlowRunning){
-    setTimeout(()=>switchTab(1), 800);
-  }
+  scheduleWorkspaceSave();
 }
 
 // ── 场景变化检测截帧 ──
@@ -1789,13 +2167,18 @@ async function doCaptureScene(){
   updateFillBtn(); updateDlBtns(); updateAiBtns();
   const qb=document.getElementById('quickBar'); if(qb) qb.style.display='';
   updateQuickBar();
-  if(!S._superFlowRunning){ setTimeout(()=>switchTab(1), 800); }
+  scheduleWorkspaceSave();
 }
 
 // ===================================================================
 // TAB 切换
 // ===================================================================
 function switchTab(idx){
+  if(idx===1 && !updateResultNavigationState()){
+    toast('先生成上架套件，结果会自动集中到这里','warn');
+    document.getElementById('upzone')?.focus();
+    return;
+  }
   for(let i=0;i<3;i++){
     const tp=document.getElementById('tabPane'+i);
     if(tp) tp.classList.toggle('active', i===idx);
@@ -1811,10 +2194,11 @@ function switchTab(idx){
   relocateFrameWall(idx);
   if(idx===1){ updateAiBtns(); updateListingChecklist(); }
   if(idx===2){ updateSelBadge(); refreshCollageEngineCard(); }
+  updateTaskFlowState();
 }
 
 function relocateUnifiedPanels(idx){
-  const aiSlot=document.getElementById('aiLegacySlot');
+  const aiSlot=document.getElementById('settingsLegacySlot')||document.getElementById('aiLegacySlot');
   const aiPane=document.getElementById('tabPane1');
   if(aiSlot && aiPane && aiPane.parentElement!==aiSlot) aiSlot.appendChild(aiPane);
 
@@ -1827,6 +2211,7 @@ function relocateUnifiedPanels(idx){
   if(empty && resultPanel){
     const hasResult=resultPanel.style.display!=='none';
     empty.style.display=hasResult?'none':'';
+    document.getElementById('view1')?.classList.toggle('has-results',hasResult);
   }
 
   const assetPanel=document.getElementById('assetPanel');
@@ -1851,27 +2236,87 @@ function setListingCheck(id, ok, text){
 
 function updateListingChecklist(){
   const batches=S.batches||[];
-  const coverCount=batches.filter(b=>!b.isDetailLong).length;
-  const detailCount=batches.filter(b=>b.isDetailLong || b.isDetail).length;
+  const covers=batches.filter(b=>b.assetKind==='cover' && b.canvas);
+  const details=batches.filter(b=>b.assetKind==='detail' && b.canvas);
+  const coverCount=covers.length;
+  const detailCount=details.length;
   const readyCount=batches.filter(b=>b.canvas).length;
   const title=(document.getElementById('seoTitle')?.value||'').trim();
   const intro=(document.getElementById('seoIntro')?.value||'').trim();
-  const keywords=(document.getElementById('seoKeywords')?.value||'').trim().split(/\s+/).filter(Boolean);
-  setListingCheck('checkCover', coverCount>0, coverCount>0 ? coverCount+' 版封面候选' : '待生成');
-  setListingCheck('checkDetail', detailCount>0, detailCount>0 ? detailCount+' 张详情长图' : '待生成');
-  setListingCheck('checkSeo', !!(title&&intro), title&&intro ? '标题和简介已生成' : '待生成');
-  setListingCheck('checkKeywords', keywords.length>=50, keywords.length ? keywords.length+' 个关键词' : '待生成');
+  const keywords=[...new Set((document.getElementById('seoKeywords')?.value||'').trim().split(/\s+/).filter(Boolean))];
+  const source=getSourceMeta();
+  const res=getResolutionInfo(source);
+  const sourceOk=!!(source.width&&source.height);
+  const finalOk=covers.some(b=>b.id===S.finalCoverId)&&details.some(b=>b.id===S.finalDetailId);
+  const copyOk=title.length>=8 && title.length<=80 && intro.length>=20;
+  const keywordsOk=keywords.length===50;
+  const platformOk=copyOk&&keywordsOk;
+  const completed=[sourceOk,coverCount>0,detailCount>0,copyOk,keywordsOk,finalOk].filter(Boolean).length;
+  setListingCheck('checkSource',sourceOk,sourceOk?res.size+' · '+res.label:'待上传视频');
+  setListingCheck('checkCover', coverCount>0, coverCount>0 ? coverCount+' 版可用' : '待生成');
+  setListingCheck('checkDetail', detailCount>0, detailCount>0 ? detailCount+' 张可用' : '待生成');
+  setListingCheck('checkSeo',copyOk,title&&intro?(copyOk?'长度合适':'标题需 8-80 字，简介至少 20 字'):'待生成');
+  setListingCheck('checkKeywords',keywordsOk,keywords.length?(keywordsOk?'50 个已去重':keywords.length+' 个，需恰好 50 个'):'待生成');
+  setListingCheck('checkFinal',finalOk,finalOk?'已选主封面和主详情':'请选择最终版本');
+  const countEl=document.getElementById('keywordCount');
+  if(countEl){ countEl.textContent=keywords.length+' / 50'; countEl.classList.toggle('is-warn',keywords.length!==50); }
+  const titleCount=document.getElementById('titleCount');
+  if(titleCount){ titleCount.textContent=title.length+' / 80'; titleCount.classList.toggle('is-warn',title.length<8||title.length>80); }
+  const introCount=document.getElementById('introCount');
+  if(introCount){ introCount.textContent=intro.length+' 字'; introCount.classList.toggle('is-warn',intro.length<20); }
+  const summary=document.getElementById('listingSummary');
+  if(summary) summary.textContent=!sourceOk?'上传视频后将显示真实规格':finalOk&&platformOk?'上架包已就绪，可直接导出':(readyCount?'还需选择最终版本并检查文案':'生成后会在这里完成上架校验');
+  const badge=document.getElementById('resultReadyBadge');
+  if(badge) badge.textContent=readyCount?(finalOk?'可导出':'待确认'):'等待生成';
+  const completion=document.getElementById('resultCompletionCount');
+  if(completion) completion.textContent=completed+' / 6';
   const unifiedBtn=document.getElementById('unifiedDownloadBtn');
-  if(unifiedBtn) unifiedBtn.disabled=readyCount===0;
+  if(unifiedBtn){ unifiedBtn.disabled=readyCount===0||!finalOk||!platformOk; unifiedBtn.title=unifiedBtn.disabled?'请选择主封面、主详情并完成文案校验':'导出完整上架包'; }
+  updateResultNavigationState();
 }
 
 function onSeoManualEdit(){
   if(SALES.plan){
     SALES.plan.seoTitle=document.getElementById('seoTitle')?.value||'';
+    SALES.plan.seoTitleAlts=(document.getElementById('seoTitleAlts')?.value||'').split('\n').map(s=>s.replace(/^备选\d+[:：]\s*/, '').trim()).filter(Boolean);
     SALES.plan.seoIntro=document.getElementById('seoIntro')?.value||'';
-    SALES.plan.keywords=(document.getElementById('seoKeywords')?.value||'').trim().split(/\s+/).filter(Boolean);
+    SALES.plan.keywords=[...new Set((document.getElementById('seoKeywords')?.value||'').trim().split(/\s+/).filter(Boolean))];
+    SALES.plan.copySource='人工修改';
   }
+  S.dirty=true;
+  scheduleWorkspaceSave();
   updateListingChecklist();
+}
+
+async function copyTextValue(text, success){
+  try{ await navigator.clipboard.writeText(text); toast(success||'已复制'); }
+  catch(_){ toast('复制失败，请手动选择文本','err'); }
+}
+
+function copySeoField(id){
+  const el=document.getElementById(id); if(!el) return;
+  copyTextValue(el.value||el.textContent||'','已复制');
+}
+
+function copyAllSeo(){
+  const title=document.getElementById('seoTitle')?.value||'';
+  const alts=document.getElementById('seoTitleAlts')?.value||'';
+  const intro=document.getElementById('seoIntro')?.value||'';
+  const keywords=document.getElementById('seoKeywords')?.value||'';
+  copyTextValue('标题：'+title+'\n\n备选标题：\n'+alts+'\n\n作品简介：\n'+intro+'\n\n关键词：\n'+keywords,'完整文案已复制');
+}
+
+function scrollResultTo(id,button){
+  if(button){
+    document.querySelectorAll('.result-anchor-nav button').forEach(el=>el.classList.toggle('is-active',el===button));
+  }
+  document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function prepareRegenerate(){
+  switchTab(0);
+  document.getElementById('salesKitBtn')?.focus();
+  toast('调整输入后点击生成，新结果会保留上一版草稿');
 }
 
 // 把共享帧墙(#sharedFrameWall)移动到目标视图的帧挂载点
@@ -2631,6 +3076,7 @@ async function aiSmartLayoutWithVision(apiKey){
 
     const resp = await fetch('https://llm-api.mcisaas.com/v1/chat/completions',{
       method:'POST',
+      signal:currentRunSignal(),
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
       body: JSON.stringify({ model, messages:[{role:'user', content:contentParts}], max_tokens:500, temperature:0 })
     });
@@ -2973,7 +3419,17 @@ const HISTORY = { stack: [], future: [], max: 50 };
 
 // 抓取当前所有批次 cells 的深拷贝快照
 function snapshotCells(){
-  return S.batches.map(b => ({ id: b.id, cells: b.cells.slice(), crops: JSON.parse(JSON.stringify(b.crops||{})) }));
+  return {
+    batches:S.batches.map(b => ({
+      id:b.id,
+      cells:(b.cells||[]).slice(),
+      crops:JSON.parse(JSON.stringify(b.crops||{})),
+      detailLayout:b.detailLayout?JSON.parse(JSON.stringify(b.detailLayout)):null,
+      heroTitle:b.heroTitle||''
+    })),
+    finalCoverId:S.finalCoverId,
+    finalDetailId:S.finalDetailId
+  };
 }
 
 // 在「修改发生前」调用：把当前状态压入历史，清空 redo 栈
@@ -2982,20 +3438,30 @@ function pushHistory(){
   if(HISTORY.stack.length > HISTORY.max) HISTORY.stack.shift();
   HISTORY.future.length = 0;
   updateUndoRedoUI();
+  scheduleWorkspaceSave();
 }
 
 // 把一份快照应用回当前批次（仅恢复仍存在的批次）
 function applySnapshot(snap){
-  snap.forEach(s => {
+  const items=Array.isArray(snap)?snap:(snap?.batches||[]);
+  items.forEach(s => {
     const b = S.batches.find(x => x.id === s.id);
-    if(b && b.cells.length === s.cells.length){
+    if(b && (b.cells||[]).length === (s.cells||[]).length){
       b.cells = s.cells.slice();
       b.crops = s.crops ? JSON.parse(JSON.stringify(s.crops)) : {};
-      renderAllCells(b);
-      clearBatchCanvas(b);
+      if(s.detailLayout) b.detailLayout=JSON.parse(JSON.stringify(s.detailLayout));
+      if(typeof s.heroTitle==='string') b.heroTitle=s.heroTitle;
+      if(b.isDetailLong){ syncHeroTitleInput(b); regenDetailLong(b); }
+      else { renderAllCells(b); clearBatchCanvas(b); }
     }
   });
+  if(!Array.isArray(snap)){
+    S.finalCoverId=snap.finalCoverId||null;
+    S.finalDetailId=snap.finalDetailId||null;
+  }
   refreshUsageTags();
+  updateFinalAssetUI();
+  scheduleWorkspaceSave();
 }
 
 function undo(){
@@ -3044,36 +3510,48 @@ const DEFAULT_SEO_MODEL = 'claude-opus-4-8';
 function saveApiKey(){
   const val = document.getElementById('aiApiKey').value.trim();
   if(!val){ toast('请先输入 API Key', 'err'); return; }
-  localStorage.setItem(API_KEY_STORAGE, val);
-  updateApiKeyUI(true);
-  toast('API Key 已保存到本地 🔒');
+  const persist=!!document.getElementById('persistApiKey')?.checked;
+  sessionStorage.setItem(API_KEY_STORAGE,val);
+  if(persist) localStorage.setItem(API_KEY_STORAGE,val);
+  else localStorage.removeItem(API_KEY_STORAGE);
+  updateApiKeyUI(persist);
+  updateAiConnectionUI();
+  toast(persist?'API Key 已保存在此浏览器':'API Key 仅在当前会话使用');
   refreshModelList(true);
 }
 
 function clearApiKey(){
   localStorage.removeItem(API_KEY_STORAGE);
+  sessionStorage.removeItem(API_KEY_STORAGE);
   document.getElementById('aiApiKey').value = '';
+  const persist=document.getElementById('persistApiKey'); if(persist) persist.checked=false;
   updateApiKeyUI(false);
-  toast('已清除本地保存的 API Key');
+  updateAiConnectionUI();
+  toast('已清除 API Key');
 }
 
 function updateApiKeyUI(saved){
   const badge    = document.getElementById('apiKeySavedBadge');
   const clearRow = document.getElementById('apiKeyClearRow');
+  const hasKey=!!((document.getElementById('aiApiKey')?.value||sessionStorage.getItem(API_KEY_STORAGE)||localStorage.getItem(API_KEY_STORAGE)||'').trim());
   if(badge)    badge.style.display    = saved ? '' : 'none';
-  if(clearRow) clearRow.style.display = saved ? '' : 'none';
+  if(clearRow) clearRow.style.display = hasKey ? '' : 'none';
 }
 
 // 页面加载时自动读取已保存的 Key
 (function loadSavedApiKey(){
-  const saved = localStorage.getItem(API_KEY_STORAGE);
+	  const persisted=localStorage.getItem(API_KEY_STORAGE);
+	  const saved = sessionStorage.getItem(API_KEY_STORAGE)||persisted;
 	  if(saved){
 	    document.getElementById('aiApiKey').value = saved;
-	    updateApiKeyUI(true);
+	    const persist=document.getElementById('persistApiKey'); if(persist) persist.checked=!!persisted;
+	    updateApiKeyUI(!!persisted);
 	    const cached=loadCachedModels();
 	    if(cached.length) applyAvailableModels(cached, true);
 	    refreshModelList(true);
 	  }
+	  updateApiKeyUI(!!persisted);
+	  updateAiConnectionUI();
 	})();
 
 function loadCachedModels(){
@@ -3266,6 +3744,7 @@ async function visionScoreBatch(frames, apiKey, model, hintText, goodRefImages=[
 
   const resp = await fetch('https://llm-api.mcisaas.com/v1/chat/completions',{
     method:'POST',
+    signal:currentRunSignal(),
     headers:{
       'Content-Type':'application/json',
       'Authorization':'Bearer '+apiKey
@@ -3850,7 +4329,8 @@ async function runAIPick(autoFill=false){
 
   btn.innerHTML='<span class="spin"></span>分析中...'; btn.disabled=true; btn2.disabled=true;
 
-  const apiKey  = document.getElementById('aiApiKey').value.trim();
+  let apiKey  = document.getElementById('aiApiKey').value.trim();
+  if(apiKey && !(await ensureAiDataConsent())) apiKey='';
   const model   = document.getElementById('aiModel').value;
   const hint    = document.getElementById('aiPromptHint').value.trim();
   const intent  = resolveIntent();   // 解析当前拼图意图（auto 按批次推断）
@@ -3973,22 +4453,22 @@ function promptCustomBatch(){
   else toast('格式有误，请输入如 3×4','err');
 }
 
-function addBatch(cols,rows){
+function addBatch(cols,rows,silent=false){
   const id=++batchIdCnt;
   const total=cols*rows;
-  const batch={id, cols, rows, cells:Array(total).fill(null), crops:{}, hasBadge:(cols===2&&rows===2), canvas:null};
+  const batch={id, cols, rows, cells:Array(total).fill(null), crops:{}, hasBadge:false, canvas:null, assetKind:'custom'};
   S.batches.push(batch);
-  document.getElementById('batchEmpty').style.display='none';
+  const empty=document.getElementById('batchEmpty'); if(empty) empty.style.display='none';
   renderBatch(batch);
   updateFillBtn();
   updateQuickBar();
   updateListingChecklist();
-  toast('已添加 '+cols+'×'+rows+' 销售图 #'+id);
+  if(!silent) toast('已添加 '+cols+'×'+rows+' 自定义资产');
 }
 
 function renderBatch(b){
   const el=document.createElement('div');
-  el.className='batch'; el.id='batch-'+b.id;
+  el.className='batch asset-'+(b.assetKind||'custom'); el.id='batch-'+b.id;
   el.innerHTML=batchHTML(b);
   document.getElementById('batchList').appendChild(el);
   initBatchEvents(el,b);
@@ -4006,6 +4486,8 @@ function batchHTML(b){
     '    <span style="color:var(--tm);font-size:11px;">'+(b.note?escapeHtmlSafe(b.note):'销售图 #'+b.id)+'</span>'+
     '  </div>'+
     '  <div class="batch-actions">'+
+    (b.assetKind==='cover' ? '    <button class="btn-sm final-choice-btn" onclick="setFinalAsset('+b.id+',\'cover\')" id="final-'+b.id+'">设为主封面</button>' : '')+
+    '    <button class="btn-sm" onclick="openPreviewModal(S.batches.find(x=>x.id==='+b.id+'))" title="放大并精修">放大</button>'+
     '    <button class="btn-sm" onclick="downloadBatch('+b.id+')" id="dl-'+b.id+'" disabled>'+
     '      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>下载'+
     '    </button>'+
@@ -4028,17 +4510,17 @@ function batchHTML(b){
     '    <input type="number" class="gs-inp" id="gr-'+b.id+'" value="'+b.rows+'" min="1" max="10" style="width:36px;"/>'+
     '    <button class="btn-apply" onclick="resizeBatch('+b.id+')" style="white-space:nowrap;">应用</button>'+
     '  </div>'+
-    '  <div class="side-section">'+
-    '    <span style="font-size:12px;color:var(--tp);white-space:nowrap;">4K角标</span>'+
+    '  <div class="side-section" style="display:'+(getResolutionInfo().is4K?'flex':'none')+';">'+
+    '    <span style="font-size:12px;color:var(--tp);white-space:nowrap;">'+(getResolutionInfo().is4K?'4K角标':'规格角标')+'</span>'+
     '    <label class="tog" style="margin:0;">'+
-    '      <input type="checkbox" id="badge-'+b.id+'" '+(b.hasBadge?'checked':'')+' />'+
+    '      <input type="checkbox" id="badge-'+b.id+'" '+(b.hasBadge&&getResolutionInfo().is4K?'checked':'')+' '+(!getResolutionInfo().is4K?'disabled title="源视频不足 4K，不能添加 4K 角标"':'')+' />'+
     '      <div class="tog-track"></div>'+
     '      <div class="tog-thumb"></div>'+
     '    </label>'+
     '  </div>'+
     '  <button class="btn-gen" onclick="generateBatch('+b.id+')" id="gen-'+b.id+'" style="flex:1;min-width:80px;">生成销售图</button>'+
     '  <button class="btn-dl" onclick="downloadBatch('+b.id+')" id="dl2-'+b.id+'" disabled style="flex:1;min-width:80px;">'+
-    '    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>下载 1080P'+
+    '    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>下载生成尺寸'+
     '  </button>'+
     '</div>'
   );
@@ -4063,8 +4545,9 @@ function initBatchEvents(el, b){
   el.querySelectorAll('.cell').forEach(cell=>{
     const ci=parseInt(cell.dataset.ci);
     // ALL cells (empty + has-img) trigger picker on click
-    cell.onclick = e=>{
+    cell.onclick = async e=>{
       if(e.target.closest('.cell-remove')) return;
+      if(await handleSwapTap(b.id,'cell:'+ci,cell)) return;
       pickFrame(b, ci);
     };
     bindDropEvents(cell, b, ci);
@@ -4151,6 +4634,28 @@ async function performCrossSwap(srcBid, srcKey, dstBid, dstKey){
   if(db!==sb) await refreshBatchAfterSwap(db);
   refreshUsageTags && refreshUsageTags();
   toast('已交换两格画面'+(srcBid!==dstBid?'（跨批次）':''));
+}
+
+const TAP_SWAP={active:false,source:null};
+function toggleSwapMode(){
+  TAP_SWAP.active=!TAP_SWAP.active; TAP_SWAP.source=null;
+  document.body.classList.toggle('swap-mode',TAP_SWAP.active);
+  document.querySelectorAll('.tap-swap-source').forEach(el=>el.classList.remove('tap-swap-source'));
+  const btn=document.getElementById('swapModeBtn');
+  if(btn){ btn.classList.toggle('is-selected',TAP_SWAP.active); btn.textContent=TAP_SWAP.active?'退出交换':'交换画面'; }
+  toast(TAP_SWAP.active?'依次点击两个画面即可交换，适用于鼠标和触屏':'已退出画面交换');
+}
+async function handleSwapTap(bid,key,el){
+  if(!TAP_SWAP.active) return false;
+  if(!TAP_SWAP.source){
+    TAP_SWAP.source={bid,key,el}; el?.classList.add('tap-swap-source');
+    toast('已选择第一个画面，请点击目标画面');
+    return true;
+  }
+  const src=TAP_SWAP.source; TAP_SWAP.source=null;
+  src.el?.classList.remove('tap-swap-source');
+  await performCrossSwap(src.bid,src.key,bid,key);
+  return true;
 }
 // 给一个 DOM 格子元素绑定「作为跨批次拖拽源 + 落点」的事件
 function bindCrossCellDrag(el, bid, slotKey){
@@ -4483,8 +4988,9 @@ function renderCell(b, ci){
   // 应用裁剪变换到缩略图
   if(hasImg) applyCellCropStyle(cellEl.querySelector('img'), b, ci);
   // re-bind ALL cell events (both empty and has-img)
-  cellEl.onclick = e=>{
+  cellEl.onclick = async e=>{
     if(e.target.closest('.cell-remove')) return;
+    if(await handleSwapTap(b.id,'cell:'+ci,cellEl)) return;
     pickFrame(b, ci);
   };
   bindDropEvents(cellEl, b, ci);
@@ -4518,8 +5024,9 @@ function resizeBatch(bid){
   // rebind
   grid.querySelectorAll('.cell').forEach(cell=>{
     const ci=parseInt(cell.dataset.ci);
-    cell.onclick = e=>{ if(e.target.closest('.cell-remove')) return; pickFrame(b,ci); };
+    cell.onclick = async e=>{ if(e.target.closest('.cell-remove')) return; if(await handleSwapTap(b.id,'cell:'+ci,cell)) return; pickFrame(b,ci); };
     bindDropEvents(cell, b, ci);
+    bindCrossCellDrag(cell,b.id,'cell:'+ci);
   });
   const tagEl=document.querySelector('#batch-'+bid+' .batch-tag');
   if(tagEl) tagEl.textContent=b.cols+'×'+b.rows;
@@ -4531,9 +5038,12 @@ function resizeBatch(bid){
 function removeBatch(bid){
   const idx=S.batches.findIndex(x=>x.id===bid); if(idx===-1) return;
   S.batches.splice(idx,1);
+  if(S.finalCoverId===bid) S.finalCoverId=null;
+  if(S.finalDetailId===bid) S.finalDetailId=null;
   document.getElementById('batch-'+bid)?.remove();
-  if(S.batches.length===0) document.getElementById('batchEmpty').style.display='flex';
+  if(S.batches.length===0){ const empty=document.getElementById('batchEmpty'); if(empty) empty.style.display='flex'; }
   updateFillBtn(); refreshUsageTags(); checkDlAllBtn();
+  updateFinalAssetUI(); scheduleWorkspaceSave();
   toast('已删除销售图 #'+bid);
 }
 
@@ -4648,7 +5158,9 @@ async function generateBatch(bid, silent){
   // Activate global download
   checkDlAllBtn();
   const hasBadge=badgeChk&&badgeChk.checked;
-  toast('销售图 #'+bid+' 生成成功（'+W+'×'+H+'）'+(hasBadge?' ✦ 已叠加角标':'')+' — 点击预览图可全屏查看/替换');
+  if(!silent) toast('销售图 #'+bid+' 生成成功（'+W+'×'+H+'）'+(hasBadge?' · 已叠加角标':'')+'，可点击预览图继续精修');
+  updateFinalAssetUI();
+  scheduleWorkspaceSave();
   // 不再自动弹出全屏预览，避免打断操作；用户点击预览缩略图即可全屏
 }
 
@@ -4681,10 +5193,10 @@ function openExportOptions(){
           '<span class="exp-val" id="expQVal">'+Math.round(EXPORT.quality*100)+'%</span></div>'+
         '<div class="exp-row"><span class="exp-label">分辨率</span><div class="exp-seg" id="expScale">'+
           '<button data-s="0.5"'+(EXPORT.scale===0.5?' class="active"':'')+'>0.5×</button>'+
-          '<button data-s="1"'+(EXPORT.scale===1?' class="active"':'')+'>原始(1×)</button>'+
+          '<button data-s="1"'+(EXPORT.scale===1?' class="active"':'')+'>生成尺寸</button>'+
           '<button data-s="2"'+(EXPORT.scale===2?' class="active"':'')+'>2×</button>'+
         '</div></div>'+
-        '<div class="exp-tip" style="margin-top:10px;font-size:12px;color:var(--muted,#8aa);line-height:1.5;">拼图按视频原始分辨率合成，「原始(1×)」即无损尺寸；倍率以此为基准缩放。</div>'+
+        '<div class="exp-tip" style="margin-top:10px;font-size:12px;color:var(--muted,#8aa);line-height:1.5;">生成尺寸以当前画布为准；倍率会对导出的图片重新缩放，并不改变源视频规格。</div>'+
         '<div class="crop-btns" style="margin-top:6px;"><button class="btn-sm btn-primary-sm" onclick="applyExportOptions()">保存设置</button></div>'+
       '</div>'+
     '</div>';
@@ -4697,7 +5209,7 @@ function openExportOptions(){
     EXPORT.scale=parseFloat(b.dataset.s); m.querySelectorAll('#expScale button').forEach(x=>x.classList.toggle('active',x===b)); });
   m.querySelector('#expQ').addEventListener('input',e=>{ EXPORT.quality=parseInt(e.target.value)/100; document.getElementById('expQVal').textContent=e.target.value+'%'; });
 }
-function applyExportOptions(){ document.getElementById('exportModal')?.remove(); toast('导出设置已保存：'+EXPORT.format.toUpperCase()+' · '+EXPORT.scale+'× 原始分辨率'); }
+function applyExportOptions(){ document.getElementById('exportModal')?.remove(); toast('导出设置已保存：'+EXPORT.format.toUpperCase()+' · '+EXPORT.scale+'× 生成尺寸'); }
 
 // 根据 EXPORT 设置把画布转为 dataURL（含分辨率缩放）
 function exportCanvasURL(srcCanvas){
@@ -4754,10 +5266,126 @@ async function generateAll(){
 }
 
 function downloadAll(){
-  const ready=S.batches.filter(b=>b.canvas);
-  if(ready.length===0){ toast('请先生成销售图','err'); return; }
-  ready.forEach((b,i)=>{ setTimeout(()=>downloadBatch(b.id), i*300); });
-  toast('正在下载全部 '+ready.length+' 个拼图...');
+  exportListingPackage();
+}
+
+function exportMime(){
+  return EXPORT.format==='png'?'image/png':EXPORT.format==='webp'?'image/webp':'image/jpeg';
+}
+
+function makeExportCanvas(srcCanvas){
+  if(EXPORT.scale===1) return srcCanvas;
+  const c=document.createElement('canvas');
+  c.width=Math.round(srcCanvas.width*EXPORT.scale);
+  c.height=Math.round(srcCanvas.height*EXPORT.scale);
+  const cx=c.getContext('2d'); cx.imageSmoothingEnabled=true; cx.imageSmoothingQuality='high';
+  cx.drawImage(srcCanvas,0,0,c.width,c.height);
+  return c;
+}
+
+function canvasToExportBytes(canvas){
+  const out=makeExportCanvas(canvas);
+  return new Promise((resolve,reject)=>out.toBlob(async blob=>{
+    if(!blob){ reject(new Error('图片编码失败')); return; }
+    resolve(new Uint8Array(await blob.arrayBuffer()));
+  },exportMime(),EXPORT.format==='png'?undefined:EXPORT.quality));
+}
+
+function readSalesFeedbackInputs(){
+  return {
+    views:Math.max(0,parseInt(document.getElementById('feedbackViews')?.value||0)||0),
+    clicks:Math.max(0,parseInt(document.getElementById('feedbackClicks')?.value||0)||0),
+    orders:Math.max(0,parseInt(document.getElementById('feedbackOrders')?.value||0)||0),
+    updatedAt:Date.now()
+  };
+}
+
+function loadSalesFeedback(data){
+  const value=data||{views:0,clicks:0,orders:0};
+  const map={feedbackViews:value.views||'',feedbackClicks:value.clicks||'',feedbackOrders:value.orders||''};
+  Object.entries(map).forEach(([id,v])=>{ const el=document.getElementById(id); if(el) el.value=v; });
+  updateSalesFeedbackSummary(value);
+}
+
+function updateSalesFeedbackSummary(data=readSalesFeedbackInputs()){
+  const el=document.getElementById('feedbackSummary'); if(!el) return;
+  if(!data.views&&!data.clicks&&!data.orders){ el.textContent='尚未记录表现数据'; return; }
+  const ctr=data.views?((data.clicks/data.views)*100).toFixed(2)+'%':'暂无';
+  const conversion=data.clicks?((data.orders/data.clicks)*100).toFixed(2)+'%':'暂无';
+  el.textContent='点击率 '+ctr+' · 点击后成交率 '+conversion+' · 数据会随当前草稿保存';
+}
+
+function saveSalesFeedback(){
+  const p=PROJECTS.list.find(x=>x.id===PROJECTS.activeId);
+  if(!p){ toast('请先创建上架任务','err'); return; }
+  const data=readSalesFeedbackInputs();
+  if(data.clicks>data.views&&data.views>0){ toast('点击数不能大于曝光数','err'); return; }
+  if(data.orders>data.clicks&&data.clicks>0){ toast('成交数不能大于点击数','err'); return; }
+  p.salesFeedback=data;
+  updateSalesFeedbackSummary(data);
+  scheduleWorkspaceSave();
+  toast('售卖表现已保存，可用于后续比较封面版本');
+}
+
+function listingPayload(){
+  const source=getSourceMeta();
+  const keywords=[...new Set((document.getElementById('seoKeywords')?.value||'').trim().split(/\s+/).filter(Boolean))];
+  return {
+    project:PROJECTS.list.find(x=>x.id===PROJECTS.activeId)?.name||'未命名素材包',
+    generatedAt:new Date().toISOString(),
+    source:{...source,resolution:getResolutionInfo(source).label},
+    title:document.getElementById('seoTitle')?.value||'',
+    alternativeTitles:(document.getElementById('seoTitleAlts')?.value||'').split('\n').map(s=>s.replace(/^备选\d+[:：]\s*/,'').trim()).filter(Boolean),
+    introduction:document.getElementById('seoIntro')?.value||'',
+    keywords,
+    theme:SALES.plan?.theme||'', sellingPoints:SALES.plan?.sellingPoints||[],
+    sourceStatus:{strategyModel:SALES.plan?.visionModelUsed||'本地基础模板',seoModel:SALES.plan?.seoModelUsed||'本地基础模板',manualEdited:SALES.plan?.copySource==='人工修改'},
+    finalCoverId:S.finalCoverId, finalDetailId:S.finalDetailId,
+    salesFeedback:readSalesFeedbackInputs()
+  };
+}
+
+async function exportListingPackage(){
+  const ready=S.batches.filter(b=>b.canvas && (b.assetKind==='cover'||b.assetKind==='detail'));
+  if(!ready.length){ toast('请先生成封面和详情图','err'); return; }
+  if(!window.fflate){ toast('导出组件未加载，请刷新页面后重试','err'); return; }
+  if(!S.finalCoverId||!S.finalDetailId){
+    toast('请先选择主封面和主详情，再导出上架包','err');
+    document.getElementById('resultAssetSection')?.scrollIntoView({behavior:'smooth',block:'start'});
+    return;
+  }
+  const title=(document.getElementById('seoTitle')?.value||'').trim();
+  const intro=(document.getElementById('seoIntro')?.value||'').trim();
+  const keywordCount=[...new Set((document.getElementById('seoKeywords')?.value||'').trim().split(/\s+/).filter(Boolean))].length;
+  if(title.length<8||title.length>80||intro.length<20||keywordCount!==50){
+    toast('请先完成文案校验：标题 8-80 字、简介至少 20 字、关键词恰好 50 个','err');
+    document.getElementById('resultCopySection')?.scrollIntoView({behavior:'smooth',block:'start'});
+    return;
+  }
+  const btn=document.getElementById('unifiedDownloadBtn');
+  const old=btn?.textContent; if(btn){btn.disabled=true;btn.textContent='正在打包...';}
+  try{
+    const files={}; const ext=exportExt();
+    let coverAlt=0, detailAlt=0;
+    for(const b of ready){
+      const isCover=b.assetKind==='cover';
+      const isFinal=isCover?b.id===S.finalCoverId:b.id===S.finalDetailId;
+      const dir=isCover?'covers':'details';
+      const base=isFinal?(isCover?'cover-main':'detail-main'):(isCover?'cover-alt-'+(++coverAlt):'detail-alt-'+(++detailAlt));
+      files[dir+'/'+base+'.'+ext]=await canvasToExportBytes(b.canvas);
+    }
+    const listing=listingPayload();
+    const text='主推标题\n'+listing.title+'\n\n备选标题\n'+listing.alternativeTitles.join('\n')+'\n\n作品简介\n'+listing.introduction+'\n\n关键词（'+listing.keywords.length+'）\n'+listing.keywords.join(' ')+'\n';
+    files['listing.txt']=fflate.strToU8(text);
+    files['listing.json']=fflate.strToU8(JSON.stringify(listing,null,2));
+    const zipped=await new Promise((resolve,reject)=>fflate.zip(files,{level:6},(err,data)=>err?reject(err):resolve(data)));
+    const blob=new Blob([zipped],{type:'application/zip'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download=(listing.project||'guangchang-listing').replace(/[\\/:*?"<>|]/g,'_')+'_上架包.zip'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+    toast('上架包已导出：图片、文案与规格清单均已包含');
+  }catch(e){ console.error(e); toast('上架包导出失败：'+(e?.message||'未知错误'),'err'); }
+  finally{ if(btn){btn.disabled=false;btn.textContent=old||'导出上架包';} }
 }
 
 function loadImg(src){
@@ -4775,28 +5403,194 @@ function loadImg(src){
 const SALES = {
   plan: null,
   detailCanvas: null,
-  detailRows: []
+  detailRows: [],
+  versions: []
 };
+globalThis.__vfpSalesState=SALES;
+
+const WORKSPACE_DB='vfp_workspace_v1';
+let _workspaceSaveTimer=null;
+
+function updateRailSaveState(label,state='saved'){
+  const el=document.getElementById('railSaveState');
+  if(!el) return;
+  const text=el.querySelector('span:last-child');
+  if(text) text.textContent=label;
+  el.dataset.state=state;
+}
+
+function openWorkspaceDB(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(WORKSPACE_DB,1);
+    req.onupgradeneeded=()=>req.result.createObjectStore('workspace');
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+  });
+}
+
+function serializeBatchDraft(b){
+  const out={...b,canvas:null,wasGenerated:!!b.canvas};
+  return out;
+}
+
+function serializeProjectDraft(p){
+  return {
+    ...p,
+    videoUrl:'',
+    imgCache:null,
+    frames:p.frames||[],
+    selected:p.selected||[],
+    batches:(p.batches||[]).map(serializeBatchDraft),
+    salesPlan:p.salesPlan||null
+  };
+}
+
+async function saveWorkspaceNow(){
+  if(PROJECTS.list.length===0){
+    try{
+      const db=await openWorkspaceDB();
+      await new Promise((resolve,reject)=>{ const tx=db.transaction('workspace','readwrite'); tx.objectStore('workspace').delete('latest'); tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error); });
+      db.close(); S.dirty=false; updateRailSaveState('已自动保存');
+    }catch(e){ console.warn('清理草稿失败',e); updateRailSaveState('保存失败','error'); }
+    return;
+  }
+  saveActiveProject();
+  const payload={
+    savedAt:Date.now(), activeId:PROJECTS.activeId, idCnt:PROJECTS.idCnt,
+    projects:PROJECTS.list.map(serializeProjectDraft)
+  };
+  try{
+    const db=await openWorkspaceDB();
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction('workspace','readwrite');
+      tx.objectStore('workspace').put(payload,'latest');
+      tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error);
+    });
+    db.close(); S.dirty=false; updateRailSaveState('已自动保存');
+  }catch(e){ console.warn('自动保存失败',e); updateRailSaveState('保存失败','error'); }
+}
+
+function scheduleWorkspaceSave(){
+  S.dirty=true;
+  updateRailSaveState('正在保存','saving');
+  clearTimeout(_workspaceSaveTimer);
+  _workspaceSaveTimer=setTimeout(saveWorkspaceNow,700);
+}
+
+async function restoreWorkspaceDrafts(){
+  try{
+    const db=await openWorkspaceDB();
+    const payload=await new Promise((resolve,reject)=>{
+      const tx=db.transaction('workspace','readonly');
+      const req=tx.objectStore('workspace').get('latest');
+      req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error);
+    });
+    db.close();
+    if(!payload?.projects?.length) return;
+    PROJECTS.list=payload.projects.map(p=>({
+      ...p,
+      videoUrl:p.videoBlob?URL.createObjectURL(p.videoBlob):'',
+      imgCache:new Map(),
+      batches:(p.batches||[]).map(b=>({...b,canvas:null}))
+    }));
+    PROJECTS.idCnt=payload.idCnt||Math.max(...PROJECTS.list.map(p=>p.id));
+    PROJECTS.activeId=PROJECTS.list.some(p=>p.id===payload.activeId)?payload.activeId:PROJECTS.list[0].id;
+    const p=PROJECTS.list.find(x=>x.id===PROJECTS.activeId);
+    restoreProject(p); renderProjectTabs();
+    setTimeout(async()=>{
+      for(const b of S.batches){
+        if(b.wasGenerated && !b.isDetailLong && b.cells?.some(c=>c!==null)) await generateBatch(b.id,true);
+      }
+      updateFinalAssetUI();
+    },300);
+    toast('已恢复上次自动保存的草稿');
+    S.dirty=false;
+  }catch(e){ console.warn('恢复草稿失败',e); }
+}
+
+function closeDraftManager(){ document.getElementById('draftManagerMask')?.remove(); }
+
+function openDraftManager(){
+  document.getElementById('draftManagerMask')?.remove();
+  const mask=document.createElement('div');
+  mask.id='draftManagerMask'; mask.className='app-confirm-mask';
+  const projects=PROJECTS.list||[];
+  const rows=projects.length?projects.map(p=>{
+    const active=p.id===PROJECTS.activeId;
+    const frames=active?(S.frames||[]).length:(p.frames||[]).length;
+    const assets=active?(S.batches||[]).filter(b=>b.assetKind==='cover'||b.assetKind==='detail').length:(p.batches||[]).filter(b=>b.assetKind==='cover'||b.assetKind==='detail').length;
+    return '<div class="draft-row'+(active?' is-active':'')+'">'+
+      '<button type="button" class="draft-main" onclick="switchDraftFromManager('+p.id+')"><strong>'+escapeHtmlSafe(p.name||'未命名任务')+'</strong><span>'+frames+' 个候选画面 · '+assets+' 个销售资产'+(active?' · 当前任务':'')+'</span></button>'+
+      '<button type="button" class="draft-icon" onclick="renameDraftFromManager('+p.id+')" title="重命名">重命名</button>'+
+      '<button type="button" class="draft-icon is-danger" onclick="deleteDraftFromManager('+p.id+')" title="删除">删除</button>'+
+    '</div>';
+  }).join(''):'<div class="draft-empty">还没有本机草稿。上传视频后会自动保存。</div>';
+  mask.innerHTML='<div class="app-confirm-box draft-manager" role="dialog" aria-modal="true" aria-labelledby="draftManagerTitle">'+
+    '<div class="draft-manager-head"><div><div class="sales-eyebrow">本机自动保存</div><div class="app-confirm-title" id="draftManagerTitle">任务草稿</div><p>草稿保存在当前浏览器，可切换、重命名或删除。</p></div><button type="button" class="settings-close" onclick="closeDraftManager()" aria-label="关闭">×</button></div>'+
+    '<div class="draft-list">'+rows+'</div></div>';
+  document.body.appendChild(mask);
+  mask.addEventListener('click',e=>{ if(e.target===mask) closeDraftManager(); });
+  mask.querySelector('.settings-close')?.focus();
+}
+
+function switchDraftFromManager(id){ closeDraftManager(); switchProject(id); switchTab(0); }
+function renameDraftFromManager(id){ renameProject(id); scheduleWorkspaceSave(); openDraftManager(); }
+async function deleteDraftFromManager(id){ await deleteProject(id); openDraftManager(); }
+
+function archiveCurrentVersion(){
+  const hasOutput=(S.batches||[]).some(b=>b.canvas)||(SALES.plan&&SALES.plan.seoTitle);
+  if(!hasOutput) return false;
+  SALES.versions.push({
+    batches:S.batches,
+    plan:SALES.plan?JSON.parse(JSON.stringify(SALES.plan)):null,
+    finalCoverId:S.finalCoverId,
+    finalDetailId:S.finalDetailId,
+    savedAt:Date.now()
+  });
+  if(SALES.versions.length>3) SALES.versions.shift();
+  const btn=document.getElementById('restoreVersionBtn'); if(btn) btn.style.display='';
+  return true;
+}
+
+function restorePreviousVersion(){
+  const previous=SALES.versions.pop();
+  if(!previous){ toast('没有可恢复的上一版','err'); return; }
+  S.batches=previous.batches||[];
+  SALES.plan=previous.plan;
+  S.finalCoverId=previous.finalCoverId||null;
+  S.finalDetailId=previous.finalDetailId||null;
+  renderAllBatches();
+  if(SALES.plan) showSalesResults(SALES.plan);
+  updateFinalAssetUI();
+  const btn=document.getElementById('restoreVersionBtn'); if(btn) btn.style.display=SALES.versions.length?'':'none';
+  scheduleWorkspaceSave();
+  toast('已恢复上一版结果');
+}
 
 // 清空分镜/卖点文档（清空视频 / 新建项目时调用），连带重置上传文件名提示与已生成的销售策略
 function clearStoryDoc(){
   const area=document.getElementById('storyDoc');
   if(area) area.value='';
   const fn=document.getElementById('storyFileName');
-  if(fn){ fn.textContent='支持 txt / md / csv / json，doc/docx 会尽量提取可读文本'; fn.classList.remove('has-file'); }
+  if(fn){ fn.textContent='支持 TXT、Markdown、CSV、JSON、RTF、DOC、DOCX'; fn.classList.remove('has-file'); }
   const fi=document.getElementById('storyFileInput');
   if(fi){ try{ fi.value=''; }catch(_){} }
   // 重置销售策略缓存，避免残留上一个视频的卖点
   SALES.plan=null; SALES.detailRows=[]; SALES.usedFrames=null; SALES.lastTotalTime='';
+  const panel=document.getElementById('salesResultPanel'); if(panel) panel.style.display='none';
+  updateResultNavigationState();
+  updateTaskFlowState();
 }
 
 function salesInputs(){
   return {
     doc: (document.getElementById('storyDoc')?.value || '').trim(),
     type: document.getElementById('salesPackType')?.value || '自定义',
-    goal: document.getElementById('salesGoal')?.value || '点击与转化兼顾',
+    goal: document.getElementById('salesGoal')?.value || '由AI自动判断',
     useText: !!document.getElementById('salesUseText')?.checked,
     makeAltCovers: !!document.getElementById('salesMakeAltCovers')?.checked,
+    isAiGenerated: !!document.getElementById('salesAiGenerated')?.checked,
+    sourceMeta: getSourceMeta(),
     textStyle: document.getElementById('detailTextStyle')?.value || 'minimal',
     textPosition: document.getElementById('detailTextPosition')?.value || 'top',
     textDensity: document.getElementById('detailTextDensity')?.value || 'light',
@@ -4820,13 +5614,13 @@ function setSalesProgress(pct, text){
     let total='';
     if(_salesProgressStart){
       total=((performance.now()-_salesProgressStart)/1000).toFixed(1);
-      if(timeEl) timeEl.textContent='⏱ 本次总用时 '+total+'s · 已完成';
-      if(label) label.textContent='✅ 光厂上架套件已生成';
-      fill.style.width='100%';
+      if(timeEl) timeEl.textContent=pct===-2?'已停止':('本次用时 '+total+'s');
+      if(label) label.textContent=text||(pct===-2?'生成未完成':'上架套件已生成');
+      fill.style.width=pct===-2?'0%':'100%';
     }
     SALES.lastTotalTime=total;
     // 停留 6 秒后淡出，期间用户可清楚看到总用时
-    setTimeout(()=>{ wrap.style.display='none'; }, 6000);
+    setTimeout(()=>{ wrap.style.display='none'; }, pct===-2?8000:6000);
     return;
   }
   wrap.style.display='flex';
@@ -4838,7 +5632,7 @@ function setSalesProgress(pct, text){
     const tick=()=>{
       if(!timeEl) return;
       const el=((performance.now()-_salesProgressStart)/1000).toFixed(1);
-      timeEl.textContent='⏱ 已用 '+el+'s';
+      timeEl.textContent='已用 '+el+'s';
     };
     tick();
     _salesProgressTimer=setInterval(tick, 100);
@@ -4850,23 +5644,28 @@ async function readStoryFile(file){
   const ext=(name.split('.').pop()||'').toLowerCase();
   const buf=await file.arrayBuffer();
   let text='';
-  try{
-    text=new TextDecoder('utf-8').decode(buf);
-  }catch(_){
-    text=new TextDecoder('gb18030').decode(buf);
-  }
   if(ext==='docx'){
-    text=text
-      .replace(/<w:p[^>]*>/g,'\n')
-      .replace(/<[^>]+>/g,' ')
-      .replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
+    if(!window.mammoth) throw new Error('DOCX 解析组件未加载，请刷新页面后重试');
+    const result=await window.mammoth.extractRawText({arrayBuffer:buf});
+    text=result.value||'';
   } else if(ext==='rtf'){
+    text=new TextDecoder('utf-8').decode(buf);
     text=text.replace(/\\par[d]?/g,'\n').replace(/\\'[0-9a-fA-F]{2}/g,'').replace(/[{}]\\?[^\\s]+ ?/g,' ');
   } else if(ext==='doc'){
-    text=text.replace(/[^\u4e00-\u9fa5A-Za-z0-9，。；、,.!?！？：:\n\r\s-]/g,' ');
+    const utf16=new TextDecoder('utf-16le').decode(buf);
+    const runs=utf16.match(/[\u4e00-\u9fa5A-Za-z0-9，。；、,.!?！？：:（）()\-\s]{8,}/g)||[];
+    text=runs.map(s=>s.replace(/\s+/g,' ').trim()).filter(s=>/[\u4e00-\u9fa5A-Za-z]{4,}/.test(s)).join('\n');
+    if(text.length<20) throw new Error('未能可靠读取这个旧版 .doc，请另存为 .docx、.txt 或直接粘贴正文');
+  } else {
+    try{ text=new TextDecoder('utf-8',{fatal:true}).decode(buf); }
+    catch(_){ text=new TextDecoder('gb18030').decode(buf); }
   }
   text=text.replace(/\s+\n/g,'\n').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim();
   if(!text || text.length<8) throw new Error('未能从文档中提取到足够文本，可复制内容后粘贴到输入框');
+  if(text.length>12000){
+    const ok=await appConfirm({title:'文档内容较长',message:'已解析 '+text.length+' 字。为控制 AI 上下文，本次只使用前 12000 字；建议把最重要的主题、镜头和用途放在前面。',okText:'使用前 12000 字',cancelText:'返回整理文档'});
+    if(!ok) throw new Error('已取消导入，请精简后重试');
+  }
   return text.slice(0,12000);
 }
 
@@ -4896,9 +5695,19 @@ function showSalesResults(plan){
   if(panel) panel.style.display='';
   const warn=document.getElementById('salesAiWarning');
   if(warn){
-    const issues=plan.aiIssues||[];
+    const issues=[...(plan.aiIssues||[])];
+    if(plan.generationMode==='local'&&!issues.some(x=>x.title==='本地基础结果')){
+      issues.unshift({title:'本地基础结果',message:'这套结果没有调用 AI 理解视频或文档，适合预览结构；连接 AI 后可按模块重新生成。'});
+    }
     warn.style.display=issues.length?'':'none';
     warn.innerHTML=issues.map(x=>'<div><strong>'+escapeHtmlSafe(x.title)+'</strong><span>'+escapeHtmlSafe(x.message)+'</span></div>').join('');
+  }
+  const sourceBadge=document.getElementById('resultSourceBadge');
+  if(sourceBadge){
+    const local=plan.generationMode==='local'||(!plan.visionModelUsed&&!plan.seoModelUsed);
+    sourceBadge.textContent=local?'本地草稿':'AI 已生成';
+    sourceBadge.classList.toggle('is-local',local);
+    sourceBadge.classList.toggle('is-ai',!local);
   }
   const strategy=document.getElementById('salesStrategy');
 	  if(strategy){
@@ -4907,8 +5716,8 @@ function showSalesResults(plan){
 	      '核心卖点：'+plan.sellingPoints.join(' / '),
 	      '视觉方向：'+plan.visualDirection,
 	      '详情结构：'+plan.detailRows.map(r=>r.label+'（'+r.count+'图）').join(' → '),
-	      plan.visionModelUsed ? ('视觉模型：'+plan.visionModelUsed) : '',
-	      plan.seoModelUsed ? ('SEO模型：'+plan.seoModelUsed) : ''
+	      '策略来源：'+(plan.visionModelUsed||'本地基础模板'),
+	      '文案来源：'+(plan.copySource||plan.seoModelUsed||'本地基础模板')
 	    ].filter(Boolean).join('\n');
 	  }
   const list=document.getElementById('coverPlanList');
@@ -4923,6 +5732,7 @@ function showSalesResults(plan){
   document.getElementById('seoIntro').value=plan.seoIntro||'';
   document.getElementById('seoKeywords').value=(plan.keywords||[]).join(' ');
   updateListingChecklist();
+  updateTaskFlowState();
 }
 
 function docKeywords(doc, type){
@@ -4950,13 +5760,14 @@ function fallbackSalesPlan(input){
   const keywords = buildKeywordList(sceneWords, input.type);
   return {
     theme,
+    generationMode:'local',
     aiIssues: input.aiIssues||[],
     sellingPoints,
     visualDirection:'封面用高冲击、主题明确的代表性画面；详情用大图+多图矩阵证明场景丰富、细节可用、商业质感稳定。',
     coverPlans:[
-      {name:'主题一眼识别版', score:92, reason:'优先选择能立刻说明素材包主题的高光画面，适合作为默认主封面。'},
-      {name:'点击冲击力版', score:88, reason:'强化色彩、光影、主体冲突和视觉节奏，用于测试更高点击。'},
-      {name:'内容丰富证明版', score:85, reason:'让四张图覆盖不同角度和场景，降低买家对素材重复度的顾虑。'}
+      {name:'主题一眼识别版', score:92, themeScore:96, clickScore:88, richnessScore:84, reason:'优先选择能立刻说明素材包主题的高光画面，适合作为默认主封面。'},
+      {name:'点击冲击力版', score:88, themeScore:86, clickScore:94, richnessScore:82, reason:'强化色彩、光影、主体冲突和视觉节奏，用于测试更高点击。'},
+      {name:'内容丰富证明版', score:85, themeScore:84, clickScore:82, richnessScore:95, reason:'让四张图覆盖不同角度和场景，降低买家对素材重复度的顾虑。'}
     ],
 	    detailRows:[
 	      {label:'主题清晰', count:3, text:'一眼看懂主题'},
@@ -4973,33 +5784,44 @@ function fallbackSalesPlan(input){
 }
 
 function buildKeywordList(words, type){
+  const resolution=sourceResolutionToken();
   const defaults=[
-    type,'视频素材','4K素材','高清素材','商用素材','素材包','企业宣传','广告片','宣传片','品牌片',
+    type,'视频素材',resolution?resolution+'素材':'','商用素材','素材包','企业宣传','广告片','宣传片','品牌片',
     '展厅','大屏','新媒体','短视频','剪辑素材','商业项目','科技感','高级感','现代','视觉包装',
-    '背景视频','片头片尾','数字化','产业宣传','产品宣传','项目汇报','发布会','官网视频','海报视觉','详情页'
+    '背景视频','片头片尾','数字化','产业宣传','产品宣传','项目汇报','发布会','官网视频','海报视觉','详情页',
+    '行业视频','宣传背景','影视后期','视频剪辑','创意素材','视觉设计','商务演示','活动暖场','舞台大屏','信息流广告',
+    '社交媒体','自媒体包装','电商宣传','企业官网','品牌发布','会议开场','片头背景','栏目包装','后期制作','商业广告',
+    '展示视频','营销素材','推广视频','内容创作','可编辑素材','版权素材','高清背景','视觉内容','创意剪辑','宣传素材'
   ];
   const pool=[...new Set([...words, ...defaults].map(x=>String(x||'').trim()).filter(Boolean))];
-  while(pool.length<50) pool.push(['商业应用','高端视觉','场景展示','内容丰富','可商用'][pool.length%5]+(pool.length+1));
   return pool.slice(0,50);
 }
 
-// 兜底 SEO 标题：按范例风格 分辨率+主题+主体+风格+场景+可商用素材；尽量去无效词
+function sanitizeSeoClaims(text,input){
+  let out=String(text||'');
+  const res=getResolutionInfo(input?.sourceMeta||getSourceMeta());
+  if(!res.is8K) out=out.replace(/\b8K\b/gi,'');
+  if(!res.is4K) out=out.replace(/\b4K\b/gi,'');
+  if(!input?.isAiGenerated) out=out.replace(/AI(?:高清)?视频素材|AI素材|AI视频/gi,'视频素材');
+  return out.replace(/\s+/g,' ').trim();
+}
+
+// 兜底 SEO 标题只使用经过确认的真实规格与内容来源。
 function makeSeoTitle(theme, words){
   const cleanWords=(words||[]).map(w=>String(w||'').trim())
     .filter(w=>w && !/^(精品|精美|优质|高端|大气|震撼|超清|画质|欢迎|选购|本素材|视频素材包)$/.test(w));
   const body=cleanWords.filter(w=>!theme.includes(w)).slice(0,5).join(' ');
-  return ('4K'+theme+'AI高清视频素材 '+body+' 商业宣传背景片头可商用素材')
-    .replace(/\s+/g,' ').trim();
+  const input=salesInputs();
+  const prefix=[sourceResolutionToken(),theme,input.isAiGenerated?'AI视频素材':'视频素材'].filter(Boolean).join(' ');
+  return sanitizeSeoClaims(prefix+' '+body+' 商业宣传背景 可商用素材',input);
 }
-// 兜底备选标题（2 个，4K/8K 错开）
 function makeSeoTitleAlts(theme, words){
   const cleanWords=(words||[]).map(w=>String(w||'').trim())
     .filter(w=>w && !/^(精品|精美|优质|高端|大气|震撼|超清|画质|欢迎|选购|本素材|视频素材包)$/.test(w));
   const body=cleanWords.filter(w=>!theme.includes(w)).slice(0,4).join(' ');
-  return [
-    ('8K'+theme+'视频素材 '+body+' 史诗大片背景可商用').replace(/\s+/g,' ').trim(),
-    (theme+'AI视频素材4K '+body+' 宣传片头文旅党政可商用').replace(/\s+/g,' ').trim()
-  ];
+  const input=salesInputs();
+  const source=[sourceResolutionToken(),input.isAiGenerated?'AI视频素材':'视频素材'].filter(Boolean).join(' ');
+  return [sanitizeSeoClaims(theme+' '+source+' '+body+' 商业项目背景 可商用',input),sanitizeSeoClaims(theme+' '+body+' 宣传片与新媒体视觉 可商用素材',input)];
 }
 
 function makeSeoIntro(theme, sellingPoints, words){
@@ -5055,7 +5877,7 @@ async function aiSalesPlan(input){
     type:'text',
     text:
       '你是光厂视频素材包的高级产品经理、视觉策划和SEO运营。请结合分镜文档、素材类型、销售目标和视频抽样画面，输出适合光厂售卖的上架方案。\n'+
-	      '必须严格输出纯JSON，不要代码块。JSON字段：theme(string), sellingPoints(string[3-5]), visualDirection(string), coverPlans([{name,score,reason}] 3个), detailRows([{label,count,text}] 4-8行，前三行count必须为3，后续每行count为1-3), seoTitle(string), seoIntro(string，不写时长，重点写内容/适用场景/商业用途), keywords(string[50])。\n'+
+	      '必须严格输出纯JSON，不要代码块。JSON字段：theme(string), sellingPoints(string[3-5]), visualDirection(string), coverPlans([{name,score,themeScore,clickScore,richnessScore,reason}] 3个，所有分数0-100), detailRows([{label,count,text}] 4-8行，前三行count必须为3，后续每行count为1-3), seoTitle(string), seoIntro(string，不写时长，重点写内容/适用场景/商业用途), keywords(string[50])。\n'+
 	      '封面目标：一眼表达素材包主题、四宫格有点击冲击力。详情目标：前三行是升级版3×3九宫格基础详情，后续按内容延展；每行文字必须精简，label不超过8字，text不超过18字，突出明确卖点。\n'+
       '素材类型：'+input.type+'\n销售目标：'+input.goal+'\n是否允许详情图文字：'+(input.useText?'允许少量文字':'尽量纯图')+'\n分镜/素材文档：\n'+(input.doc||'用户未提供文档，请根据视频画面和素材类型判断。')
   }];
@@ -5068,6 +5890,7 @@ async function aiSalesPlan(input){
   }
   const resp=await fetch('https://llm-api.mcisaas.com/v1/chat/completions',{
     method:'POST',
+    signal:currentRunSignal(),
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+input.apiKey},
     body:JSON.stringify({
       model:input.model,
@@ -5083,11 +5906,15 @@ async function aiSalesPlan(input){
     // 模型其实有返回，只是格式无法解析——明确告知是"格式问题"而非"未调用"
     throw new Error('销售策略模型已返回内容，但JSON格式无法解析（可能被截断或含非法字符）。原始返回前120字：'+raw.slice(0,120));
   }
+  if(!Array.isArray(parsed.sellingPoints)||parsed.sellingPoints.length<3||!Array.isArray(parsed.coverPlans)||parsed.coverPlans.length<3||!Array.isArray(parsed.detailRows)||parsed.detailRows.length<4){
+    throw new Error('销售策略模型返回字段不完整，已停止生成；请重试或更换模型');
+  }
   const fallback=fallbackSalesPlan(input);
+  parsed.generationMode='ai';
   parsed.visionModelUsed=input.model;
-  parsed.sellingPoints=Array.isArray(parsed.sellingPoints)&&parsed.sellingPoints.length?parsed.sellingPoints:fallback.sellingPoints;
-  parsed.coverPlans=Array.isArray(parsed.coverPlans)&&parsed.coverPlans.length?parsed.coverPlans.slice(0,3):fallback.coverPlans;
-  parsed.detailRows=Array.isArray(parsed.detailRows)&&parsed.detailRows.length?parsed.detailRows.slice(0,7):fallback.detailRows;
+  parsed.sellingPoints=parsed.sellingPoints.slice(0,5);
+  parsed.coverPlans=parsed.coverPlans.slice(0,3);
+  parsed.detailRows=parsed.detailRows.slice(0,7);
   parsed.keywords=Array.isArray(parsed.keywords)&&parsed.keywords.length?parsed.keywords:fallback.keywords;
   while(parsed.coverPlans.length<3) parsed.coverPlans.push(fallback.coverPlans[parsed.coverPlans.length]);
   while(parsed.keywords.length<50) parsed.keywords.push(...fallback.keywords);
@@ -5097,16 +5924,20 @@ async function aiSalesPlan(input){
 
 async function aiSeoOptimize(input, plan){
   if(!input.apiKey) return plan;
+  const resolution=getResolutionInfo(input.sourceMeta);
+  const specRule=resolution.is8K?'源视频为 8K，可使用 8K/4K 描述':resolution.is4K?'源视频为 4K，只能使用 4K 描述':'源视频不足 4K，标题中严禁出现 4K 或 8K';
+  const aiRule=input.isAiGenerated?'用户已确认该素材由 AI 生成，可使用 AI 描述':'用户未确认素材由 AI 生成，标题和关键词中严禁出现 AI 描述';
   const prompt =
-    '你是光厂（VJ师）视频素材网的金牌SEO标题专家。请严格按下面给出的"标准范例风格"生成上架标题与备选标题。\n\n'+
-    '【标题公式】= 分辨率(4K/8K) + 核心主题/IP + 主体内容/画面 + 风格调色 + 适用场景/用途 + 可商用素材。\n'+
+    '你是光厂（VJ师）视频素材网的资深SEO标题专家。请根据真实内容生成上架标题与备选标题。\n\n'+
+    '【真实性约束】'+specRule+'；'+aiRule+'。不得推测或夸大素材属性。\n'+
+    '【标题公式】= 已确认的真实规格 + 核心主题/IP + 主体内容/画面 + 风格调色 + 适用场景/用途 + 可商用素材。\n'+
     '【硬性要求】\n'+
     '1. 主推标题 1 个 + 备选标题 2 个，每个标题 28~42 个汉字，信息密度高、可直接上架。\n'+
-    '2. 必须包含具体的分辨率（4K 或 8K，二选一开头优先）、主题关键词、画面主体、风格/调色词、应用场景、"可商用素材"或"可商用"收尾。\n'+
+    '2. 只有在真实性约束允许时才写分辨率或 AI；必须包含主题关键词、画面主体、风格/调色词、应用场景，并以"可商用素材"或"可商用"收尾。\n'+
     '3. 用空格分隔语义块，读起来像 4~5 个搜索短语拼接，覆盖多种搜索意图。\n'+
     '4. 严禁套话空话与无效词：不要出现"精美/震撼/高端大气/优质/精品/欢迎选购/视频素材包/本素材/超清画质"等空泛形容词，所有词必须有检索价值或具体含义。\n'+
     '5. 主体内容要写"画面里真实有的东西"（如：兵马俑铁骑、抗体中和刺突、红船党徽），不要泛泛而谈。\n\n'+
-    '【标准范例（之后一律以此为准）】\n'+
+    '【结构范例（只参考信息密度，不复制未经确认的 4K/8K/AI 属性）】\n'+
     '范例1 主推：4K大秦帝国统一天下AI高清视频素材 秦朝兵马俑铁骑历史史诗大片 黑金铁血秦风长城军阵背景片头 历史纪录片文旅党政可商用素材\n'+
     '范例1 备选A：8K秦朝大秦帝国视频素材 兵马俑军阵铁骑出征统一六国历史重现 黑金冷峻史诗大片背景\n'+
     '范例1 备选B：大秦雄风兵马俑长城AI视频素材4K 秦风黑金铁血调色 历史纪录片片头文旅可商用\n'+
@@ -5127,6 +5958,7 @@ async function aiSeoOptimize(input, plan){
     '分镜/素材文档：\n'+(input.doc||'用户未提供文档，请根据素材类型和已有策略生成。');
   const resp=await fetch('https://llm-api.mcisaas.com/v1/chat/completions',{
     method:'POST',
+    signal:currentRunSignal(),
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+input.apiKey},
     body:JSON.stringify({
       model:input.seoModel,
@@ -5139,18 +5971,23 @@ async function aiSeoOptimize(input, plan){
   const raw=(await resp.json()).choices?.[0]?.message?.content?.trim()||'';
   const parsed=robustParseJSON(raw);
   if(!parsed) throw new Error('SEO文案模型已返回内容，但JSON格式无法解析。原始返回前120字：'+raw.slice(0,120));
-  const fallback=fallbackSalesPlan(input);
   const keywords=Array.isArray(parsed.keywords)?parsed.keywords:String(parsed.keywords||'').split(/\s+/);
-  plan.seoTitle=String(parsed.seoTitle||plan.seoTitle||fallback.seoTitle).trim();
+  if(!parsed.seoTitle||!parsed.seoIntro||!Array.isArray(parsed.seoTitleAlts)||parsed.seoTitleAlts.length<2||keywords.length<50){
+    throw new Error('SEO 文案模型返回字段不完整，已停止生成；请重试或更换模型');
+  }
+  plan.seoTitle=String(parsed.seoTitle).trim();
   // 2 个备选标题
   let alts=[];
   if(Array.isArray(parsed.seoTitleAlts)) alts=parsed.seoTitleAlts;
   else if(parsed.seoTitleAlts) alts=[String(parsed.seoTitleAlts)];
   plan.seoTitleAlts=alts.map(x=>String(x||'').trim()).filter(Boolean).slice(0,2);
-  plan.seoIntro=String(parsed.seoIntro||plan.seoIntro||fallback.seoIntro).trim();
+  plan.seoIntro=String(parsed.seoIntro).trim();
   plan.keywords=[...new Set(keywords.map(x=>String(x).trim()).filter(Boolean))];
-  while(plan.keywords.length<50) plan.keywords.push(...fallback.keywords);
   plan.keywords=[...new Set(plan.keywords)].slice(0,50);
+  plan.seoTitle=sanitizeSeoClaims(plan.seoTitle,input);
+  plan.seoTitleAlts=plan.seoTitleAlts.map(x=>sanitizeSeoClaims(x,input));
+  plan.keywords=plan.keywords.map(x=>sanitizeSeoClaims(x,input)).filter(Boolean);
+  if(plan.keywords.length!==50) throw new Error('SEO 模型返回的有效关键词不足 50 个，未使用模板词补齐；请重试');
   plan.seoModelUsed=input.seoModel;
   return plan;
 }
@@ -5205,6 +6042,7 @@ async function aiDetailHeroTitles(input, plan, need){
       '素材类型：'+input.type;
     const resp=await fetch('https://llm-api.mcisaas.com/v1/chat/completions',{
       method:'POST',
+      signal:currentRunSignal(),
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+input.apiKey},
       body:JSON.stringify({ model:input.seoModel, messages:[{role:'user',content:prompt}], max_tokens:500, temperature:.5 })
     });
@@ -5217,7 +6055,7 @@ async function aiDetailHeroTitles(input, plan, need){
     if(!titles.length) throw new Error('标题清洗后为空');
     const res=[]; for(let i=0;i<need;i++) res.push(titles[i%titles.length]);
     return res;
-  }catch(e){ console.warn('详情卖点标题生成失败，用本地兜底', e); return localFallback(); }
+  }catch(e){ throw new Error('详情标题模型调用失败：'+(e?.message||'未知错误')); }
 }
 // 单张长图重新生成一个标题（用于资产卡上「换标题」按钮）
 async function regenOneHeroTitle(b){
@@ -5226,14 +6064,16 @@ async function regenOneHeroTitle(b){
   const plan=b.heroPlan||{};
   toast('正在重新生成标题…');
   try{
+    pushHistory();
     const titles=await aiDetailHeroTitles(input, plan, 4);
     // 尽量取一个和当前不同的
     let pick=titles.find(t=>t && t!==b.heroTitle) || titles[0];
     b.heroTitle=pick;
     await regenDetailLong(b);
     syncHeroTitleInput(b);
-    toast('✅ 标题已更新：'+pick);
-  }catch(e){ toast('标题生成失败：'+e.message); }
+    scheduleWorkspaceSave();
+    toast('标题已更新：'+pick);
+  }catch(e){ toast('标题生成失败：'+e.message,'err'); }
 }
 
 function pickEvenFrames(n){
@@ -5259,14 +6099,15 @@ async function getSalesRankedFrames(){
 
 function resetSalesBatches(){
   S.batches=[]; batchIdCnt=0;
+  S.finalCoverId=null; S.finalDetailId=null;
   const list=document.getElementById('batchList');
   if(list){
     list.innerHTML='<div class="empty" id="batchEmpty"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><p>还没有销售图资产<br/>可点击上方版式或回到第一步自动生成</p></div>';
   }
 }
 
-async function createCoverCandidates(plan, ranked){
-  resetSalesBatches();
+async function createCoverCandidates(plan, ranked, options={}){
+  if(options.reset!==false) resetSalesBatches();
   SALES.usedFrames = new Set();   // 记录封面已用帧，供详情图去重
   const plans=plan.coverPlans.slice(0, document.getElementById('salesMakeAltCovers').checked ? 3 : 1);
   const coverCount = plans.length;
@@ -5293,6 +6134,8 @@ async function createCoverCandidates(plan, ranked){
   for(let i=0;i<coverCount;i++){
     addBatch(2,2);
     const b=S.batches[S.batches.length-1];
+    b.assetKind='cover';
+    b.coverPlan=plans[i];
     b.title='封面候选 '+String.fromCharCode(65+i);
     b.note=plans[i].name+' · '+plans[i].score+'分';
     let picks=[...new Set(buckets[i])].slice(0,4);
@@ -5311,10 +6154,48 @@ async function createCoverCandidates(plan, ranked){
 function renderBatchTitle(b){
   const el=document.getElementById('batch-'+b.id);
   if(!el) return;
+  el.className='batch asset-'+(b.assetKind||'custom');
   const tag=el.querySelector('.batch-tag');
   const meta=el.querySelector('.batch-title span:nth-child(2)');
   if(tag) tag.textContent=b.title||b.cols+'×'+b.rows;
   if(meta) meta.textContent=b.note||('销售图 #'+b.id);
+  if(b.assetKind==='cover'&&b.coverPlan){
+    if(!document.getElementById('final-'+b.id)){
+      const action=el.querySelector('.batch-actions');
+      const btn=document.createElement('button'); btn.type='button'; btn.className='btn-sm final-choice-btn'; btn.id='final-'+b.id; btn.textContent='设为主封面'; btn.onclick=()=>setFinalAsset(b.id,'cover');
+      action?.prepend(btn);
+    }
+    let decision=el.querySelector('.cover-decision');
+    if(!decision){ decision=document.createElement('div'); decision.className='cover-decision'; el.querySelector('.batch-head')?.after(decision); }
+    const p=b.coverPlan;
+    decision.innerHTML='<div><span>主题表达</span><b>'+Math.round(p.themeScore||p.score||0)+'</b></div><div><span>点击力</span><b>'+Math.round(p.clickScore||p.score||0)+'</b></div><div><span>丰富度</span><b>'+Math.round(p.richnessScore||p.score||0)+'</b></div><p>'+escapeHtmlSafe(p.reason||'')+'</p>';
+  }
+}
+
+function setFinalAsset(id,type){
+  const b=S.batches.find(x=>x.id===id);
+  if(!b || !b.canvas){ toast('请先生成该资产','err'); return; }
+  pushHistory();
+  if(type==='cover') S.finalCoverId=id;
+  else S.finalDetailId=id;
+  S.dirty=true;
+  updateFinalAssetUI();
+  scheduleWorkspaceSave();
+  toast(type==='cover'?'已设为主封面':'已设为主详情');
+}
+
+function updateFinalAssetUI(){
+  (S.batches||[]).forEach(b=>{
+    const selected=(b.assetKind==='cover'&&b.id===S.finalCoverId)||(b.assetKind==='detail'&&b.id===S.finalDetailId);
+    const card=document.getElementById('batch-'+b.id);
+    card?.classList.toggle('is-final',selected);
+    const btn=document.getElementById('final-'+b.id);
+    if(btn){
+      btn.classList.toggle('is-selected',selected);
+      btn.textContent=selected?(b.assetKind==='cover'?'主封面':'主详情'):(b.assetKind==='cover'?'设为主封面':'设为主详情');
+    }
+  });
+  updateListingChecklist();
 }
 
 // 详情挑帧：从已排序帧中混合「质量序 + 时间序」，并排除封面已用帧（Task2 去重）
@@ -5363,9 +6244,9 @@ function buildDetailSegmentTitles(plan, need){
 
 // ── 详情长图：变行布局 ──────────────────────────────────────────────
 // 正确需求：3 个版本的长图（像封面一样有 3 个版本，每张一张图）；
-// 每张 = 顶部一个 3×3 九宫格 + 下方若干行（行数由内容多少决定，每行 1~4 张）：
+// 每张 = 顶部一个 3×3 九宫格 + 下方若干行（行数由内容多少决定，每行 1~3 张）：
 //   · 重点画面 → 整行 1 张大图（通栏）
-//   · 细节/重复 → 拼成 3~4 张一行
+//   · 补充内容 → 根据详情结构拼成 1~3 张一行
 // 自适配高度、不改变原图比例、不出现黑边（通栏行按原图比例，多图行按等高自适应）。
 //
 // 布局结构：layout = { titleSeg:{frames:[9个], title}, rows:[{cols:N, frames:[N个], title?}] }
@@ -5373,7 +6254,7 @@ function buildDetailSegmentTitles(plan, need){
 
 // 根据可用帧的“重要度顺序”自动编排一张长图的行布局。
 // importantPool：按重要度从高到低排序的帧索引；count 不固定，AI/前端决定行数。
-function buildDetailLongLayout(framesOrdered){
+function buildDetailLongLayout(framesOrdered, detailRows){
   const fr=[...framesOrdered];
   const layout={ gridFrames: fr.splice(0,9), rows:[] };
   // 九宫格不足 9 帧时循环补齐，避免空格
@@ -5381,17 +6262,15 @@ function buildDetailLongLayout(framesOrdered){
     const base=[...layout.gridFrames];
     let i=0; while(layout.gridFrames.length<9){ layout.gridFrames.push(base[i%base.length]); i++; }
   }
-  // 下方若干行：交替「通栏大图（重点）」与「多图行（细节/重复）」，行数随剩余帧自适应
-  // 规律：重点画面占整行(1张)，其后细节拼 3 或 4 张；直到帧用完（最多 ~6 行，避免过长）
-  const rowPlanCycle=[1,3,1,4,1,3];   // 1=通栏大图, 3/4=细节多图行
+  // 前三行固定 3×3；后续行由 AI 详情结构驱动，每行严格限制为 1~3 张。
+  const rowDefs=(detailRows||[]).slice(3,9);
+  const rowPlan=rowDefs.length?rowDefs.map(r=>Math.max(1,Math.min(3,parseInt(r.count)||1))):[1,3,2];
   let ci=0;
-  while(fr.length>0 && layout.rows.length<6){
-    let cols=rowPlanCycle[ci % rowPlanCycle.length]; ci++;
-    cols=Math.min(cols, Math.max(1, fr.length));   // 剩余不足则收窄
-    // 若剩余正好很少，避免出现孤单 2 张这种尴尬行：1 张就通栏，2 张并排，>=3 取 3/4
-    if(fr.length<=2) cols=fr.length;
+  while(fr.length>0 && ci<rowPlan.length){
+    let cols=Math.min(rowPlan[ci],fr.length); ci++;
     const rowFrames=fr.splice(0, cols);
-    layout.rows.push({ cols: rowFrames.length, frames: rowFrames });
+    const rowDef=rowDefs[layout.rows.length]||{};
+    layout.rows.push({ cols: rowFrames.length, frames: rowFrames, label:rowDef.label||'', text:rowDef.text||'' });
   }
   return layout;
 }
@@ -5466,7 +6345,7 @@ async function renderDetailLongCanvas(b){
   }
 
   // 3) 标题带：叠在九宫格顶部（用该张长图的 AI 标题）
-  drawDetailHeroTitle(ctx, b.heroPlan||null, W, gridCellH, opt, b.heroTitle);
+  if(b.heroShowText!==false) drawDetailHeroTitle(ctx, b.heroPlan||null, W, gridCellH, opt, b.heroTitle);
 
   return canvas;
 }
@@ -5476,6 +6355,7 @@ async function renderDetailLongCanvas(b){
 async function createDetailCandidates(plan, ranked, input){
   const DETAIL_COUNT=3;        // 3 个版本的详情长图
   const exclude=SALES.usedFrames || new Set();
+  const detailRows=normalizeDetailRows(plan, input);
 
   // 用「细节意图」重新评分 + 多样性挑选，并排除封面帧
   let pool;
@@ -5491,8 +6371,8 @@ async function createDetailCandidates(plan, ranked, input){
   // 全片范围都没帧则用全部帧兜底
   if(!pool.length) pool=S.frames.map((_,i)=>i);
 
-  // 每张长图大约需要 9(九宫格) + ~14(下方若干行) ≈ 23 帧；3 张错开分配
-  const perImg=23;
+  // 每张长图 = 固定九宫格 + AI 决定的后续 1~3 图行。
+  const perImg=9+detailRows.slice(3,9).reduce((sum,r)=>sum+Math.max(1,Math.min(3,r.count||1)),0);
   const buckets=Array.from({length:DETAIL_COUNT},()=>[]);
   // 先按时间+质量混合，再轮流分配到 3 个版本，保证版本之间画面错开
   const mixed=chooseDetailFrames(pool, Math.min(pool.length, DETAIL_COUNT*perImg), new Set());
@@ -5502,35 +6382,36 @@ async function createDetailCandidates(plan, ranked, input){
   buckets.forEach(bk=>{ let i=0; while(bk.length<perImg && pool.length){ const cand=pool[i%pool.length]; bk.push(cand); i++; if(i>pool.length*3) break; } });
 
   // 每张长图一个「卖点标题」（~12字，主题·内容定位），专门交给 opus4.8(seoModel) 生成，让顾客一眼看懂内容
-  const titles=await aiDetailHeroTitles(input, plan, DETAIL_COUNT);
+  const titles=input.useText?await aiDetailHeroTitles(input, plan, DETAIL_COUNT):Array(DETAIL_COUNT).fill('');
 
   const labels=['详情长图 A','详情长图 B','详情长图 C'];
   for(let i=0;i<DETAIL_COUNT;i++){
     const id=++batchIdCnt;
-    const layout=buildDetailLongLayout(buckets[i]);
+    const layout=buildDetailLongLayout(buckets[i],detailRows);
     const totalCells=9 + layout.rows.reduce((a,r)=>a+r.cols,0);
-    const b={ id, cols:3, rows:0, cells:[], crops:{}, hasBadge:false, canvas:null,
+    const b={ id, cols:3, rows:0, cells:[], crops:{}, hasBadge:false, canvas:null, assetKind:'detail',
               isDetail:true, isDetailLong:true, detailIndex:i, detailLayout:layout,
-              heroPlan:plan, heroTitle:titles[i],
+              heroPlan:plan, heroTitle:titles[i], heroShowText:input.useText,
               title:labels[i], note:'长图·九宫格+'+layout.rows.length+'行 · 与封面去重' };
     S.batches.push(b);
-    document.getElementById('batchEmpty').style.display='none';
+    const empty=document.getElementById('batchEmpty'); if(empty) empty.style.display='none';
     renderDetailBatchCard(b);
     await regenDetailLong(b);
   }
-  SALES.detailRows=normalizeDetailRows(plan, input);
+  SALES.detailRows=detailRows;
   const block=document.getElementById('detailPreviewBlock');
   if(block) block.style.display='';
   const meta=document.getElementById('detailMeta');
-  if(meta) meta.textContent='已生成 '+DETAIL_COUNT+' 张详情长图（3 个版本，每张 = 3×3九宫格 + 若干自适应行；重点画面通栏大图、细节拼 3~4 张），不变形不留黑边；每张顶部叠加由 AI 卖点生成的红色渐变标题。';
+  if(meta) meta.textContent='已生成 '+DETAIL_COUNT+' 张详情长图：前三行固定 3×3，后续按内容使用 1~3 张自适应拼接；画面无缝铺满，不变形、不留黑边。';
   updateFillBtn(); updateQuickBar(); checkDlAllBtn();
   refreshUsageTags();
+  updateFinalAssetUI();
 }
 
 // 渲染详情长图的资产卡片（标题 + 预览缩略图 + 下载/重生/删除）
 function renderDetailBatchCard(b){
   const el=document.createElement('div');
-  el.className='batch'; el.id='batch-'+b.id;
+  el.className='batch asset-detail'; el.id='batch-'+b.id;
   el.innerHTML=
     '<div class="batch-head">'+
     '  <div class="batch-title">'+
@@ -5538,7 +6419,8 @@ function renderDetailBatchCard(b){
     '    <span style="color:var(--tm);font-size:11px;">'+escapeHtmlSafe(b.note)+'</span>'+
     '  </div>'+
     '  <div class="batch-actions">'+
-    '    <button class="btn-sm" onclick="openPreviewModal(S.batches.find(x=>x.id==='+b.id+'))" title="全屏放大预览"><i class="fas fa-expand"></i> 放大</button>'+
+    '    <button class="btn-sm final-choice-btn" onclick="setFinalAsset('+b.id+',\'detail\')" id="final-'+b.id+'">设为主详情</button>'+
+    '    <button class="btn-sm detail-edit-btn" onclick="openPreviewModal(S.batches.find(x=>x.id==='+b.id+'))" title="全屏编辑详情长图">编辑画面</button>'+
     '    <button class="btn-sm" id="dl-'+b.id+'" onclick="downloadBatch('+b.id+')" disabled>下载长图</button>'+
     '    <button class="btn-sm" id="gen-'+b.id+'" onclick="regenDetailLong(S.batches.find(x=>x.id==='+b.id+'))">重新生成</button>'+
     '    <button class="btn-del" onclick="removeBatch('+b.id+')">删除</button>'+
@@ -5546,15 +6428,16 @@ function renderDetailBatchCard(b){
     '</div>'+
     // 标题编辑区：文字与字数都可手动改，也可让 AI 重新生成
     '<div class="hero-title-edit">'+
-    '  <span class="hero-title-lbl"><i class="fas fa-heading"></i> 卖点标题</span>'+
+    '  <span class="hero-title-lbl">卖点标题</span>'+
     '  <input type="text" class="hero-title-input" id="herotitle-'+b.id+'" maxlength="20" '+
     '    placeholder="如：郑和下西洋·明代海上丝绸之路" '+
     '    value="'+escapeHtmlSafe(b.heroTitle||'')+'" '+
     '    oninput="onHeroTitleInput('+b.id+')" />'+
     '  <span class="hero-title-count" id="herocount-'+b.id+'"></span>'+
-    '  <button class="btn-sm hero-title-ai" id="herogen-'+b.id+'" onclick="regenOneHeroTitle(S.batches.find(x=>x.id==='+b.id+'))" title="让 opus4.8 重新生成卖点标题"><i class="fas fa-wand-magic-sparkles"></i> AI换标题</button>'+
+    '  <button class="btn-sm hero-title-ai" id="herogen-'+b.id+'" onclick="regenOneHeroTitle(S.batches.find(x=>x.id==='+b.id+'))" title="使用当前 SEO 模型重新生成卖点标题">AI 换标题</button>'+
     '</div>'+
-    '<div class="prev-thumb" id="prev-'+b.id+'" title="点击任一格子可替换 · 拖拽格子可跨版本/跨封面交换 · 点「放大」全屏预览"><canvas id="pcanvas-'+b.id+'"></canvas></div>';
+    '<div class="detail-edit-hint"><strong>直接编辑长图</strong><span>点击画面替换 · 拖到另一格交换 · 可跨封面和详情版本</span></div>'+
+    '<div class="prev-thumb" id="prev-'+b.id+'" title="点击任一画面可替换，拖拽到另一画面可交换"><canvas id="pcanvas-'+b.id+'"></canvas></div>';
   document.getElementById('batchList').appendChild(el);
   const prev=el.querySelector('.prev-thumb');
   if(prev) prev.addEventListener('click', ()=>openPreviewModal(b));
@@ -5580,10 +6463,11 @@ let _heroTitleTimer={};
 function onHeroTitleInput(id){
   const b=S.batches.find(x=>x.id===id); if(!b) return;
   const inp=document.getElementById('herotitle-'+id); if(!inp) return;
+  if(!inp.dataset.editing){ pushHistory(); inp.dataset.editing='1'; }
   b.heroTitle=inp.value;
   updateHeroTitleCount(b);
   if(_heroTitleTimer[id]) clearTimeout(_heroTitleTimer[id]);
-  _heroTitleTimer[id]=setTimeout(()=>{ regenDetailLong(b); }, 500);
+  _heroTitleTimer[id]=setTimeout(()=>{ regenDetailLong(b); delete inp.dataset.editing; scheduleWorkspaceSave(); }, 500);
 }
 
 // 生成/重绘一张详情长图（仅重画，不重新挑帧；改标题样式时复用）
@@ -5622,17 +6506,31 @@ function buildDetailThumbDragOverlay(b, prevWrap){
   if(ov) ov.remove();
   ov=document.createElement('div');
   ov.className='detail-thumb-overlay';
-  ov.style.cssText='position:absolute;inset:0;z-index:3;';
+  const pcanvas=prevWrap.querySelector('canvas');
+  const overlayHeight=pcanvas?.height||prevWrap.scrollHeight||prevWrap.clientHeight;
+  ov.style.cssText='position:absolute;left:0;top:0;width:100%;height:'+overlayHeight+'px;z-index:3;';
   const slots=computeDetailLongSlots(b);
   slots.forEach(s=>{
     const cell=document.createElement('div');
     cell.className='dt-slot';
     cell.style.cssText='position:absolute;left:'+(s.x*100)+'%;top:'+(s.y*100)+'%;width:'+(s.w*100)+'%;height:'+(s.h*100)+'%;';
+    cell.setAttribute('role','button');
+    cell.setAttribute('tabindex','0');
+    cell.setAttribute('aria-label','替换或拖拽交换详情画面');
+    cell.innerHTML='<span>替换</span>';
     // slotKey
     const key = s.slot.kind==='grid' ? ('grid:'+s.slot.idx) : ('row:'+s.slot.ri+':'+s.slot.c);
     bindCrossCellDrag(cell, b.id, key);
     // 点击格子 → 打开该格替换选择器（双重入口：缩略图也能直接换帧）
-    cell.addEventListener('click', (e)=>{ e.stopPropagation(); openDetailSlotPicker(b, s.slot); });
+    cell.addEventListener('click', async (e)=>{
+      e.stopPropagation();
+      const tapKey=s.slot.kind==='grid'?('grid:'+s.slot.idx):('row:'+s.slot.ri+':'+s.slot.c);
+      if(await handleSwapTap(b.id,tapKey,cell)) return;
+      openDetailSlotPicker(b, s.slot);
+    });
+    cell.addEventListener('keydown',e=>{
+      if(e.key==='Enter'||e.key===' '){ e.preventDefault(); e.stopPropagation(); openDetailSlotPicker(b,s.slot); }
+    });
     ov.appendChild(cell);
   });
   prevWrap.appendChild(ov);
@@ -5657,6 +6555,7 @@ const HERO_GRADIENTS={
 // Q4：渐变不透明（实心好看），用斜向 + 多色标 + 顶部高光，更有质感；只在边缘柔化与图片衔接。
 // textOverride：传入则用它做标题（用于每段不同的 AI 标题）；否则用全局核心卖点。
 function drawDetailHeroTitle(ctx, plan, W, rowH, opt, textOverride){
+  if(!document.getElementById('salesUseText')?.checked) return;
   const core = textOverride || distillCoreSellingLine(plan, 20);
   if(!core) return;
   opt = opt || heroTitleOptions();
@@ -5891,85 +6790,176 @@ async function ensureSalesFrames(){
   return S.frames.length>0;
 }
 
+function rebuildUsedCoverFrames(){
+  SALES.usedFrames=new Set();
+  (S.batches||[]).filter(b=>b.assetKind==='cover').forEach(b=>(b.cells||[]).forEach(fi=>{ if(fi!=null) SALES.usedFrames.add(fi); }));
+}
+
+async function ensureSalesFrameScores(input){
+  const needsScores=!(S.aiScores&&S.aiScores.length);
+  const needsVision=!!input.apiKey&&(S.lastPick?.engine!=='vision'||S.lastPick?.model!==input.model);
+  if(needsScores||needsVision) await runAIPick(false);
+  if(input.apiKey&&S.lastPick?.engine!=='vision'){
+    throw new Error('视觉选图模型调用失败：'+(S.lastPick?.visionError||S.lastPick?.error||'请检查模型权限'));
+  }
+}
+
+async function retrySalesPart(kind,button){
+  if(RUN_STATE.active){ toast('已有生成任务正在进行','warn'); return; }
+  if(!['copy','cover','detail'].includes(kind)) return;
+  if(!SALES.plan){ toast('请先生成一套结果','err'); return; }
+  if(kind!=='copy' && !(await ensureSalesFrames())) return;
+  let input=salesInputs();
+  input=await resolveSalesGenerationMode(input);
+  if(!input) return;
+  const labels={copy:'文案',cover:'封面',detail:'详情'};
+  const old=button?.textContent||'';
+  const run=beginSalesRun();
+  const archived=archiveCurrentVersion();
+  if(button){ button.disabled=true; button.textContent='正在重做'+labels[kind]+'...'; }
+  try{
+    if(kind==='copy'){
+      setSalesProgress(20,'正在重新理解文案要求...');
+      let plan=input.apiKey?await aiSalesPlan(input):fallbackSalesPlan(input);
+      ensureRunCurrent(run);
+      setSalesProgress(65,input.apiKey?'正在重新优化标题、简介和关键词...':'正在重新整理本地基础文案...');
+      plan=await aiSeoOptimize(input,plan); ensureRunCurrent(run);
+      plan.generationMode=input.generationMode;
+      plan.copySource=input.apiKey?input.seoModel:'本地基础模板';
+      showSalesResults(plan);
+    }else{
+      await ensureSalesFrameScores(input); ensureRunCurrent(run);
+      const ranked=await getSalesRankedFrames();
+      if(!ranked.length) throw new Error('没有可用候选画面，请重新分析视频');
+      if(kind==='cover'){
+        setSalesProgress(35,'正在重新生成封面候选...');
+        S.batches=S.batches.filter(b=>b.assetKind!=='cover');
+        S.finalCoverId=null;
+        renderAllBatches();
+        await createCoverCandidates(SALES.plan,ranked,{reset:false});
+      }else{
+        setSalesProgress(35,'正在重新编排详情长图...');
+        S.batches=S.batches.filter(b=>b.assetKind!=='detail');
+        S.finalDetailId=null;
+        rebuildUsedCoverFrames();
+        renderAllBatches();
+        await createDetailCandidates(SALES.plan,ranked,input);
+      }
+      ensureRunCurrent(run);
+      updateFinalAssetUI();
+    }
+    setSalesProgress(100,labels[kind]+'已重新生成');
+    setTimeout(()=>setSalesProgress(-1,labels[kind]+'已重新生成'),250);
+    scheduleWorkspaceSave();
+    toast(labels[kind]+'已重新生成，其他人工修改已保留');
+  }catch(e){
+    if(archived) restorePreviousVersion();
+    if(e?.name==='AbortError') setSalesProgress(-2,'已取消生成，现有内容已保留');
+    else{
+      console.error(e);
+      setSalesProgress(-2,labels[kind]+'生成失败：'+(e?.message||'未知错误'));
+      toast(labels[kind]+'模型调用失败，原结果已保留。请检查 Key、模型权限或网络','err');
+    }
+  }finally{
+    finishSalesRun(run);
+    if(button){ button.disabled=false; button.textContent=old; }
+    updateSalesPrimaryState();
+  }
+}
+
 async function runSalesCopyOnly(){
+  if(RUN_STATE.active){ toast('已有生成任务正在进行','warn'); return; }
   if(!(await warnIfNoDocText())) return;
-  const input=salesInputs();
-  setSalesProgress(20,'正在生成销售策略...');
-	    let plan;
-	    try{ plan=await aiSalesPlan(input); }
-	    catch(e){
-	      console.warn(e);
-	      input.aiIssues=[...(input.aiIssues||[]), {title:'销售文案策略生成失败（与挑帧是两个独立调用）', message:((e&&e.message)||'未知错误')+'。说明：这是“销售策略/文案”这一次单独的模型调用失败，与“挑帧引擎”互相独立，不代表挑帧失败——挑帧是否用了 AI 请以拼图区「挑帧引擎」卡片为准。当前文案使用本地兜底，请检查 API Key、模型权限或刷新模型列表后重试。'}];
-	      plan=fallbackSalesPlan(input);
-	      toast('销售文案策略调用失败，已显示原因并用本地兜底（不影响挑帧状态）','warn');
-	    }
-  setSalesProgress(68,'正在用 '+input.seoModel+' 优化 SEO 文案...');
-  try{ plan=await aiSeoOptimize(input, plan); }
-	  catch(e){
-	    console.warn(e);
-	    plan.aiIssues=[...(plan.aiIssues||[]), {title:'SEO 模型调用失败', message:((e&&e.message)||'未知错误')+'。已保留基础文案，建议换用列表中的可用模型。'}];
-	    toast('SEO 模型失败，已在结果中提示','warn');
-	  }
-  showSalesResults(plan);
-  const _ct=_salesProgressStart?((performance.now()-_salesProgressStart)/1000).toFixed(1):'';
-  toast('✅ 文案生成完成'+(_ct?('，本次总用时 '+_ct+'s'):''));
-  setSalesProgress(-1);
+  let input=salesInputs();
+  input=await resolveSalesGenerationMode(input);
+  if(!input) return;
+  const run=beginSalesRun();
+  try{
+    setSalesProgress(20,input.apiKey?'正在分析销售策略...':'正在生成本地基础文案...');
+    let plan=await aiSalesPlan(input); ensureRunCurrent(run);
+    setSalesProgress(68,input.apiKey?'正在优化 SEO 文案...':'正在整理标题与关键词...');
+    plan=await aiSeoOptimize(input,plan); ensureRunCurrent(run);
+    plan.generationMode=input.generationMode;
+    plan.copySource=input.apiKey?input.seoModel:'本地基础模板';
+    showSalesResults(plan);
+    finishSalesRun(run);
+    switchTab(1);
+    setSalesProgress(-1,'文案已生成');
+    scheduleWorkspaceSave();
+    toast('文案已生成，可在结果页继续修改');
+  }catch(e){
+    if(e?.name==='AbortError') setSalesProgress(-2,'已取消生成，现有内容已保留');
+    else{
+      console.error(e);
+      setSalesProgress(-2,'文案生成失败：'+(e?.message||'未知错误'));
+      toast('模型调用失败，未使用虚构结果。请检查 Key、模型权限或更换模型','err');
+    }
+  }finally{ finishSalesRun(run); }
 }
 
 async function runSalesKit(){
+  if(RUN_STATE.active){ toast('已有生成任务正在进行','warn'); return; }
   if(!(await warnIfNoDocText())) return;
-  const input=salesInputs();
+  let input=salesInputs();
+  input=await resolveSalesGenerationMode(input);
+  if(!input) return;
+  const run=beginSalesRun();
   const btn=document.getElementById('salesKitBtn');
   const old=btn?btn.innerHTML:'';
-  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>生成销售套件中...'; }
+  let archived=false;
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>正在生成上架套件...'; }
   try{
     setSalesProgress(8,'检查视频与分镜文档...');
-    if(!(await ensureSalesFrames())) return;
-    setSalesProgress(24,'用 '+input.model+' 分析分镜、卖点与画面策略...');
-	    let plan;
-	    try{ plan=await aiSalesPlan(input); }
-	    catch(e){
-	      console.warn(e);
-	      input.aiIssues=[...(input.aiIssues||[]), {title:'销售文案策略生成失败（与挑帧是两个独立调用）', message:((e&&e.message)||'未知错误')+'。说明：「销售策略/文案」与「挑帧引擎」是两个互相独立的模型调用，本条只代表“销售文案策略”这次调用失败，不代表挑帧失败。本次挑帧是否成功用了 AI，请以拼图区「挑帧引擎」状态卡片为准（若显示“已生效✓”即说明挑帧确实调用并理解了画面）。当前文案为本地兜底。'}];
-	      plan=fallbackSalesPlan(input);
-	      toast('销售文案策略调用失败，已显示原因并用本地兜底（不影响挑帧状态）','warn');
-	    }
-    setSalesProgress(36,'用 '+input.seoModel+' 优化标题、简介和关键词...');
-    try{ plan=await aiSeoOptimize(input, plan); }
-	    catch(e){
-	      console.warn(e);
-	      plan.aiIssues=[...(plan.aiIssues||[]), {title:'SEO 模型调用失败', message:((e&&e.message)||'未知错误')+'。标题/简介/关键词已保留基础版本，请换模型后可重新生成文案。'}];
-	      toast('SEO 模型失败，已在结果中提示','warn');
-	    }
+    if(!(await ensureSalesFrames())){ setSalesProgress(-2,'未能提取候选画面'); return; }
+    ensureRunCurrent(run);
+    setSalesProgress(24,input.apiKey?'正在理解内容与销售卖点...':'正在生成本地基础策略...');
+    let plan=await aiSalesPlan(input); ensureRunCurrent(run);
+    setSalesProgress(36,input.apiKey?'正在优化标题、简介和关键词...':'正在整理基础文案...');
+    plan=await aiSeoOptimize(input, plan); ensureRunCurrent(run);
+    plan.generationMode=input.generationMode;
+    plan.copySource=input.apiKey?input.seoModel:'本地基础模板';
+    archived=archiveCurrentVersion();
     showSalesResults(plan);
-	    setSalesProgress(45,'挑选高销售价值画面...');
-	    if(!(S.aiScores&&S.aiScores.length) && input.apiKey){
-	      try{ await runAIPick(false); }
-	      catch(e){
-	        console.warn('AI挑帧失败，改用本地排序', e);
-	        plan.aiIssues=[...(plan.aiIssues||[]), {title:'AI 选图失败', message:((e&&e.message)||'未知错误')+'。封面和详情图已改用本地画面评分排序生成。'}];
-	        showSalesResults(plan);
-	      }
-	    }
+    setSalesProgress(45,input.apiKey?'正在挑选高销售价值画面...':'正在用本地评分挑选画面...');
+    await ensureSalesFrameScores(input);
+    ensureRunCurrent(run);
     const ranked=await getSalesRankedFrames();
-    if(!ranked.length){ toast('没有可用帧，请先截帧','err'); return; }
-    setSalesProgress(66,'生成封面候选（覆盖全片·互不相似）...');
+    if(!ranked.length) throw new Error('没有可用候选画面，请检查视频后重试');
+    setSalesProgress(66,'正在生成可比较的封面候选...');
     await createCoverCandidates(plan, ranked);
-    setSalesProgress(84,'生成 3 张详情图（与封面去重）...');
+    ensureRunCurrent(run);
+    setSalesProgress(84,'正在生成详情长图...');
     await createDetailCandidates(plan, ranked, input);
+    ensureRunCurrent(run);
+    S.finalCoverId=null;
+    S.finalDetailId=null;
+    updateFinalAssetUI();
     setSalesProgress(100,'光厂上架套件已生成');
     updateListingChecklist();
+    finishSalesRun(run);
     switchTab(1);
-    const _tt=_salesProgressStart?((performance.now()-_salesProgressStart)/1000).toFixed(1):'';
-    toast('✅ 光厂上架套件完成'+(_tt?('，本次总用时 '+_tt+'s'):'')+'：封面候选(4宫格) + 3 张详情长图均已进入资产区，可编辑替换');
-    setTimeout(()=>setSalesProgress(-1),300);
+    setTimeout(()=>setSalesProgress(-1,'上架套件已生成'),300);
+    scheduleWorkspaceSave();
+    toast('上架套件已生成，请确认主封面、主详情和文案');
+  } catch(e){
+    if(archived) restorePreviousVersion();
+    else if(S.batches.some(b=>b.assetKind==='cover'||b.assetKind==='detail')) resetSalesBatches();
+    if(e?.name==='AbortError') setSalesProgress(-2,'已取消生成，现有内容已保留');
+    else{
+      console.error(e);
+      setSalesProgress(-2,'生成失败：'+(e?.message||'未知错误'));
+      toast('生成已停止，未使用虚构结果。请检查 Key、模型权限、网络或更换模型','err');
+    }
   } finally {
-    if(btn){ btn.disabled=false; btn.innerHTML=old; }
+    finishSalesRun(run);
+    if(btn) btn.innerHTML=old;
+    updateSalesPrimaryState();
   }
 }
 
 document.getElementById('salesKitBtn')?.addEventListener('click', runSalesKit);
 document.getElementById('salesCopyBtn')?.addEventListener('click', runSalesCopyOnly);
+updateSalesPrimaryState();
 // Q4：去掉透明度调节后，配色/字号/位置改动即重绘已有详情批次（仅重画标题层，不重新挑帧）
 ['heroGradStyle','heroFontScale','heroBandPos'].forEach(id=>{
   document.getElementById(id)?.addEventListener('change', ()=>regenDetailBatches());
@@ -6108,6 +7098,9 @@ function buildDetailLongOverlay(b){
     const cell=document.createElement('div');
     cell.className='pm-cell pm-cell-long';
     cell.draggable=true;
+    cell.tabIndex=0;
+    cell.setAttribute('role','button');
+    cell.setAttribute('aria-label','替换或拖拽交换详情画面');
     cell.style.cssText='position:absolute;left:'+(s.x*100)+'%;top:'+(s.y*100)+'%;width:'+(s.w*100)+'%;height:'+(s.h*100)+'%;';
     cell.innerHTML=
       '<div class="pm-cell-actions">'+
@@ -6120,6 +7113,9 @@ function buildDetailLongOverlay(b){
         openDetailSlotPicker(b, s.slot);
       }
     };
+    cell.addEventListener('keydown',e=>{
+      if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openDetailSlotPicker(b,s.slot); }
+    });
     // 拖拽交换
     cell.addEventListener('dragstart', ()=>{ _detailDragSlot=s.slot; cell.classList.add('pm-dragging'); });
     cell.addEventListener('dragend', ()=>{ cell.classList.remove('pm-dragging'); });
@@ -6182,9 +7178,11 @@ async function detailSlotPickDone(fi){
   document.getElementById('framePicker')?.remove();
   if(!_detailPickTarget) return;
   const { b, slot }=_detailPickTarget; _detailPickTarget=null;
+  pushHistory();
   setDetailSlotFrame(b, slot, fi);
   await regenDetailLong(b);
   openPreviewModal(b);
+  scheduleWorkspaceSave();
   toast('已替换为第 '+(fi+1)+' 帧');
 }
 // 预览中替换某格的帧选择器（复用 framePicker，但回调后自动重新生成）
@@ -6490,6 +7488,20 @@ document.addEventListener('keydown', e=>{
     if(e.key==='Escape'||e.key==='?') closeHelp();
     return;
   }
+  const settings=document.getElementById('settingsDrawer');
+  if(settings && settings.classList.contains('open')){
+    if(e.key==='Escape'){ e.preventDefault(); closeSettingsDrawer(); }
+    if(e.key==='Tab'){
+      const focusable=[...settings.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])')]
+        .filter(el=>el.offsetParent!==null);
+      if(focusable.length){
+        const first=focusable[0], last=focusable[focusable.length-1];
+        if(e.shiftKey&&document.activeElement===first){ e.preventDefault(); last.focus(); }
+        else if(!e.shiftKey&&document.activeElement===last){ e.preventDefault(); first.focus(); }
+      }
+    }
+    return;
+  }
   // skip if in input/textarea or lightbox/modal is open
   if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT') return;
   // ? 打开帮助（不受其它面板限制）
@@ -6515,9 +7527,6 @@ document.addEventListener('keydown', e=>{
   }
   if(e.key==='1') switchTab(0);
   if(e.key==='2') switchTab(1);
-  if(e.key==='r'||e.key==='R') doCapture();
-  if(e.key==='q'||e.key==='Q') runSmartFlow();
-  if(e.key==='g'||e.key==='G') generateAll();
   if((e.ctrlKey||e.metaKey)&&(e.key==='s'||e.key==='S')){
     e.preventDefault(); downloadAll();
   }
@@ -6527,17 +7536,36 @@ document.addEventListener('keydown', e=>{
 });
 
 // ===================================================================
-// INITIAL DEFAULT BATCHES
+// INITIAL WORKSPACE
 // ===================================================================
-addBatch(2,2);
-addBatch(3,3);
 
 // 方案B：初始把共享帧墙挂载到视图0
 try{ relocateFrameWall(0); }catch(_){}
+try{ relocateUnifiedPanels(0); }catch(_){}
 
 // 初始化拼图意图提示 + 记录用户是否手动改过推荐帧数
 try{ setAiIntent(S.aiIntent || 'auto'); }catch(_){}
 try{ const nEl=document.getElementById('aiN'); if(nEl) nEl.addEventListener('input', ()=>{ nEl._userTouched=true; }); }catch(_){}
+document.addEventListener('input',e=>{
+  if(e.target?.id==='aiApiKey') updateAiConnectionUI();
+  if(e.target?.id==='storyDoc') updateTaskFlowState();
+  if(e.target?.id==='feedbackViews'||e.target?.id==='feedbackClicks'||e.target?.id==='feedbackOrders') updateSalesFeedbackSummary();
+  if(e.target?.matches('input,textarea,select')) scheduleWorkspaceSave();
+});
+document.addEventListener('change',e=>{
+  if(e.target?.matches('input,textarea,select')) scheduleWorkspaceSave();
+  if(e.target?.id==='aiModel'||e.target?.id==='aiSeoModel') syncModelPresetUI();
+});
+document.querySelectorAll('button:not([type])').forEach(btn=>btn.type='button');
+document.querySelectorAll('img:not([alt])').forEach(img=>img.alt='');
+const toastRegion=document.getElementById('toast');
+if(toastRegion){ toastRegion.setAttribute('role','status'); toastRegion.setAttribute('aria-live','polite'); }
+window.addEventListener('beforeunload',e=>{
+  if(RUN_STATE.active || S.dirty){ e.preventDefault(); e.returnValue=''; }
+});
+restoreWorkspaceDrafts();
+setTimeout(syncSalesGoalUI,0);
+setTimeout(()=>{ updateAiConnectionUI(); updateTaskFlowState(); },0);
 </script>
 </body>
 </html>

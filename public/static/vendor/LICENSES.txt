@@ -1,0 +1,16 @@
+Third-party browser bundles
+===========================
+
+fflate 0.8.3
+Source: https://github.com/101arrowz/fflate
+License: MIT
+Copyright (c) 2023 Arjun Barrett
+
+mammoth.js 1.12.0
+Source: https://github.com/mwilliamson/mammoth.js
+License: BSD-2-Clause
+Copyright (c) 2013, Michael Williamson
+
+The bundled files in this directory are unmodified browser distributions from
+the packages above. Their respective licenses permit redistribution with this
+notice.
