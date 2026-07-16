@@ -99,3 +99,48 @@ test('story documents support multi-select and drag-drop import',()=>{
   assert.match(html,/storyDropzone\?\.addEventListener\('drop'/);
   assert.match(html,/importStoryFiles\(e\.dataTransfer\.files\)/);
 });
+
+test('each imported document remains independently editable and removable',()=>{
+  assert.match(html,/const BATCH_DOCUMENTS = \{ list: \[\]/);
+  assert.match(html,/id="documentMatchList"/);
+  assert.match(html,/function reassignDocument\(id,value\)/);
+  assert.match(html,/async function deleteBatchDocument\(id\)/);
+  assert.match(css,/\.document-match-row/);
+});
+
+test('automatic document matching is balanced and can use AI',()=>{
+  assert.match(html,/async function requestAiDocumentMatches\(documents\)/);
+  assert.match(html,/const capacity=Math\.max\(1,Math\.ceil\(BATCH_DOCUMENTS\.list\.length\/PROJECTS\.list\.length\)\)/);
+  assert.match(html,/按导入顺序均衡配对/);
+  assert.match(html,/doc\.matchMethod=doc\.assignedProjectId==null\?'unassigned':'manual'/);
+});
+
+test('long documents are fully imported and fairly sampled for each project',()=>{
+  assert.match(html,/function getProjectModelContext\(projectId,limit=48000\)/);
+  assert.match(html,/modelContextExcerpt\(item\.text,perItem\)/);
+  assert.doesNotMatch(html,/slice\(0,12000\)/);
+});
+
+test('the primary action can generate every pending video sequentially',()=>{
+  assert.match(html,/async function runBatchSalesKit\(\)/);
+  assert.match(html,/function isProjectGenerationComplete\(project\)/);
+  assert.match(html,/for\(let i=0;i<tasks\.length;i\+\+\)/);
+  assert.match(html,/await runSalesKit\(\{batchMode:true/);
+  assert.match(html,/activeProject\.generationStatus='complete'/);
+  assert.match(html,/activeProject\.generationStatus=e\?\.name==='AbortError'\?'pending':'failed'/);
+  assert.match(html,/\+'批量生成 '\+pending\+' 个任务'/);
+});
+
+test('history is explicit and never auto-restores into a fresh workspace',()=>{
+  assert.match(html,/migrateLegacyWorkspaceToHistory\(\);/);
+  assert.doesNotMatch(html,/restoreWorkspaceDrafts\(\);/);
+  assert.match(html,/async function restoreHistoryRecord\(historyId\)/);
+  assert.match(html,/只有点击恢复才会载入工作台/);
+});
+
+test('a new batch clears the workbench in one action after saving history',()=>{
+  assert.match(html,/id="projectNewBatchBtn"/);
+  assert.match(html,/async function startNewBatch\(\)/);
+  assert.match(html,/await saveWorkspaceNow\(\)/);
+  assert.match(html,/BATCH_DOCUMENTS\.list=\[\]/);
+});

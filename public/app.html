@@ -95,9 +95,9 @@
     </button>
 
     <div class="rail-spacer"></div>
-    <button type="button" class="rail-save-state" id="railSaveState" aria-live="polite" onclick="openDraftManager()" title="查看本机草稿">
+    <button type="button" class="rail-save-state" id="railSaveState" aria-live="polite" onclick="openDraftManager()" title="查看历史记录">
       <span class="rail-save-dot"></span>
-      <span>已自动保存</span>
+      <span>历史记录</span>
     </button>
 
     <!-- 辅助操作 -->
@@ -243,10 +243,17 @@
                 <span id="storyFileName" class="doc-file-name">可拖入一个或多个 TXT、DOCX 等文档</span>
               </div>
               <label class="sales-field sales-doc">
-                <span>分镜脚本 / 素材说明 / 卖点文档</span>
-                <textarea id="storyDoc" rows="6" placeholder="拖入文档，或直接粘贴分镜、镜头内容、素材包主题、使用场景..."></textarea>
+                <span>当前视频补充说明 <small>可选</small></span>
+                <textarea id="storyDoc" rows="4" placeholder="补充这条视频的主题、卖点、使用场景或特殊要求..."></textarea>
               </label>
-              <div class="story-drop-hint" aria-hidden="true">松开即可导入到当前视频任务</div>
+              <div class="document-pool" id="documentPoolPanel" style="display:none;">
+                <div class="document-pool-head">
+                  <div><strong>文档配对</strong><span id="documentMatchSummary">等待匹配</span></div>
+                  <button type="button" id="autoMatchDocumentsBtn" onclick="autoMatchDocuments({force:true})">重新自动匹配</button>
+                </div>
+                <div class="document-match-list" id="documentMatchList"></div>
+              </div>
+              <div class="story-drop-hint" aria-hidden="true">松开即可导入并自动匹配</div>
             </div>
 
             <details class="task-more-settings">
@@ -331,6 +338,7 @@
               <button class="btn-p btn-ghost sales-secondary" id="salesCopyBtn" type="button">
                 生成文案
               </button>
+              <button class="batch-current-btn" id="salesCurrentBtn" type="button" style="display:none;">只生成当前任务</button>
             </div>
             <div id="salesProgress" class="sales-progress" style="display:none;" role="status" aria-live="polite">
               <div class="sales-progress-bar"><div id="salesProgressFill"></div></div>
@@ -387,10 +395,15 @@
               </div>
               <div class="proj-hint">每个视频独立保存文档与结果，点击即可切换</div>
             </div>
-            <button type="button" class="project-add-btn" id="projectAddVideosBtn" onclick="document.getElementById('vInput').click()">
-              <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-              添加视频
-            </button>
+            <div class="project-queue-actions">
+              <button type="button" class="project-new-batch-btn" id="projectNewBatchBtn" onclick="startNewBatch()">
+                新建批次
+              </button>
+              <button type="button" class="project-add-btn" id="projectAddVideosBtn" onclick="document.getElementById('vInput').click()">
+                <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                添加视频
+              </button>
+            </div>
           </div>
           <div class="proj-tabs" id="projTabs"></div>
         </div>
@@ -1224,7 +1237,7 @@ function updateTaskFlowState(){
   if(typeof S==='undefined') return;
   const video=document.getElementById('vPrev');
   const videoReady=!!(video?.src&&Number.isFinite(video.duration)&&video.duration>0)||(S.frames&&S.frames.length>0);
-  const docReady=!!(document.getElementById('storyDoc')?.value||'').trim();
+  const docReady=!!getProjectContextText(PROJECTS.activeId).trim();
   const resultReady=updateResultNavigationState();
   const running=typeof RUN_STATE!=='undefined'&&!!RUN_STATE.active;
   const source=document.getElementById('taskStepSource');
@@ -1241,20 +1254,33 @@ function updateTaskFlowState(){
   if(rv){ rv.textContent=videoReady?'视频已就绪':'未添加视频'; rv.classList.toggle('is-missing',!videoReady); rv.classList.toggle('is-ready',videoReady); }
   if(rc){ rc.textContent=docReady?'内容说明已补充':'内容说明可选'; rc.classList.toggle('is-ready',docReady); }
   if(rm){ rm.textContent=key?'AI 智能模式':'本地基础模式'; rm.classList.toggle('is-ready',!!key); rm.classList.toggle('is-warning',!key); }
+  const projects=globalThis.__vfpProjects?.list||[];
+  const pending=projects.filter(project=>!isProjectGenerationComplete(project)).length;
   const label=document.getElementById('salesKitBtnLabel');
-  if(label) label.textContent=key?'AI 生成上架套件':'生成基础上架套件';
+  if(label){
+    if(projects.length>1&&pending>0) label.textContent=(key?'AI ':'')+'批量生成 '+pending+' 个任务';
+    else if(projects.length>1) label.textContent='重新生成当前任务';
+    else label.textContent=key?'AI 生成上架套件':'生成基础上架套件';
+  }
+  const currentBtn=document.getElementById('salesCurrentBtn');
+  if(currentBtn) currentBtn.style.display=projects.length>1?'':'none';
 }
 
 function updateSalesPrimaryState(forceReady){
   const btn=document.getElementById('salesKitBtn');
-  if(!btn || RUN_STATE.active) return;
+  if(!btn) return;
   const video=document.getElementById('vPrev');
   const videoReady=!!(video?.src && Number.isFinite(video.duration) && video.duration>0);
   const frameReady=!!(S.frames && S.frames.length);
-  const ready=typeof forceReady==='boolean' ? forceReady : (videoReady || frameReady);
-  btn.disabled=!ready;
-  btn.title=ready ? '生成封面、详情图与 SEO 文案' : '请先上传视频';
-  btn.setAttribute('aria-disabled',String(!ready));
+  const projects=globalThis.__vfpProjects?.list||[];
+  const batchReady=projects.length>1&&projects.some(project=>project.videoBlob||project.videoUrl);
+  const ready=typeof forceReady==='boolean' ? forceReady : (videoReady || frameReady || batchReady);
+  const running=!!RUN_STATE.active||!!globalThis.__vfpBatchRun?.active;
+  btn.disabled=!ready||running;
+  btn.title=ready ? (projects.length>1?'依次生成所有未完成视频任务':'生成封面、详情图与 SEO 文案') : '请先上传视频';
+  btn.setAttribute('aria-disabled',String(btn.disabled));
+  const currentBtn=document.getElementById('salesCurrentBtn');
+  if(currentBtn){ currentBtn.disabled=!videoReady||running; currentBtn.style.display=projects.length>1?'':'none'; }
   updateTaskFlowState();
 }
 function setModelPreset(preset,button){
@@ -1336,6 +1362,8 @@ const S = {
 let batchIdCnt = 0;
 
 const RUN_STATE = { seq:0, active:null };
+const BATCH_RUN = { active:false, cancelled:false };
+globalThis.__vfpBatchRun=BATCH_RUN;
 
 function beginSalesRun(){
   const projectId=PROJECTS.activeId;
@@ -1361,7 +1389,8 @@ function currentRunSignal(){ return RUN_STATE.active?.controller?.signal; }
 
 function cancelSalesRun(){
   const run=RUN_STATE.active;
-  if(!run) return;
+  BATCH_RUN.cancelled=true;
+  if(!run){ toast('批量生成将在当前任务结束后停止','warn'); return; }
   run.cancelled=true;
   run.controller.abort();
   finishSalesRun(run);
@@ -1519,6 +1548,8 @@ function setAiIntent(intent){
 // 多视频项目管理（每个视频 = 独立项目，互不干扰）
 // ===================================================================
 const PROJECTS = { list: [], activeId: null, idCnt: 0 };
+const BATCH_DOCUMENTS = { list: [], idCnt: 0, lastMode:'none', lastError:'' };
+globalThis.__vfpProjects=PROJECTS;
 
 // 把当前全局 S + UI 状态打包进活动项目
 function saveActiveProject(){
@@ -1536,8 +1567,8 @@ function saveActiveProject(){
   p.salesPlan = (typeof SALES!=='undefined' && SALES.plan) ? JSON.parse(JSON.stringify(SALES.plan)) : (p.salesPlan||null);
   p.salesFeedback=readSalesFeedbackInputs();
   // 分镜/卖点文档随项目保存（清空视频/切换项目时一并隔离、清除）
-  p.storyDoc   = (document.getElementById('storyDoc')?.value || '');
-  p.storyFileLabel = (document.getElementById('storyFileName')?.textContent || '');
+  p.manualStoryDoc = (document.getElementById('storyDoc')?.value || '');
+  p.storyDoc = p.manualStoryDoc;
   // 视频源信息（用于切换时恢复预览）
   p.videoUrl   = vPrev.src || p.videoUrl;
   p.sourceMeta = getSourceMeta();
@@ -1567,13 +1598,7 @@ function restoreProject(p){
   // 恢复该项目的分镜/卖点文档（无则清空，避免残留上一个视频的文档）
   const _docEl=document.getElementById('storyDoc');
   if(_docEl){
-    _docEl.value = p.storyDoc || '';
-    const _fn=document.getElementById('storyFileName');
-    if(_fn){
-      const hasDoc=!!(p.storyDoc||'').trim();
-      _fn.textContent=hasDoc?(p.storyFileLabel||'已保存当前任务的内容说明'):'可拖入一个或多个 TXT、DOCX 等文档';
-      _fn.classList.toggle('has-file',hasDoc);
-    }
+    _docEl.value = p.manualStoryDoc ?? p.storyDoc ?? '';
   }
   if(p.formState){
     ['salesPackType','salesGoal','heroGradStyle','heroFontScale','heroBandPos'].forEach(id=>{ const el=document.getElementById(id); if(el&&p.formState[id]!=null) el.value=p.formState[id]; });
@@ -1626,6 +1651,7 @@ function restoreProject(p){
   }
   updateFinalAssetUI();
   loadSalesFeedback(p.salesFeedback);
+  renderDocumentMatches();
   renderProjectTabs();
 }
 
@@ -1673,12 +1699,18 @@ function createProject(file){
     fileSize: fmtSz(file.size), fileFmt: file.name.split('.').pop().toUpperCase(),
     videoUrl: URL.createObjectURL(file), videoBlob:file,
     frames:[], selected:[], batches:[], aiScores:[], imgCache:new Map(),
-    captureMode:'interval', batchIdCnt:0, storyDoc:'', storyFileLabel:'', sourceMeta:null,
+    captureMode:'interval', batchIdCnt:0, storyDoc:'', manualStoryDoc:'', sourceMeta:null,
     fileKey:videoFileKey(file),
-    finalCoverId:null, finalDetailId:null, salesPlan:null,
+    finalCoverId:null, finalDetailId:null, salesPlan:null, generationStatus:'pending',
   };
   PROJECTS.list.push(p);
   return p;
+}
+
+function isProjectGenerationComplete(project){
+  if(!project) return false;
+  if(project.generationStatus==='complete') return true;
+  return project.generationStatus==null&&!!project.salesPlan;
 }
 
 // 切换到指定项目
@@ -1732,10 +1764,50 @@ async function closeCurrentVideo(){
   toast('已关闭视频，可重新上传');
 }
 
+async function startNewBatch(){
+  if(RUN_STATE.active||BATCH_RUN.active){ toast('请先取消正在进行的生成任务','warn'); return; }
+  if(!PROJECTS.list.length&&!BATCH_DOCUMENTS.list.length){ document.getElementById('vInput')?.click(); return; }
+  const ok=await appConfirm({
+    title:'开始新批次',
+    message:'当前视频、文档与结果会保存在历史记录中，然后清空工作台。',
+    okText:'保存并新建',
+    cancelText:'继续当前任务'
+  });
+  if(!ok) return;
+  clearTimeout(_workspaceSaveTimer);
+  await saveWorkspaceNow();
+  PROJECTS.list.forEach(project=>{ if(project.videoUrl) try{URL.revokeObjectURL(project.videoUrl);}catch(_){} });
+  PROJECTS.list=[]; PROJECTS.activeId=null; PROJECTS.idCnt=0;
+  BATCH_DOCUMENTS.list=[]; BATCH_DOCUMENTS.idCnt=0; BATCH_DOCUMENTS.lastMode='none'; BATCH_DOCUMENTS.lastError='';
+  WORKSPACE_SESSION_ID='session-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
+  WORKSPACE_HISTORY_NAME='';
+  S.frames=[]; S.selected=[]; S.batches=[]; S.aiScores=[]; S.imgCache=new Map();
+  S.finalCoverId=null; S.finalDetailId=null; S.lastPick=null; S.dirty=false; batchIdCnt=0;
+  SALES.plan=null; SALES.detailCanvas=null; SALES.detailRows=[]; SALES.usedFrames=null; SALES.versions=[];
+  if(typeof HISTORY!=='undefined'){ HISTORY.stack.length=0; HISTORY.future.length=0; updateUndoRedoUI(); }
+  vPrev.removeAttribute('src'); vPrev.load();
+  document.getElementById('vCon').style.display='none';
+  document.getElementById('capBtn').disabled=true;
+  document.getElementById('superBtn').disabled=true;
+  const story=document.getElementById('storyDoc'); if(story) story.value='';
+  const storyInput=document.getElementById('storyFileInput'); if(storyInput) storyInput.value='';
+  const packType=document.getElementById('salesPackType'); if(packType) packType.value='自定义';
+  const goal=document.getElementById('salesGoal'); if(goal) goal.value='由AI自动判断';
+  const aiGenerated=document.getElementById('salesAiGenerated'); if(aiGenerated) aiGenerated.checked=false;
+  document.getElementById('salesResultPanel').style.display='none';
+  renderAllFrames(); renderAllBatches(); renderProjectTabs(); renderDocumentMatches();
+  updateSelBadge(); updateDlBtns(); updateAiBtns(); updateSalesPrimaryState(false);
+  document.getElementById('totalN').textContent='0';
+  updateFinalAssetUI(); updateResultNavigationState(); updateTaskFlowState(); updateStoryImportLabel();
+  relocateUnifiedPanels(0); switchTab(0); updateRailSaveState('历史记录');
+  toast('新批次已建立，当前工作台已清空');
+}
+
 // 删除项目（无确认版，供 closeCurrentVideo 调用）
 function deleteProjectNoConfirm(id){
   const idx=PROJECTS.list.findIndex(x=>x.id===id); if(idx===-1) return;
   const p=PROJECTS.list[idx];
+  BATCH_DOCUMENTS.list.forEach(doc=>{ if(doc.assignedProjectId===id){ doc.assignedProjectId=null; doc.matchMethod='unassigned'; doc.matchReason='原视频任务已删除'; doc.confidence=0; } });
   if(p.videoUrl){ try{ URL.revokeObjectURL(p.videoUrl); }catch(e){} }
   const wasActive = (id===PROJECTS.activeId);
   PROJECTS.list.splice(idx,1);
@@ -1752,6 +1824,7 @@ function deleteProjectNoConfirm(id){
     updateSelBadge(); updateDlBtns(); updateAiBtns();
     document.getElementById('totalN').textContent='0';
     renderProjectTabs();
+    renderDocumentMatches();
     scheduleWorkspaceSave();
     return;
   }
@@ -1761,6 +1834,7 @@ function deleteProjectNoConfirm(id){
     restoreProject(np);
   }
   renderProjectTabs();
+  renderDocumentMatches();
   scheduleWorkspaceSave();
 }
 
@@ -1789,19 +1863,109 @@ function renderProjectTabs(){
     // 活动项目读取实时 S 计数，非活动读取已保存快照
     const fc=active ? S.frames.length  : (p.frames?p.frames.length:0);
     const bc=active ? S.batches.length : (p.batches?p.batches.length:0);
-    const hasResult=!!(active?(typeof SALES!=='undefined'&&SALES.plan):p.salesPlan);
-    const state=hasResult?'已生成':(fc?'已分析':'待生成');
-    return '<div class="proj-tab'+(active?' active':'')+(hasResult?' is-complete':'')+'" role="button" tabindex="0" aria-current="'+(active?'true':'false')+'" onclick="switchProject('+p.id+')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();switchProject('+p.id+');}" ondblclick="renameProject('+p.id+')" title="点击切换，双击重命名">'+
+    const dc=assignedDocuments(p.id).length;
+    const complete=isProjectGenerationComplete(p);
+    const hasPartial=!!(active?(typeof SALES!=='undefined'&&SALES.plan):p.salesPlan);
+    const state=complete?'已生成':p.generationStatus==='failed'?'生成失败':p.generationStatus==='running'?'生成中':(hasPartial?'待完成':(fc?'已分析':'待生成'));
+    return '<div class="proj-tab'+(active?' active':'')+(complete?' is-complete':'')+(p.generationStatus==='failed'?' is-failed':'')+'" role="button" tabindex="0" aria-current="'+(active?'true':'false')+'" onclick="switchProject('+p.id+')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();switchProject('+p.id+');}" ondblclick="renameProject('+p.id+')" title="点击切换，双击重命名">'+
       '<span class="proj-index">'+(index+1)+'</span>'+
       '<div class="proj-tab-main">'+
         '<div class="proj-tab-name">'+escapeHtml(p.name)+'</div>'+
-        '<div class="proj-tab-meta"><span class="proj-state">'+state+'</span><span>'+fc+' 个候选画面'+(bc?' · '+bc+' 项资产':'')+'</span></div>'+
+        '<div class="proj-tab-meta"><span class="proj-state">'+state+'</span><span>'+dc+' 份文档 · '+fc+' 个候选画面'+(bc?' · '+bc+' 项资产':'')+'</span></div>'+
       '</div>'+
       '<button type="button" class="proj-tab-del" onclick="event.stopPropagation();deleteProject('+p.id+')" title="删除任务" aria-label="删除 '+escapeHtml(p.name)+'">×</button>'+
     '</div>';
   }).join('');
+  updateSalesPrimaryState();
 }
 function escapeHtml(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function assignedDocuments(projectId){
+  return BATCH_DOCUMENTS.list.filter(doc=>doc.assignedProjectId===projectId);
+}
+
+function getProjectContextText(projectId){
+  const project=PROJECTS.list.find(p=>p.id===projectId);
+  const parts=[];
+  for(const doc of assignedDocuments(projectId)) parts.push('【'+doc.name+'】\n'+doc.text);
+  const manual=(project?.manualStoryDoc ?? project?.storyDoc ?? '').trim();
+  if(manual) parts.push('【补充说明】\n'+manual);
+  return parts.join('\n\n').trim();
+}
+
+function modelContextExcerpt(text,limit){
+  const value=String(text||'').trim();
+  if(value.length<=limit) return value;
+  const head=Math.max(1,Math.floor(limit*.72));
+  const tail=Math.max(1,limit-head-18);
+  return value.slice(0,head)+'\n[中间内容已压缩]\n'+value.slice(-tail);
+}
+
+function getProjectModelContext(projectId,limit=48000){
+  const project=PROJECTS.list.find(p=>p.id===projectId);
+  const items=assignedDocuments(projectId).map(doc=>({title:'【'+doc.name+'】',text:doc.text||''}));
+  const manual=(project?.manualStoryDoc ?? project?.storyDoc ?? '').trim();
+  if(manual) items.push({title:'【补充说明】',text:manual});
+  if(!items.length) return '';
+  const overhead=items.reduce((sum,item)=>sum+item.title.length+2,0)+(items.length-1)*2;
+  const perItem=Math.max(120,Math.floor((limit-overhead)/items.length));
+  return items.map(item=>item.title+'\n'+modelContextExcerpt(item.text,perItem)).join('\n\n').slice(0,limit);
+}
+
+function updateStoryImportLabel(){
+  const label=document.getElementById('storyFileName');
+  if(!label) return;
+  const total=BATCH_DOCUMENTS.list.length;
+  const assigned=BATCH_DOCUMENTS.list.filter(doc=>doc.assignedProjectId!=null).length;
+  label.textContent=total?('已导入 '+total+' 份文档 · '+assigned+' 份已匹配'):'可拖入一个或多个 TXT、DOCX 等文档';
+  label.classList.toggle('has-file',total>0);
+}
+
+function renderDocumentMatches(){
+  const panel=document.getElementById('documentPoolPanel');
+  const list=document.getElementById('documentMatchList');
+  const summary=document.getElementById('documentMatchSummary');
+  if(!panel||!list) return;
+  const docs=BATCH_DOCUMENTS.list;
+  panel.style.display=docs.length?'':'none';
+  if(!docs.length){ list.innerHTML=''; updateStoryImportLabel(); return; }
+  const assigned=docs.filter(doc=>doc.assignedProjectId!=null).length;
+  const mode=BATCH_DOCUMENTS.lastMode==='ai'?'AI 已匹配':BATCH_DOCUMENTS.lastMode==='filename'?'文件名匹配':'等待匹配';
+  if(summary) summary.textContent=assigned+' / '+docs.length+' 已匹配 · '+mode;
+  list.innerHTML=docs.map(doc=>{
+    const options=['<option value="">未分配</option>'].concat(PROJECTS.list.map(p=>'<option value="'+p.id+'"'+(doc.assignedProjectId===p.id?' selected':'')+'>'+escapeHtml(p.name)+'</option>')).join('');
+    const method=doc.matchMethod==='ai'?'AI 匹配':doc.matchMethod==='manual'?'手动指定':doc.matchMethod==='filename'?'文件名匹配':'未匹配';
+    const target=PROJECTS.list.find(p=>p.id===doc.assignedProjectId);
+    return '<div class="document-match-row'+(target?'':' is-unassigned')+'">'+
+      '<div class="document-match-file"><strong>'+escapeHtml(doc.name)+'</strong><span>'+doc.text.length+' 字 · '+method+(doc.confidence?' '+doc.confidence+'%':'')+'</span></div>'+
+      '<label><span>对应视频</span><select onchange="reassignDocument('+doc.id+',this.value)">'+options+'</select></label>'+
+      '<button type="button" class="document-delete-btn" onclick="deleteBatchDocument('+doc.id+')" title="删除文档" aria-label="删除 '+escapeHtml(doc.name)+'">×</button>'+
+    '</div>';
+  }).join('');
+  updateStoryImportLabel();
+  updateTaskFlowState();
+  renderProjectTabs();
+}
+
+function reassignDocument(id,value){
+  const doc=BATCH_DOCUMENTS.list.find(item=>item.id===id); if(!doc) return;
+  const projectId=value?Number(value):null;
+  doc.assignedProjectId=PROJECTS.list.some(p=>p.id===projectId)?projectId:null;
+  doc.matchMethod=doc.assignedProjectId==null?'unassigned':'manual';
+  doc.matchReason=doc.assignedProjectId==null?'用户设为未分配':'用户手动指定';
+  doc.confidence=doc.assignedProjectId==null?0:100;
+  renderDocumentMatches();
+  scheduleWorkspaceSave();
+}
+
+async function deleteBatchDocument(id){
+  const doc=BATCH_DOCUMENTS.list.find(item=>item.id===id); if(!doc) return;
+  if(!(await appConfirm({title:'删除文档',message:'删除「'+doc.name+'」？视频任务不会被删除。',okText:'删除文档',cancelText:'保留'}))) return;
+  BATCH_DOCUMENTS.list=BATCH_DOCUMENTS.list.filter(item=>item.id!==id);
+  renderDocumentMatches();
+  scheduleWorkspaceSave();
+  toast('已删除文档');
+}
 
 // ===================================================================
 // BADGE
@@ -1872,7 +2036,7 @@ function appConfirm({title, message, okText='继续', cancelText='取消', showD
 // 检查是否提供了分镜/卖点文档或文字；未提供则弹可关闭提示
 // 返回 true 表示可继续生成
 async function warnIfNoDocText(){
-  const doc=(document.getElementById('storyDoc')?.value || '').trim();
+  const doc=getProjectContextText(PROJECTS.activeId);
   if(doc.length>0) return true;                       // 已提供文字，直接放行
   if(localStorage.getItem(NO_DOC_WARN_KEY)==='1') return true; // 用户已选择不再提示
   return await appConfirm({
@@ -1922,7 +2086,6 @@ async function importVideoFiles(fileList){
   if(!valid.length){ toast('没有识别到支持的视频文件','err'); return; }
 
   const pendingDoc=PROJECTS.activeId==null?(document.getElementById('storyDoc')?.value||''):'';
-  const pendingDocLabel=PROJECTS.activeId==null?(document.getElementById('storyFileName')?.textContent||''):'';
   saveActiveProject();
   const existingKeys=new Map(PROJECTS.list.map(p=>[p.fileKey||videoFileKey(p.videoBlob||{}),p]));
   const selectionKeys=new Set();
@@ -1945,11 +2108,12 @@ async function importVideoFiles(fileList){
 
   if(pendingDoc.trim()){
     created[0].storyDoc=pendingDoc;
-    created[0].storyFileLabel=pendingDocLabel||'已保存当前任务的内容说明';
+    created[0].manualStoryDoc=pendingDoc;
   }
   PROJECTS.activeId=created[0].id;
   restoreProject(created[0]);
   renderProjectTabs();
+  await autoMatchDocuments({force:false,silent:true});
   scheduleWorkspaceSave();
   const notes=[];
   if(duplicateCount) notes.push('跳过 '+duplicateCount+' 个重复文件');
@@ -5434,6 +5598,8 @@ globalThis.__vfpSalesState=SALES;
 
 const WORKSPACE_DB='vfp_workspace_v1';
 let _workspaceSaveTimer=null;
+let WORKSPACE_SESSION_ID='session-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
+let WORKSPACE_HISTORY_NAME='';
 
 function updateRailSaveState(label,state='saved'){
   const el=document.getElementById('railSaveState');
@@ -5470,47 +5636,105 @@ function serializeProjectDraft(p){
 }
 
 async function saveWorkspaceNow(){
-  if(PROJECTS.list.length===0){
-    try{
-      const db=await openWorkspaceDB();
-      await new Promise((resolve,reject)=>{ const tx=db.transaction('workspace','readwrite'); tx.objectStore('workspace').delete('latest'); tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error); });
-      db.close(); S.dirty=false; updateRailSaveState('已自动保存');
-    }catch(e){ console.warn('清理草稿失败',e); updateRailSaveState('保存失败','error'); }
+  if(PROJECTS.list.length===0&&BATCH_DOCUMENTS.list.length===0){
+    S.dirty=false;
+    updateRailSaveState('历史记录');
     return;
   }
   saveActiveProject();
   const payload={
+    historyId:WORKSPACE_SESSION_ID,
+    historyName:WORKSPACE_HISTORY_NAME||((PROJECTS.list[0]?.name||'批量任务')+(PROJECTS.list.length>1?' 等 '+PROJECTS.list.length+' 个视频':'')),
     savedAt:Date.now(), activeId:PROJECTS.activeId, idCnt:PROJECTS.idCnt,
+    documentIdCnt:BATCH_DOCUMENTS.idCnt,
+    documents:BATCH_DOCUMENTS.list.map(doc=>({...doc})),
     projects:PROJECTS.list.map(serializeProjectDraft)
   };
   try{
     const db=await openWorkspaceDB();
     await new Promise((resolve,reject)=>{
       const tx=db.transaction('workspace','readwrite');
-      tx.objectStore('workspace').put(payload,'latest');
+      tx.objectStore('workspace').put(payload,'history:'+WORKSPACE_SESSION_ID);
       tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error);
     });
-    db.close(); S.dirty=false; updateRailSaveState('已自动保存');
-  }catch(e){ console.warn('自动保存失败',e); updateRailSaveState('保存失败','error'); }
+    db.close();
+    S.dirty=false;
+    updateRailSaveState('历史记录');
+    trimWorkspaceHistory().catch(()=>{});
+  }catch(e){ console.warn('保存历史失败',e); updateRailSaveState('保存失败','error'); }
 }
 
 function scheduleWorkspaceSave(){
   S.dirty=true;
-  updateRailSaveState('正在保存','saving');
+  updateRailSaveState('保存中','saving');
   clearTimeout(_workspaceSaveTimer);
   _workspaceSaveTimer=setTimeout(saveWorkspaceNow,700);
 }
 
-async function restoreWorkspaceDrafts(){
+async function readWorkspaceHistory(){
+  const db=await openWorkspaceDB();
+  const records=await new Promise((resolve,reject)=>{
+    const tx=db.transaction('workspace','readonly');
+    const store=tx.objectStore('workspace');
+    const keyReq=store.getAllKeys();
+    const valueReq=store.getAll();
+    tx.oncomplete=()=>resolve(keyReq.result.map((key,index)=>({key,value:valueReq.result[index]})).filter(item=>String(item.key).startsWith('history:')));
+    tx.onerror=()=>reject(tx.error);
+  });
+  db.close();
+  return records.sort((a,b)=>(b.value?.savedAt||0)-(a.value?.savedAt||0));
+}
+
+async function trimWorkspaceHistory(limit=20){
+  const records=await readWorkspaceHistory();
+  if(records.length<=limit) return;
+  const db=await openWorkspaceDB();
+  await new Promise((resolve,reject)=>{
+    const tx=db.transaction('workspace','readwrite');
+    const store=tx.objectStore('workspace');
+    records.slice(limit).forEach(item=>store.delete(item.key));
+    tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error);
+  });
+  db.close();
+}
+
+async function migrateLegacyWorkspaceToHistory(){
+  try{
+    const db=await openWorkspaceDB();
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction('workspace','readwrite');
+      const store=tx.objectStore('workspace');
+      const req=store.get('latest');
+      req.onsuccess=()=>{
+        const payload=req.result;
+        if(payload?.projects?.length){
+          const id='legacy-'+(payload.savedAt||Date.now());
+          store.put({...payload,historyId:id,historyName:'上次自动保存的任务',documents:payload.documents||[]},'history:'+id);
+        }
+        store.delete('latest');
+      };
+      tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error);
+    });
+    db.close();
+  }catch(e){ console.warn('迁移旧草稿失败',e); }
+}
+
+async function restoreHistoryRecord(historyId){
+  if(PROJECTS.list.length||BATCH_DOCUMENTS.list.length){
+    const ok=await appConfirm({title:'恢复历史任务',message:'恢复后会替换当前工作台内容。当前任务已经保存在历史记录中。',okText:'恢复并替换',cancelText:'取消'});
+    if(!ok) return;
+    await saveWorkspaceNow();
+  }
   try{
     const db=await openWorkspaceDB();
     const payload=await new Promise((resolve,reject)=>{
       const tx=db.transaction('workspace','readonly');
-      const req=tx.objectStore('workspace').get('latest');
+      const req=tx.objectStore('workspace').get('history:'+historyId);
       req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error);
     });
     db.close();
-    if(!payload?.projects?.length) return;
+    if(!payload?.projects?.length){ toast('这条历史记录没有可恢复的视频','err'); return; }
+    PROJECTS.list.forEach(project=>{ if(project.videoUrl) try{URL.revokeObjectURL(project.videoUrl);}catch(_){} });
     PROJECTS.list=payload.projects.map(p=>({
       ...p,
       videoUrl:p.videoBlob?URL.createObjectURL(p.videoBlob):'',
@@ -5519,47 +5743,72 @@ async function restoreWorkspaceDrafts(){
     }));
     PROJECTS.idCnt=payload.idCnt||Math.max(...PROJECTS.list.map(p=>p.id));
     PROJECTS.activeId=PROJECTS.list.some(p=>p.id===payload.activeId)?payload.activeId:PROJECTS.list[0].id;
+    BATCH_DOCUMENTS.list=(payload.documents||[]).map(doc=>({...doc}));
+    BATCH_DOCUMENTS.idCnt=payload.documentIdCnt||Math.max(0,...BATCH_DOCUMENTS.list.map(doc=>doc.id||0));
+    BATCH_DOCUMENTS.lastMode=BATCH_DOCUMENTS.list.some(doc=>doc.matchMethod==='ai')?'ai':'filename';
+    WORKSPACE_SESSION_ID=historyId;
+    WORKSPACE_HISTORY_NAME=payload.historyName||'';
     const p=PROJECTS.list.find(x=>x.id===PROJECTS.activeId);
-    restoreProject(p); renderProjectTabs();
+    restoreProject(p); renderProjectTabs(); renderDocumentMatches();
     setTimeout(async()=>{
       for(const b of S.batches){
         if(b.wasGenerated && !b.isDetailLong && b.cells?.some(c=>c!==null)) await generateBatch(b.id,true);
       }
       updateFinalAssetUI();
     },300);
-    toast('已恢复上次自动保存的草稿');
+    closeDraftManager();
+    switchTab(0);
+    toast('已从历史记录恢复 '+PROJECTS.list.length+' 个视频任务');
     S.dirty=false;
-  }catch(e){ console.warn('恢复草稿失败',e); }
+  }catch(e){ console.warn('恢复历史失败',e); toast('历史记录恢复失败','err'); }
 }
 
 function closeDraftManager(){ document.getElementById('draftManagerMask')?.remove(); }
 
-function openDraftManager(){
+async function openDraftManager(){
   document.getElementById('draftManagerMask')?.remove();
   const mask=document.createElement('div');
   mask.id='draftManagerMask'; mask.className='app-confirm-mask';
-  const projects=PROJECTS.list||[];
-  const rows=projects.length?projects.map(p=>{
-    const active=p.id===PROJECTS.activeId;
-    const frames=active?(S.frames||[]).length:(p.frames||[]).length;
-    const assets=active?(S.batches||[]).filter(b=>b.assetKind==='cover'||b.assetKind==='detail').length:(p.batches||[]).filter(b=>b.assetKind==='cover'||b.assetKind==='detail').length;
-    return '<div class="draft-row'+(active?' is-active':'')+'">'+
-      '<button type="button" class="draft-main" onclick="switchDraftFromManager('+p.id+')"><strong>'+escapeHtmlSafe(p.name||'未命名任务')+'</strong><span>'+frames+' 个候选画面 · '+assets+' 个销售资产'+(active?' · 当前任务':'')+'</span></button>'+
-      '<button type="button" class="draft-icon" onclick="renameDraftFromManager('+p.id+')" title="重命名">重命名</button>'+
-      '<button type="button" class="draft-icon is-danger" onclick="deleteDraftFromManager('+p.id+')" title="删除">删除</button>'+
+  const records=await readWorkspaceHistory().catch(()=>[]);
+  const rows=records.length?records.map(({value})=>{
+    const projects=value.projects||[];
+    const assets=projects.reduce((sum,p)=>sum+(p.batches||[]).filter(b=>b.assetKind==='cover'||b.assetKind==='detail').length,0);
+    const id=String(value.historyId||'');
+    const time=value.savedAt?new Date(value.savedAt).toLocaleString():'未知时间';
+    return '<div class="draft-row">'+
+      '<button type="button" class="draft-main" onclick="restoreHistoryRecord('+JSON.stringify(id)+')"><strong>'+escapeHtmlSafe(value.historyName||'批量任务')+'</strong><span>'+projects.length+' 个视频 · '+(value.documents||[]).length+' 份文档 · '+assets+' 个销售资产 · '+escapeHtmlSafe(time)+'</span></button>'+
+      '<button type="button" class="draft-icon" onclick="renameHistoryRecord('+JSON.stringify(id)+')" title="重命名">重命名</button>'+
+      '<button type="button" class="draft-icon is-danger" onclick="deleteHistoryRecord('+JSON.stringify(id)+')" title="删除">删除</button>'+
     '</div>';
-  }).join(''):'<div class="draft-empty">还没有本机草稿。上传视频后会自动保存。</div>';
+  }).join(''):'<div class="draft-empty">还没有历史记录。开始新的批量任务后会保存在这里，但不会自动占用工作台。</div>';
   mask.innerHTML='<div class="app-confirm-box draft-manager" role="dialog" aria-modal="true" aria-labelledby="draftManagerTitle">'+
-    '<div class="draft-manager-head"><div><div class="sales-eyebrow">本机自动保存</div><div class="app-confirm-title" id="draftManagerTitle">任务草稿</div><p>草稿保存在当前浏览器，可切换、重命名或删除。</p></div><button type="button" class="settings-close" onclick="closeDraftManager()" aria-label="关闭">×</button></div>'+
+    '<div class="draft-manager-head"><div><div class="sales-eyebrow">本机历史</div><div class="app-confirm-title" id="draftManagerTitle">历史记录</div><p>历史保存在当前浏览器，只有点击恢复才会载入工作台。</p></div><button type="button" class="settings-close" onclick="closeDraftManager()" aria-label="关闭">×</button></div>'+
     '<div class="draft-list">'+rows+'</div></div>';
   document.body.appendChild(mask);
   mask.addEventListener('click',e=>{ if(e.target===mask) closeDraftManager(); });
   mask.querySelector('.settings-close')?.focus();
 }
 
-function switchDraftFromManager(id){ closeDraftManager(); switchProject(id); switchTab(0); }
-function renameDraftFromManager(id){ renameProject(id); scheduleWorkspaceSave(); openDraftManager(); }
-async function deleteDraftFromManager(id){ await deleteProject(id); openDraftManager(); }
+async function renameHistoryRecord(id){
+  const records=await readWorkspaceHistory();
+  const record=records.find(item=>item.value?.historyId===id); if(!record) return;
+  const name=prompt('历史记录名称',record.value.historyName||'批量任务');
+  if(!name?.trim()) return;
+  const db=await openWorkspaceDB();
+  await new Promise((resolve,reject)=>{ const tx=db.transaction('workspace','readwrite'); tx.objectStore('workspace').put({...record.value,historyName:name.trim().slice(0,40)},record.key); tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error); });
+  db.close();
+  if(WORKSPACE_SESSION_ID===id) WORKSPACE_HISTORY_NAME=name.trim().slice(0,40);
+  openDraftManager();
+}
+
+async function deleteHistoryRecord(id){
+  if(!(await appConfirm({title:'删除历史记录',message:'删除这条历史记录？当前工作台内容不会受到影响。',okText:'删除记录',cancelText:'保留'}))) return;
+  const db=await openWorkspaceDB();
+  await new Promise((resolve,reject)=>{ const tx=db.transaction('workspace','readwrite'); tx.objectStore('workspace').delete('history:'+id); tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error); });
+  db.close();
+  if(WORKSPACE_SESSION_ID===id){ WORKSPACE_SESSION_ID='session-'+Date.now()+'-'+Math.random().toString(36).slice(2,8); WORKSPACE_HISTORY_NAME=''; }
+  openDraftManager();
+}
 
 function archiveCurrentVersion(){
   const hasOutput=(S.batches||[]).some(b=>b.canvas)||(SALES.plan&&SALES.plan.seoTitle);
@@ -5596,7 +5845,7 @@ function clearStoryDoc(){
   const area=document.getElementById('storyDoc');
   if(area) area.value='';
   const fn=document.getElementById('storyFileName');
-  if(fn){ fn.textContent='可拖入一个或多个 TXT、DOCX 等文档'; fn.classList.remove('has-file'); }
+  if(fn) updateStoryImportLabel();
   const fi=document.getElementById('storyFileInput');
   if(fi){ try{ fi.value=''; }catch(_){} }
   // 重置销售策略缓存，避免残留上一个视频的卖点
@@ -5608,7 +5857,7 @@ function clearStoryDoc(){
 
 function salesInputs(){
   return {
-    doc: (document.getElementById('storyDoc')?.value || '').trim(),
+    doc: getProjectModelContext(PROJECTS.activeId),
     type: document.getElementById('salesPackType')?.value || '自定义',
     goal: document.getElementById('salesGoal')?.value || '由AI自动判断',
     useText: !!document.getElementById('salesUseText')?.checked,
@@ -5686,11 +5935,8 @@ async function readStoryFile(file){
   }
   text=text.replace(/\s+\n/g,'\n').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim();
   if(!text || text.length<8) throw new Error('未能从文档中提取到足够文本，可复制内容后粘贴到输入框');
-  if(text.length>12000){
-    const ok=await appConfirm({title:'文档内容较长',message:'已解析 '+text.length+' 字。为控制 AI 上下文，本次只使用前 12000 字；建议把最重要的主题、镜头和用途放在前面。',okText:'使用前 12000 字',cancelText:'返回整理文档'});
-    if(!ok) throw new Error('已取消导入，请精简后重试');
-  }
-  return text.slice(0,12000);
+  if(text.length>120000) toast('长文档已完整导入，AI 匹配与生成时会优先使用标题和关键段落','warn');
+  return text;
 }
 
 const STORY_EXTENSIONS=new Set(['txt','md','csv','json','doc','docx','rtf']);
@@ -5698,6 +5944,128 @@ function isStoryFile(file){
   const ext=(file?.name?.split('.').pop()||'').toLowerCase();
   return !!file&&STORY_EXTENSIONS.has(ext);
 }
+
+function documentMatchTokens(value){
+  const normalized=String(value||'').toLowerCase()
+    .replace(/\.[a-z0-9]{1,6}$/,'')
+    .replace(/(分镜脚本|分镜|脚本|文案|素材说明|说明|视频素材|视频|素材包|素材|详情|封面)/g,' ')
+    .replace(/[^\u4e00-\u9fa5a-z0-9]+/g,' ')
+    .trim();
+  const tokens=new Set(normalized.split(/\s+/).filter(Boolean));
+  const chinese=(normalized.match(/[\u4e00-\u9fa5]+/g)||[]).join('');
+  for(let i=0;i<chinese.length-1;i++) tokens.add(chinese.slice(i,i+2));
+  for(const number of normalized.match(/\d+/g)||[]) tokens.add(number);
+  return tokens;
+}
+
+function documentFilenameScore(doc,project){
+  const docBase=String(doc.name||'').replace(/\.[^.]+$/,'');
+  const videoBase=String(project.fileName||project.name||'').replace(/\.[^.]+$/,'');
+  const a=documentMatchTokens(docBase+' '+String(doc.text||'').slice(0,500));
+  const b=documentMatchTokens(videoBase);
+  let overlap=0;
+  for(const token of b) if(a.has(token)) overlap+=token.length>2?3:1;
+  const na=docBase.toLowerCase().replace(/[^\u4e00-\u9fa5a-z0-9]/g,'');
+  const nb=videoBase.toLowerCase().replace(/[^\u4e00-\u9fa5a-z0-9]/g,'');
+  if(na&&nb&&(na.includes(nb)||nb.includes(na))) overlap+=12;
+  return overlap;
+}
+
+function applyFilenameDocumentMatches(documents){
+  const docs=documents.filter(doc=>doc.assignedProjectId==null);
+  if(!docs.length||!PROJECTS.list.length) return;
+  const counts=new Map(PROJECTS.list.map(project=>[project.id,0]));
+  BATCH_DOCUMENTS.list.filter(doc=>doc.assignedProjectId!=null&&!docs.includes(doc)).forEach(doc=>counts.set(doc.assignedProjectId,(counts.get(doc.assignedProjectId)||0)+1));
+  const capacity=Math.max(1,Math.ceil(BATCH_DOCUMENTS.list.length/PROJECTS.list.length));
+  for(const doc of docs){
+    const ranked=PROJECTS.list.map((project,index)=>({project,index,score:documentFilenameScore(doc,project),count:counts.get(project.id)||0}))
+      .sort((a,b)=>b.score-a.score||a.count-b.count||a.index-b.index);
+    const best=ranked.find(item=>item.count<capacity)||ranked.sort((a,b)=>a.count-b.count||b.score-a.score||a.index-b.index)[0];
+    if(!best) continue;
+    doc.assignedProjectId=best.project.id;
+    doc.matchMethod='filename';
+    doc.matchReason=best.score?'根据文件名和内容关键词匹配':'按导入顺序均衡配对';
+    doc.confidence=Math.max(50,Math.min(92,55+best.score*3));
+    counts.set(best.project.id,(counts.get(best.project.id)||0)+1);
+  }
+}
+
+async function requestAiDocumentMatches(documents){
+  const apiKey=(document.getElementById('aiApiKey')?.value||sessionStorage.getItem(API_KEY_STORAGE)||localStorage.getItem(API_KEY_STORAGE)||'').trim();
+  if(!apiKey) return null;
+  if(!(await ensureAiDataConsent())) return null;
+  const model=document.getElementById('aiSeoModel')?.value||'claude-opus-4-8';
+  const videos=PROJECTS.list.map(project=>({id:project.id,fileName:project.fileName,name:project.name}));
+  const docs=documents.map(doc=>({id:doc.id,fileName:doc.name,excerpt:String(doc.text||'').slice(0,1800)}));
+  const prompt='你要把一批视频文档自动对应到一批视频任务。请根据视频文件名、文档文件名和文档内容摘要判断对应关系。文档数不超过视频数时必须尽量一对一；文档更多时也要按内容均衡分配，不要把所有文档分给同一个视频。严格输出纯JSON：{"assignments":[{"documentId":数字,"projectId":数字,"confidence":0到100,"reason":"简短原因"}]}。只能使用给定ID。\n视频：'+JSON.stringify(videos)+'\n文档：'+JSON.stringify(docs);
+  const resp=await fetch('https://llm-api.mcisaas.com/v1/chat/completions',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
+    body:JSON.stringify({model,messages:[{role:'user',content:prompt}],max_tokens:1400,temperature:.1})
+  });
+  if(!resp.ok) throw new Error('AI 文档匹配失败 '+resp.status+': '+(await resp.text()).slice(0,140));
+  const raw=(await resp.json()).choices?.[0]?.message?.content?.trim()||'';
+  const parsed=robustParseJSON(raw);
+  if(!Array.isArray(parsed?.assignments)) throw new Error('AI 文档匹配结果格式无法解析');
+  return parsed.assignments;
+}
+
+async function autoMatchDocuments(options={}){
+  const force=!!options.force;
+  const silent=!!options.silent;
+  const button=document.getElementById('autoMatchDocumentsBtn');
+  if(!BATCH_DOCUMENTS.list.length){ if(!silent) toast('请先导入文档','warn'); return; }
+  if(!PROJECTS.list.length){
+    BATCH_DOCUMENTS.lastMode='none';
+    renderDocumentMatches();
+    if(!silent) toast('文档已保存，添加视频后会自动匹配','warn');
+    return;
+  }
+  if(force){
+    BATCH_DOCUMENTS.list.forEach(doc=>{ doc.assignedProjectId=null; doc.matchMethod='unassigned'; doc.confidence=0; });
+  }
+  const pending=BATCH_DOCUMENTS.list.filter(doc=>doc.assignedProjectId==null);
+  if(!pending.length){ renderDocumentMatches(); if(!silent) toast('所有文档都已有对应视频'); return; }
+  if(button){ button.disabled=true; button.textContent='正在匹配...'; }
+  let aiApplied=false;
+  try{
+    const assignments=await requestAiDocumentMatches(pending);
+    if(assignments){
+      const validDocIds=new Set(pending.map(doc=>doc.id));
+      const validProjectIds=new Set(PROJECTS.list.map(project=>project.id));
+      const counts=new Map(PROJECTS.list.map(project=>[project.id,0]));
+      BATCH_DOCUMENTS.list.filter(doc=>doc.assignedProjectId!=null&&!pending.includes(doc)).forEach(doc=>counts.set(doc.assignedProjectId,(counts.get(doc.assignedProjectId)||0)+1));
+      const capacity=Math.max(1,Math.ceil(BATCH_DOCUMENTS.list.length/PROJECTS.list.length));
+      const sorted=[...assignments].sort((a,b)=>Number(b.confidence||0)-Number(a.confidence||0));
+      for(const item of sorted){
+        const docId=Number(item.documentId), projectId=Number(item.projectId);
+        if(!validDocIds.has(docId)||!validProjectIds.has(projectId)) continue;
+        const doc=pending.find(entry=>entry.id===docId);
+        if(!doc||doc.assignedProjectId!=null||(counts.get(projectId)||0)>=capacity) continue;
+        doc.assignedProjectId=projectId;
+        doc.matchMethod='ai';
+        doc.matchReason=String(item.reason||'AI 根据文件名和内容判断');
+        doc.confidence=Math.max(0,Math.min(100,Number(item.confidence)||80));
+        counts.set(projectId,(counts.get(projectId)||0)+1);
+        aiApplied=true;
+      }
+    }
+    applyFilenameDocumentMatches(pending);
+    BATCH_DOCUMENTS.lastMode=aiApplied?'ai':'filename';
+    BATCH_DOCUMENTS.lastError='';
+    if(!silent) toast(aiApplied?'AI 已完成文档配对':'已按文件名完成文档配对');
+  }catch(err){
+    applyFilenameDocumentMatches(pending);
+    BATCH_DOCUMENTS.lastMode='filename';
+    BATCH_DOCUMENTS.lastError=err.message||'AI 匹配失败';
+    toast('AI 匹配失败，已按文件名配对；可在下拉框中手动修改','warn');
+  }finally{
+    if(button){ button.disabled=false; button.textContent='重新自动匹配'; }
+    renderDocumentMatches();
+    scheduleWorkspaceSave();
+  }
+}
+
 async function importStoryFiles(fileList){
   const files=Array.from(fileList||[]);
   if(!files.length) return;
@@ -5711,32 +6079,42 @@ async function importStoryFiles(fileList){
   const imported=[];
   const failed=[];
   let totalChars=0;
+  const existingKeys=new Set(BATCH_DOCUMENTS.list.map(doc=>doc.fileKey));
   for(let i=0;i<valid.length;i++){
     const file=valid[i];
+    const fileKey=[file.name,file.size,file.lastModified||0].join('|');
+    if(existingKeys.has(fileKey)){ failed.push({name:file.name,message:'文档已存在'}); continue; }
     try{
       if(label) label.textContent='正在读取 '+(i+1)+' / '+valid.length+'：'+file.name;
       const text=await readStoryFile(file);
-      imported.push(valid.length>1?'【'+file.name+'】\n'+text:text);
+      const doc={
+        id:++BATCH_DOCUMENTS.idCnt,
+        name:file.name,
+        text,
+        size:file.size,
+        fileKey,
+        assignedProjectId:null,
+        matchMethod:'unassigned',
+        matchReason:'等待自动匹配',
+        confidence:0
+      };
+      BATCH_DOCUMENTS.list.push(doc);
+      existingKeys.add(fileKey);
+      imported.push(doc);
       totalChars+=text.length;
     }catch(err){
       failed.push({name:file.name,message:err.message||'读取失败'});
     }
   }
   if(imported.length){
-    const area=document.getElementById('storyDoc');
-    const merged=imported.join('\n\n');
-    area.value=area.value.trim()?(area.value.trim()+'\n\n'+merged):merged;
-    if(label){
-      label.textContent='已导入 '+imported.length+' 份文档 · '+totalChars+' 字'+(failed.length?' · '+failed.length+' 份失败':'');
-      label.classList.add('has-file');
-    }
-    saveActiveProject();
+    renderDocumentMatches();
+    await autoMatchDocuments({force:false,silent:true});
     scheduleWorkspaceSave();
     updateTaskFlowState();
-    toast('已导入 '+imported.length+' 份文档到当前任务'+(failed.length?'，'+failed.length+' 份读取失败':''),failed.length?'warn':'ok');
+    toast('已导入 '+imported.length+' 份文档并完成配对'+(failed.length?'，'+failed.length+' 份跳过':''),failed.length?'warn':'ok');
   }else{
-    if(label) label.textContent='文档读取失败：'+failed.map(x=>x.name).join('、');
-    toast(failed[0]?.message||'文档导入失败','err');
+    updateStoryImportLabel();
+    toast(failed[0]?.message||'文档导入失败',failed.every(x=>x.message==='文档已存在')?'warn':'err');
   }
 }
 
@@ -6971,67 +7349,188 @@ async function runSalesCopyOnly(){
   }finally{ finishSalesRun(run); }
 }
 
-async function runSalesKit(){
-  if(RUN_STATE.active){ toast('已有生成任务正在进行','warn'); return; }
-  if(!(await warnIfNoDocText())) return;
+async function runSalesKit(options={}){
+  if(options instanceof Event) options={};
+  const batchMode=!!options.batchMode;
+  const progress=(pct,text)=>setSalesProgress(pct,options.batchLabel?(options.batchLabel+' · '+text):text);
+  if(RUN_STATE.active||(BATCH_RUN.active&&!batchMode)){ toast('已有生成任务正在进行','warn'); return {ok:false,error:'已有任务正在运行'}; }
+  if(!options.skipDocWarning&&!(await warnIfNoDocText())) return {ok:false,error:'用户取消生成'};
   let input=salesInputs();
-  input=await resolveSalesGenerationMode(input);
-  if(!input) return;
+  if(options.generationMode) input.generationMode=options.generationMode;
+  else input=await resolveSalesGenerationMode(input);
+  if(!input) return {ok:false,error:'用户取消生成'};
   const run=beginSalesRun();
+  const activeProject=PROJECTS.list.find(project=>project.id===PROJECTS.activeId);
+  if(activeProject) activeProject.generationStatus='running';
+  renderProjectTabs();
   const btn=document.getElementById('salesKitBtn');
   const old=btn?btn.innerHTML:'';
   let archived=false;
   if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>正在生成上架套件...'; }
   try{
-    setSalesProgress(8,'检查视频与分镜文档...');
-    if(!(await ensureSalesFrames())){ setSalesProgress(-2,'未能提取候选画面'); return; }
+    progress(8,'检查视频与对应文档...');
+    if(!(await ensureSalesFrames())) throw new Error('未能提取候选画面');
     ensureRunCurrent(run);
-    setSalesProgress(24,input.apiKey?'正在理解内容与销售卖点...':'正在生成本地基础策略...');
+    progress(24,input.apiKey?'正在理解内容与销售卖点...':'正在生成本地基础策略...');
     let plan=await aiSalesPlan(input); ensureRunCurrent(run);
-    setSalesProgress(36,input.apiKey?'正在优化标题、简介和关键词...':'正在整理基础文案...');
+    progress(36,input.apiKey?'正在优化标题、简介和关键词...':'正在整理基础文案...');
     plan=await aiSeoOptimize(input, plan); ensureRunCurrent(run);
     plan.generationMode=input.generationMode;
     plan.copySource=input.apiKey?input.seoModel:'本地基础模板';
     archived=archiveCurrentVersion();
     showSalesResults(plan);
-    setSalesProgress(45,input.apiKey?'正在挑选高销售价值画面...':'正在用本地评分挑选画面...');
+    progress(45,input.apiKey?'正在挑选高销售价值画面...':'正在用本地评分挑选画面...');
     await ensureSalesFrameScores(input);
     ensureRunCurrent(run);
     const ranked=await getSalesRankedFrames();
     if(!ranked.length) throw new Error('没有可用候选画面，请检查视频后重试');
-    setSalesProgress(66,'正在生成可比较的封面候选...');
+    progress(66,'正在生成可比较的封面候选...');
     await createCoverCandidates(plan, ranked);
     ensureRunCurrent(run);
-    setSalesProgress(84,'正在生成详情长图...');
+    progress(84,'正在生成详情长图...');
     await createDetailCandidates(plan, ranked, input);
     ensureRunCurrent(run);
     S.finalCoverId=null;
     S.finalDetailId=null;
     updateFinalAssetUI();
-    setSalesProgress(100,'光厂上架套件已生成');
+    progress(100,'光厂上架套件已生成');
     updateListingChecklist();
+    if(activeProject) activeProject.generationStatus='complete';
+    saveActiveProject();
     finishSalesRun(run);
-    switchTab(1);
-    setTimeout(()=>setSalesProgress(-1,'上架套件已生成'),300);
+    if(!batchMode){
+      switchTab(1);
+      setTimeout(()=>setSalesProgress(-1,'上架套件已生成'),300);
+    }
     scheduleWorkspaceSave();
-    toast('上架套件已生成，请确认主封面、主详情和文案');
+    if(!batchMode) toast('上架套件已生成，请确认主封面、主详情和文案');
+    return {ok:true};
   } catch(e){
+    if(activeProject) activeProject.generationStatus=e?.name==='AbortError'?'pending':'failed';
     if(archived) restorePreviousVersion();
     else if(S.batches.some(b=>b.assetKind==='cover'||b.assetKind==='detail')) resetSalesBatches();
-    if(e?.name==='AbortError') setSalesProgress(-2,'已取消生成，现有内容已保留');
+    if(e?.name==='AbortError') progress(-2,'已取消生成，现有内容已保留');
     else{
       console.error(e);
-      setSalesProgress(-2,'生成失败：'+(e?.message||'未知错误'));
-      toast('生成已停止，未使用虚构结果。请检查 Key、模型权限、网络或更换模型','err');
+      progress(-2,'生成失败：'+(e?.message||'未知错误'));
+      if(!batchMode) toast('生成已停止，未使用虚构结果。请检查 Key、模型权限、网络或更换模型','err');
     }
+    return {ok:false,error:e?.message||'未知错误'};
   } finally {
     finishSalesRun(run);
     if(btn) btn.innerHTML=old;
+    renderProjectTabs();
     updateSalesPrimaryState();
   }
 }
 
-document.getElementById('salesKitBtn')?.addEventListener('click', runSalesKit);
+function waitForActiveVideoMetadata(timeoutMs=12000){
+  if(vPrev.readyState>=1&&Number.isFinite(vPrev.duration)&&vPrev.duration>0) return Promise.resolve(true);
+  return new Promise(resolve=>{
+    let done=false;
+    const finish=value=>{ if(done) return; done=true; clearTimeout(timer); vPrev.removeEventListener('loadedmetadata',onReady); vPrev.removeEventListener('error',onError); resolve(value); };
+    const onReady=()=>finish(true), onError=()=>finish(false);
+    const timer=setTimeout(()=>finish(false),timeoutMs);
+    vPrev.addEventListener('loadedmetadata',onReady,{once:true});
+    vPrev.addEventListener('error',onError,{once:true});
+  });
+}
+
+async function runBatchSalesKit(){
+  if(BATCH_RUN.active||RUN_STATE.active){ toast('已有批量任务正在进行','warn'); return; }
+  let tasks=PROJECTS.list.filter(project=>!isProjectGenerationComplete(project));
+  if(!tasks.length){ await runSalesKit(); return; }
+  if(tasks.length===1){
+    saveActiveProject();
+    PROJECTS.activeId=tasks[0].id;
+    restoreProject(tasks[0]);
+    renderProjectTabs();
+    if(await waitForActiveVideoMetadata()) await runSalesKit();
+    return;
+  }
+  const unassigned=BATCH_DOCUMENTS.list.filter(doc=>doc.assignedProjectId==null).length;
+  if(unassigned){
+    const proceed=await appConfirm({title:'还有未配对文档',message:'有 '+unassigned+' 份文档尚未对应视频。可先在文档配对中修改，也可以忽略它们继续生成。',okText:'忽略并继续',cancelText:'返回检查'});
+    if(!proceed) return;
+  }
+  const missing=tasks.filter(project=>!getProjectContextText(project.id)).length;
+  if(missing){
+    const proceed=await appConfirm({title:'部分视频没有文档',message:'有 '+missing+' 个视频任务没有对应文档或补充说明，AI 将仅根据视频画面判断。',okText:'继续批量生成',cancelText:'返回补充'});
+    if(!proceed) return;
+  }
+  const base=salesInputs();
+  let generationMode='local';
+  if(base.apiKey){
+    if(!(await ensureAiDataConsent())) return;
+    generationMode='ai';
+  }else{
+    const proceed=await appConfirm({title:'批量使用本地基础模式？',message:'当前未配置 API Key。所有视频只会生成本地基础结果，不会真正理解视频与文档。',okText:'继续基础生成',cancelText:'去设置 AI'});
+    if(!proceed){ openSettingsDrawer(); return; }
+  }
+  BATCH_RUN.active=true;
+  BATCH_RUN.cancelled=false;
+  updateSalesPrimaryState();
+  const results=[];
+  try{
+    for(let i=0;i<tasks.length;i++){
+      if(BATCH_RUN.cancelled) break;
+      const project=tasks[i];
+      saveActiveProject();
+      PROJECTS.activeId=project.id;
+      restoreProject(project);
+      renderProjectTabs();
+      if(!(await waitForActiveVideoMetadata())){
+        project.generationStatus='failed';
+        results.push({project,ok:false,error:'视频无法读取'});
+        continue;
+      }
+      const result=await runSalesKit({batchMode:true,skipDocWarning:true,generationMode,batchLabel:'任务 '+(i+1)+' / '+tasks.length});
+      saveActiveProject();
+      results.push({project,...result});
+      renderProjectTabs();
+    }
+  }catch(err){
+    console.error('批量生成异常',err);
+    const project=PROJECTS.list.find(item=>item.id===PROJECTS.activeId)||tasks[results.length];
+    if(project&&!results.some(item=>item.project?.id===project.id)){
+      project.generationStatus='failed';
+      results.push({project,ok:false,error:err?.message||'批量流程异常'});
+    }
+  }finally{
+    BATCH_RUN.active=false;
+  }
+  const failed=results.filter(result=>!result.ok);
+  const succeeded=results.filter(result=>result.ok);
+  if(failed.length){
+    const first=failed[0].project;
+    PROJECTS.activeId=first.id;
+    restoreProject(first);
+    renderProjectTabs();
+    setSalesProgress(-2,'批量完成：'+succeeded.length+' 成功，'+failed.length+' 失败');
+    toast('批量完成：'+succeeded.length+' 成功，'+failed.length+' 失败；已定位到首个失败任务','warn');
+  }else if(succeeded.length){
+    const last=succeeded[succeeded.length-1].project;
+    PROJECTS.activeId=last.id;
+    restoreProject(last);
+    renderProjectTabs();
+    setSalesProgress(-1,'全部 '+succeeded.length+' 个任务已生成');
+    switchTab(1);
+    toast('全部 '+succeeded.length+' 个视频任务已生成');
+  }else{
+    setSalesProgress(-2,BATCH_RUN.cancelled?'批量生成已停止':'没有任务完成');
+  }
+  scheduleWorkspaceSave();
+  updateSalesPrimaryState();
+}
+
+async function runPrimarySalesAction(){
+  const pending=PROJECTS.list.filter(project=>!isProjectGenerationComplete(project)).length;
+  if(PROJECTS.list.length>1&&pending>0) await runBatchSalesKit();
+  else await runSalesKit();
+}
+
+document.getElementById('salesKitBtn')?.addEventListener('click', runPrimarySalesAction);
+document.getElementById('salesCurrentBtn')?.addEventListener('click', ()=>runSalesKit());
 document.getElementById('salesCopyBtn')?.addEventListener('click', runSalesCopyOnly);
 updateSalesPrimaryState();
 // Q4：去掉透明度调节后，配色/字号/位置改动即重绘已有详情批次（仅重画标题层，不重新挑帧）
@@ -7637,7 +8136,7 @@ if(toastRegion){ toastRegion.setAttribute('role','status'); toastRegion.setAttri
 window.addEventListener('beforeunload',e=>{
   if(RUN_STATE.active || S.dirty){ e.preventDefault(); e.returnValue=''; }
 });
-restoreWorkspaceDrafts();
+migrateLegacyWorkspaceToHistory();
 setTimeout(syncSalesGoalUI,0);
 setTimeout(()=>{ updateAiConnectionUI(); updateTaskFlowState(); },0);
 </script>
