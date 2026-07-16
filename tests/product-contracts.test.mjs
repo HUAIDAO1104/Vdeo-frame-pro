@@ -182,7 +182,35 @@ test('history is explicit and never auto-restores into a fresh workspace',()=>{
   assert.match(html,/migrateLegacyWorkspaceToHistory\(\);/);
   assert.doesNotMatch(html,/restoreWorkspaceDrafts\(\);/);
   assert.match(html,/async function restoreHistoryRecord\(historyId\)/);
-  assert.match(html,/只有点击恢复才会载入工作台/);
+  assert.match(html,/不会自动占用当前工作台/);
+});
+
+test('history listing uses a lightweight metadata store instead of loading video payloads',()=>{
+  assert.match(html,/const WORKSPACE_DB_VERSION=2/);
+  assert.match(html,/const WORKSPACE_META_STORE='history_meta'/);
+  assert.match(html,/function historyMetaFromPayload\(payload,fallbackId=''/);
+  assert.match(html,/async function readWorkspaceHistoryMeta\(\)/);
+  assert.match(html,/tx\.objectStore\(WORKSPACE_META_STORE\)\.getAll\(\)/);
+  assert.doesNotMatch(html,/const valueReq=store\.getAll\(\)/);
+});
+
+test('legacy history actions use the database key and explicit delegated controls',()=>{
+  assert.match(html,/function historyIdFromKey\(key\)/);
+  assert.match(html,/req\.onupgradeneeded=event=>/);
+  assert.match(html,/if\(event\.oldVersion<2\)/);
+  assert.match(html,/if\(key\.startsWith\('history:'\)\)/);
+  assert.match(html,/data-history-action="restore"/);
+  assert.match(html,/data-history-action="rename"/);
+  assert.match(html,/data-history-action="delete"/);
+  assert.match(html,/打开编辑/);
+});
+
+test('history rename uses an in-app prompt and deletion updates payload and metadata',()=>{
+  assert.match(html,/function appPrompt\(/);
+  assert.match(html,/await appPrompt\(\{title:'重命名历史记录'/);
+  assert.doesNotMatch(html,/prompt\('历史记录名称'/);
+  assert.match(html,/tx\.objectStore\(WORKSPACE_STORE\)\.delete\('history:'\+historyId\)/);
+  assert.match(html,/tx\.objectStore\(WORKSPACE_META_STORE\)\.delete\(historyId\)/);
 });
 
 test('a new batch clears the workbench in one action after saving history',()=>{

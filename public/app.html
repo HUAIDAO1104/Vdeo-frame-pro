@@ -2140,6 +2140,36 @@ function appConfirm({title, message, okText='继续', cancelText='取消', showD
   });
 }
 
+function appPrompt({title, message='', value='', okText='保存', cancelText='取消', maxLength=40}){
+  return new Promise(resolve=>{
+    document.getElementById('appConfirmMask')?.remove();
+    const mask=document.createElement('div');
+    mask.id='appConfirmMask';
+    mask.className='app-confirm-mask';
+    mask.innerHTML=
+      '<div class="app-confirm-box" role="dialog" aria-modal="true" aria-labelledby="appPromptTitle">'+
+        '<div class="app-confirm-title" id="appPromptTitle">'+escapeHtmlSafe(title||'编辑名称')+'</div>'+
+        (message?'<div class="app-confirm-msg">'+escapeHtmlSafe(message)+'</div>':'')+
+        '<input class="app-prompt-input" id="appPromptInput" maxlength="'+Math.max(1,Number(maxLength)||40)+'" value="'+escapeHtmlSafe(value)+'" />'+
+        '<div class="app-confirm-actions">'+
+          '<button type="button" class="app-confirm-cancel" id="appPromptCancel">'+escapeHtmlSafe(cancelText)+'</button>'+
+          '<button type="button" class="app-confirm-ok" id="appPromptOk">'+escapeHtmlSafe(okText)+'</button>'+
+        '</div>'+
+      '</div>';
+    document.body.appendChild(mask);
+    const input=mask.querySelector('#appPromptInput');
+    const close=result=>{ mask.remove(); resolve(result); };
+    mask.querySelector('#appPromptOk').onclick=()=>close(input.value.trim()||null);
+    mask.querySelector('#appPromptCancel').onclick=()=>close(null);
+    mask.addEventListener('click',event=>{ if(event.target===mask) close(null); });
+    input.addEventListener('keydown',event=>{
+      if(event.key==='Enter'){ event.preventDefault(); close(input.value.trim()||null); }
+      if(event.key==='Escape'){ event.preventDefault(); close(null); }
+    });
+    input.focus(); input.select();
+  });
+}
+
 // 检查是否提供了分镜/卖点文档或文字；未提供则弹可关闭提示
 // 返回 true 表示可继续生成
 async function warnIfNoDocText(){
@@ -5711,6 +5741,9 @@ const SALES = {
 globalThis.__vfpSalesState=SALES;
 
 const WORKSPACE_DB='vfp_workspace_v1';
+const WORKSPACE_DB_VERSION=2;
+const WORKSPACE_STORE='workspace';
+const WORKSPACE_META_STORE='history_meta';
 let _workspaceSaveTimer=null;
 let _workspaceIdleHandle=null;
 let WORKSPACE_SESSION_ID='session-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
@@ -5724,12 +5757,50 @@ function updateRailSaveState(label,state='saved'){
   el.dataset.state=state;
 }
 
+function historyIdFromKey(key){
+  const value=String(key||'');
+  return value.startsWith('history:')?value.slice(8):value;
+}
+
+function historyMetaFromPayload(payload,fallbackId=''){
+  const projects=Array.isArray(payload?.projects)?payload.projects:[];
+  const historyId=historyIdFromKey(fallbackId||payload?.historyId||'');
+  return {
+    historyId,
+    historyName:String(payload?.historyName||'批量任务'),
+    savedAt:Number(payload?.savedAt)||0,
+    projectCount:projects.length,
+    documentCount:Array.isArray(payload?.documents)?payload.documents.length:0,
+    assetCount:projects.reduce((sum,project)=>sum+(project.batches||[]).filter(batch=>batch.assetKind==='cover'||batch.assetKind==='detail').length,0),
+    projectNames:projects.slice(0,3).map(project=>String(project.name||project.fileName||'未命名视频'))
+  };
+}
+
 function openWorkspaceDB(){
   return new Promise((resolve,reject)=>{
-    const req=indexedDB.open(WORKSPACE_DB,1);
-    req.onupgradeneeded=()=>req.result.createObjectStore('workspace');
+    const req=indexedDB.open(WORKSPACE_DB,WORKSPACE_DB_VERSION);
+    req.onupgradeneeded=event=>{
+      const db=req.result;
+      const tx=req.transaction;
+      const workspace=db.objectStoreNames.contains(WORKSPACE_STORE)?tx.objectStore(WORKSPACE_STORE):db.createObjectStore(WORKSPACE_STORE);
+      const meta=db.objectStoreNames.contains(WORKSPACE_META_STORE)?tx.objectStore(WORKSPACE_META_STORE):db.createObjectStore(WORKSPACE_META_STORE);
+      if(event.oldVersion<2){
+        const cursorReq=workspace.openCursor();
+        cursorReq.onsuccess=()=>{
+          const cursor=cursorReq.result;
+          if(!cursor) return;
+          const key=String(cursor.key||'');
+          if(key.startsWith('history:')){
+            const id=historyIdFromKey(key);
+            meta.put(historyMetaFromPayload(cursor.value,id),id);
+          }
+          cursor.continue();
+        };
+      }
+    };
     req.onsuccess=()=>resolve(req.result);
     req.onerror=()=>reject(req.error);
+    req.onblocked=()=>reject(new Error('历史数据库正在被其他页面占用，请关闭旧页面后重试'));
   });
 }
 
@@ -5769,9 +5840,11 @@ async function saveWorkspaceNow(){
   };
   try{
     const db=await openWorkspaceDB();
+    const historyId=historyIdFromKey(WORKSPACE_SESSION_ID);
     await new Promise((resolve,reject)=>{
-      const tx=db.transaction('workspace','readwrite');
-      tx.objectStore('workspace').put(payload,'history:'+WORKSPACE_SESSION_ID);
+      const tx=db.transaction([WORKSPACE_STORE,WORKSPACE_META_STORE],'readwrite');
+      tx.objectStore(WORKSPACE_STORE).put({...payload,historyId},'history:'+historyId);
+      tx.objectStore(WORKSPACE_META_STORE).put(historyMetaFromPayload(payload,historyId),historyId);
       tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error);
     });
     db.close();
@@ -5793,28 +5866,54 @@ function scheduleWorkspaceSave(delay=3200){
   },Math.max(600,Number(delay)||3200));
 }
 
-async function readWorkspaceHistory(){
+async function readWorkspaceHistoryMeta(){
   const db=await openWorkspaceDB();
   const records=await new Promise((resolve,reject)=>{
-    const tx=db.transaction('workspace','readonly');
-    const store=tx.objectStore('workspace');
-    const keyReq=store.getAllKeys();
-    const valueReq=store.getAll();
-    tx.oncomplete=()=>resolve(keyReq.result.map((key,index)=>({key,value:valueReq.result[index]})).filter(item=>String(item.key).startsWith('history:')));
+    const tx=db.transaction(WORKSPACE_META_STORE,'readonly');
+    const req=tx.objectStore(WORKSPACE_META_STORE).getAll();
+    req.onsuccess=()=>resolve(req.result||[]);
+    req.onerror=()=>reject(req.error);
     tx.onerror=()=>reject(tx.error);
   });
   db.close();
-  return records.sort((a,b)=>(b.value?.savedAt||0)-(a.value?.savedAt||0));
+  return records.sort((a,b)=>(b.savedAt||0)-(a.savedAt||0));
+}
+
+async function readWorkspaceHistory(){ return readWorkspaceHistoryMeta(); }
+
+async function readHistoryPayload(historyId){
+  const id=historyIdFromKey(historyId);
+  const db=await openWorkspaceDB();
+  const payload=await new Promise((resolve,reject)=>{
+    const tx=db.transaction(WORKSPACE_STORE,'readonly');
+    const req=tx.objectStore(WORKSPACE_STORE).get('history:'+id);
+    req.onsuccess=()=>resolve(req.result||null); req.onerror=()=>reject(req.error);
+  });
+  db.close();
+  return payload;
+}
+
+async function readHistoryMetaRecord(historyId){
+  const id=historyIdFromKey(historyId);
+  const db=await openWorkspaceDB();
+  const meta=await new Promise((resolve,reject)=>{
+    const tx=db.transaction(WORKSPACE_META_STORE,'readonly');
+    const req=tx.objectStore(WORKSPACE_META_STORE).get(id);
+    req.onsuccess=()=>resolve(req.result||null); req.onerror=()=>reject(req.error);
+  });
+  db.close();
+  return meta;
 }
 
 async function trimWorkspaceHistory(limit=20){
-  const records=await readWorkspaceHistory();
+  const records=await readWorkspaceHistoryMeta();
   if(records.length<=limit) return;
   const db=await openWorkspaceDB();
   await new Promise((resolve,reject)=>{
-    const tx=db.transaction('workspace','readwrite');
-    const store=tx.objectStore('workspace');
-    records.slice(limit).forEach(item=>store.delete(item.key));
+    const tx=db.transaction([WORKSPACE_STORE,WORKSPACE_META_STORE],'readwrite');
+    const store=tx.objectStore(WORKSPACE_STORE);
+    const meta=tx.objectStore(WORKSPACE_META_STORE);
+    records.slice(limit).forEach(item=>{ const id=historyIdFromKey(item.historyId); store.delete('history:'+id); meta.delete(id); });
     tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error);
   });
   db.close();
@@ -5824,14 +5923,17 @@ async function migrateLegacyWorkspaceToHistory(){
   try{
     const db=await openWorkspaceDB();
     await new Promise((resolve,reject)=>{
-      const tx=db.transaction('workspace','readwrite');
-      const store=tx.objectStore('workspace');
+      const tx=db.transaction([WORKSPACE_STORE,WORKSPACE_META_STORE],'readwrite');
+      const store=tx.objectStore(WORKSPACE_STORE);
+      const meta=tx.objectStore(WORKSPACE_META_STORE);
       const req=store.get('latest');
       req.onsuccess=()=>{
         const payload=req.result;
         if(payload?.projects?.length){
           const id='legacy-'+(payload.savedAt||Date.now());
-          store.put({...payload,historyId:id,historyName:'上次自动保存的任务',documents:payload.documents||[]},'history:'+id);
+          const migrated={...payload,historyId:id,historyName:'上次自动保存的任务',documents:payload.documents||[]};
+          store.put(migrated,'history:'+id);
+          meta.put(historyMetaFromPayload(migrated,id),id);
         }
         store.delete('latest');
       };
@@ -5842,20 +5944,16 @@ async function migrateLegacyWorkspaceToHistory(){
 }
 
 async function restoreHistoryRecord(historyId){
+  const id=historyIdFromKey(historyId);
   if(PROJECTS.list.length||BATCH_DOCUMENTS.list.length){
     const ok=await appConfirm({title:'恢复历史任务',message:'恢复后会替换当前工作台内容。当前任务已经保存在历史记录中。',okText:'恢复并替换',cancelText:'取消'});
-    if(!ok) return;
+    if(!ok) return false;
     await saveWorkspaceNow();
   }
   try{
-    const db=await openWorkspaceDB();
-    const payload=await new Promise((resolve,reject)=>{
-      const tx=db.transaction('workspace','readonly');
-      const req=tx.objectStore('workspace').get('history:'+historyId);
-      req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error);
-    });
-    db.close();
-    if(!payload?.projects?.length){ toast('这条历史记录没有可恢复的视频','err'); return; }
+    updateRailSaveState('正在打开历史','saving');
+    const [payload,meta]=await Promise.all([readHistoryPayload(id),readHistoryMetaRecord(id)]);
+    if(!payload?.projects?.length){ toast('这条历史记录没有可恢复的视频','err'); updateRailSaveState('历史记录','error'); return false; }
     PROJECTS.list.forEach(project=>{ if(project.videoUrl) try{URL.revokeObjectURL(project.videoUrl);}catch(_){} });
     PROJECTS.list=payload.projects.map(p=>({
       ...p,
@@ -5868,8 +5966,8 @@ async function restoreHistoryRecord(historyId){
     BATCH_DOCUMENTS.list=(payload.documents||[]).map(doc=>({...doc}));
     BATCH_DOCUMENTS.idCnt=payload.documentIdCnt||Math.max(0,...BATCH_DOCUMENTS.list.map(doc=>doc.id||0));
     BATCH_DOCUMENTS.lastMode=BATCH_DOCUMENTS.list.some(doc=>doc.matchMethod==='ai')?'ai':'filename';
-    WORKSPACE_SESSION_ID=historyId;
-    WORKSPACE_HISTORY_NAME=payload.historyName||'';
+    WORKSPACE_SESSION_ID=id;
+    WORKSPACE_HISTORY_NAME=meta?.historyName||payload.historyName||'';
     const p=PROJECTS.list.find(x=>x.id===PROJECTS.activeId);
     restoreProject(p); renderProjectTabs(); renderDocumentMatches();
     setTimeout(async()=>{
@@ -5882,7 +5980,14 @@ async function restoreHistoryRecord(historyId){
     switchTab(0);
     toast('已从历史记录恢复 '+PROJECTS.list.length+' 个视频任务');
     S.dirty=false;
-  }catch(e){ console.warn('恢复历史失败',e); toast('历史记录恢复失败','err'); }
+    updateRailSaveState('历史记录');
+    return true;
+  }catch(e){
+    console.warn('恢复历史失败',e);
+    updateRailSaveState('打开失败','error');
+    toast('历史记录打开失败：'+(e?.message||'请刷新后重试'),'err');
+    return false;
+  }
 }
 
 function closeDraftManager(){ document.getElementById('draftManagerMask')?.remove(); }
@@ -5891,45 +5996,87 @@ async function openDraftManager(){
   document.getElementById('draftManagerMask')?.remove();
   const mask=document.createElement('div');
   mask.id='draftManagerMask'; mask.className='app-confirm-mask';
-  const records=await readWorkspaceHistory().catch(()=>[]);
-  const rows=records.length?records.map(({value})=>{
-    const projects=value.projects||[];
-    const assets=projects.reduce((sum,p)=>sum+(p.batches||[]).filter(b=>b.assetKind==='cover'||b.assetKind==='detail').length,0);
-    const id=String(value.historyId||'');
-    const time=value.savedAt?new Date(value.savedAt).toLocaleString():'未知时间';
-    return '<div class="draft-row">'+
-      '<button type="button" class="draft-main" onclick="restoreHistoryRecord('+JSON.stringify(id)+')"><strong>'+escapeHtmlSafe(value.historyName||'批量任务')+'</strong><span>'+projects.length+' 个视频 · '+(value.documents||[]).length+' 份文档 · '+assets+' 个销售资产 · '+escapeHtmlSafe(time)+'</span></button>'+
-      '<button type="button" class="draft-icon" onclick="renameHistoryRecord('+JSON.stringify(id)+')" title="重命名">重命名</button>'+
-      '<button type="button" class="draft-icon is-danger" onclick="deleteHistoryRecord('+JSON.stringify(id)+')" title="删除">删除</button>'+
-    '</div>';
-  }).join(''):'<div class="draft-empty">还没有历史记录。开始新的批量任务后会保存在这里，但不会自动占用工作台。</div>';
   mask.innerHTML='<div class="app-confirm-box draft-manager" role="dialog" aria-modal="true" aria-labelledby="draftManagerTitle">'+
-    '<div class="draft-manager-head"><div><div class="sales-eyebrow">本机历史</div><div class="app-confirm-title" id="draftManagerTitle">历史记录</div><p>历史保存在当前浏览器，只有点击恢复才会载入工作台。</p></div><button type="button" class="settings-close" onclick="closeDraftManager()" aria-label="关闭">×</button></div>'+
-    '<div class="draft-list">'+rows+'</div></div>';
+    '<div class="draft-manager-head"><div><div class="sales-eyebrow">本机历史</div><div class="app-confirm-title" id="draftManagerTitle">历史记录</div><p>打开历史任务后可继续修改、生成和导出；不会自动占用当前工作台。</p></div><button type="button" class="settings-close" data-history-action="close" aria-label="关闭">×</button></div>'+
+    '<div class="draft-list" id="draftHistoryList"><div class="draft-list-status"><span class="spin"></span><strong>正在读取历史记录...</strong><small>列表只读取摘要，不加载视频与截图</small></div></div></div>';
   document.body.appendChild(mask);
-  mask.addEventListener('click',e=>{ if(e.target===mask) closeDraftManager(); });
+  mask.addEventListener('click',async event=>{
+    if(event.target===mask){ closeDraftManager(); return; }
+    const button=event.target.closest('[data-history-action]');
+    if(!button||button.disabled) return;
+    const action=button.dataset.historyAction;
+    const id=historyIdFromKey(button.dataset.historyId||'');
+    if(action==='close'){ closeDraftManager(); return; }
+    if(action==='retry'){ openDraftManager(); return; }
+    if(!id) return;
+    const label=button.textContent;
+    button.disabled=true;
+    if(action==='restore') button.textContent='正在打开...';
+    try{
+      if(action==='restore') await restoreHistoryRecord(id);
+      if(action==='rename') await renameHistoryRecord(id);
+      if(action==='delete') await deleteHistoryRecord(id);
+    }catch(e){
+      console.warn('历史记录操作失败',e);
+      toast('历史记录操作失败：'+(e?.message||'请重新打开后重试'),'err');
+    }finally{
+      if(button.isConnected){ button.disabled=false; button.textContent=label; }
+    }
+  });
   mask.querySelector('.settings-close')?.focus();
+  try{
+    if(S.dirty&&(PROJECTS.list.length||BATCH_DOCUMENTS.list.length)) await saveWorkspaceNow();
+    const records=await readWorkspaceHistoryMeta();
+    if(!mask.isConnected) return;
+    const list=mask.querySelector('#draftHistoryList');
+    list.innerHTML=records.length?records.map(record=>{
+      const id=historyIdFromKey(record.historyId);
+      const time=record.savedAt?new Date(record.savedAt).toLocaleString():'未知时间';
+      const names=(record.projectNames||[]).join('、');
+      return '<article class="draft-row'+(id===WORKSPACE_SESSION_ID?' is-active':'')+'">'+
+        '<div class="draft-main"><strong>'+escapeHtmlSafe(record.historyName||'批量任务')+'</strong><span>'+record.projectCount+' 个视频 · '+record.documentCount+' 份文档 · '+record.assetCount+' 个销售资产 · '+escapeHtmlSafe(time)+'</span>'+(names?'<small>'+escapeHtmlSafe(names)+'</small>':'')+'</div>'+
+        '<button type="button" class="draft-icon is-primary" data-history-action="restore" data-history-id="'+escapeHtmlSafe(id)+'">打开编辑</button>'+
+        '<button type="button" class="draft-icon" data-history-action="rename" data-history-id="'+escapeHtmlSafe(id)+'">重命名</button>'+
+        '<button type="button" class="draft-icon is-danger" data-history-action="delete" data-history-id="'+escapeHtmlSafe(id)+'">删除</button>'+
+      '</article>';
+    }).join(''):'<div class="draft-empty">还没有历史记录。创建视频任务后，修改内容会自动保存在这里。</div>';
+  }catch(e){
+    console.warn('读取历史记录失败',e);
+    if(mask.isConnected) mask.querySelector('#draftHistoryList').innerHTML='<div class="draft-list-error"><strong>历史记录读取失败</strong><span>'+escapeHtmlSafe(e?.message||'请关闭其他旧页面后重试')+'</span><button type="button" data-history-action="retry">重新读取</button></div>';
+  }
 }
 
 async function renameHistoryRecord(id){
-  const records=await readWorkspaceHistory();
-  const record=records.find(item=>item.value?.historyId===id); if(!record) return;
-  const name=prompt('历史记录名称',record.value.historyName||'批量任务');
-  if(!name?.trim()) return;
+  const historyId=historyIdFromKey(id);
+  const record=await readHistoryMetaRecord(historyId);
+  if(!record){ toast('找不到这条历史记录，请重新打开列表','err'); return false; }
+  const name=await appPrompt({title:'重命名历史记录',message:'名称用于区分不同素材批次。',value:record.historyName||'批量任务',okText:'保存名称'});
+  if(!name) return false;
   const db=await openWorkspaceDB();
-  await new Promise((resolve,reject)=>{ const tx=db.transaction('workspace','readwrite'); tx.objectStore('workspace').put({...record.value,historyName:name.trim().slice(0,40)},record.key); tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error); });
+  const nextName=name.trim().slice(0,40);
+  await new Promise((resolve,reject)=>{ const tx=db.transaction(WORKSPACE_META_STORE,'readwrite'); tx.objectStore(WORKSPACE_META_STORE).put({...record,historyId,historyName:nextName},historyId); tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error); });
   db.close();
-  if(WORKSPACE_SESSION_ID===id) WORKSPACE_HISTORY_NAME=name.trim().slice(0,40);
+  if(WORKSPACE_SESSION_ID===historyId) WORKSPACE_HISTORY_NAME=nextName;
+  toast('历史记录已重命名');
   openDraftManager();
+  return true;
 }
 
 async function deleteHistoryRecord(id){
   if(!(await appConfirm({title:'删除历史记录',message:'删除这条历史记录？当前工作台内容不会受到影响。',okText:'删除记录',cancelText:'保留'}))) return;
+  const historyId=historyIdFromKey(id);
   const db=await openWorkspaceDB();
-  await new Promise((resolve,reject)=>{ const tx=db.transaction('workspace','readwrite'); tx.objectStore('workspace').delete('history:'+id); tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error); });
+  await new Promise((resolve,reject)=>{
+    const tx=db.transaction([WORKSPACE_STORE,WORKSPACE_META_STORE],'readwrite');
+    tx.objectStore(WORKSPACE_STORE).delete('history:'+historyId);
+    tx.objectStore(WORKSPACE_META_STORE).delete(historyId);
+    tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error);
+  });
   db.close();
-  if(WORKSPACE_SESSION_ID===id){ WORKSPACE_SESSION_ID='session-'+Date.now()+'-'+Math.random().toString(36).slice(2,8); WORKSPACE_HISTORY_NAME=''; }
+  if(WORKSPACE_SESSION_ID===historyId){ WORKSPACE_SESSION_ID='session-'+Date.now()+'-'+Math.random().toString(36).slice(2,8); WORKSPACE_HISTORY_NAME=''; }
+  toast('历史记录已删除');
   openDraftManager();
+  return true;
 }
 
 function archiveCurrentVersion(){
