@@ -127,8 +127,55 @@ test('the primary action can generate every pending video sequentially',()=>{
   assert.match(html,/for\(let i=0;i<tasks\.length;i\+\+\)/);
   assert.match(html,/await runSalesKit\(\{batchMode:true/);
   assert.match(html,/activeProject\.generationStatus='complete'/);
-  assert.match(html,/activeProject\.generationStatus=e\?\.name==='AbortError'\?'pending':'failed'/);
+  assert.match(html,/markProjectFailure\(activeProject,e,currentStage\)/);
   assert.match(html,/\+'批量生成 '\+pending\+' 个任务'/);
+});
+
+test('generation failures keep a visible reason and remain retryable',()=>{
+  assert.match(html,/id="currentProjectFailure"/);
+  assert.match(html,/function markProjectFailure\(project,error,stage\)/);
+  assert.match(html,/project\.generationError=\{message,stage:String\(stage\|\|'生成流程'\),at:Date\.now\(\)\}/);
+  assert.match(html,/function retryCurrentFailedProject\(\)/);
+  assert.match(html,/修正设置后可只重试当前任务/);
+});
+
+test('batch outcomes always open a switchable result workspace',()=>{
+  assert.match(html,/id="resultProjectSwitcher"/);
+  assert.match(html,/function switchResultProject\(id\)/);
+  assert.match(html,/const target=succeeded\.length\?succeeded\[succeeded\.length-1\]\.project:failed\[0\]\.project/);
+  assert.match(html,/setSalesProgress\(succeeded\.length\?-1:-2,summary\);\s*switchTab\(1\)/);
+});
+
+test('detail long images repair missing frames and balance extension rows',()=>{
+  assert.match(html,/const balanced=\[1,3,2,1,3,2\]/);
+  assert.match(html,/function repairDetailLongLayout\(layout\)/);
+  assert.match(html,/gridFrames:Array\.from\(\{length:9\}/);
+  assert.match(html,/const img=\(await loadImg\(S\.frames\[fi\]\?\.dataUrl\)\)\|\|fallbackImg/);
+});
+
+test('detail editing uses a large lazy-loaded frame browser',()=>{
+  assert.match(html,/className='frame-picker-mask'/);
+  assert.match(html,/if\(i<18\) img\.src=f\.dataUrl; else img\.dataset\.src=f\.dataUrl/);
+  assert.match(html,/new IntersectionObserver/);
+  assert.match(css,/#previewModal\.detail-open #pmCanvasWrap/);
+  assert.match(css,/\.frame-picker-grid\{[^}]*grid-template-columns:repeat\(auto-fill,minmax\(210px,1fr\)\)/);
+});
+
+test('workspace persistence is deferred away from active editing',()=>{
+  assert.match(html,/function scheduleWorkspaceSave\(delay=3200\)/);
+  assert.match(html,/requestIdleCallback\(persist,\{timeout:1800\}\)/);
+});
+
+test('wide desktop generation uses available space without a central bottleneck',()=>{
+  assert.match(css,/@media\(min-width:1101px\)/);
+  assert.match(css,/#tabPane0\.active\.has-projects\{grid-template-columns:minmax\(210px,\.62fr\) minmax\(280px,\.78fr\) minmax\(420px,1\.2fr\)/);
+});
+
+test('new 4K cover candidates enable their truthful badge by default',()=>{
+  assert.match(html,/b\.assetKind='cover';\s*b\.hasBadge=getResolutionInfo\(\)\.is4K/);
+  assert.match(html,/onchange="setBatchBadge\('/);
+  assert.match(html,/封面默认开启，可随时关闭/);
+  assert.match(html,/源视频不足 4K，不能添加 4K 角标/);
 });
 
 test('history is explicit and never auto-restores into a fresh workspace',()=>{
