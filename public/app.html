@@ -233,18 +233,21 @@
               </label>
             </div>
 
-            <div class="doc-upload-row">
-              <input type="file" id="storyFileInput" accept=".txt,.md,.csv,.json,.doc,.docx,.rtf,text/plain,text/markdown,application/json" style="display:none"/>
-              <button class="doc-upload-btn" type="button" id="storyFileBtn">
-                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6M9 15l3 3 3-3"/></svg>
-                上传文档
-              </button>
-              <span id="storyFileName" class="doc-file-name">支持 TXT、Markdown、CSV、JSON、RTF、DOC、DOCX</span>
+            <div class="story-dropzone" id="storyDropzone">
+              <div class="doc-upload-row">
+                <input type="file" id="storyFileInput" multiple accept=".txt,.md,.csv,.json,.doc,.docx,.rtf,text/plain,text/markdown,application/json" style="display:none"/>
+                <button class="doc-upload-btn" type="button" id="storyFileBtn">
+                  <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6M9 15l3 3 3-3"/></svg>
+                  选择文档
+                </button>
+                <span id="storyFileName" class="doc-file-name">可拖入一个或多个 TXT、DOCX 等文档</span>
+              </div>
+              <label class="sales-field sales-doc">
+                <span>分镜脚本 / 素材说明 / 卖点文档</span>
+                <textarea id="storyDoc" rows="6" placeholder="拖入文档，或直接粘贴分镜、镜头内容、素材包主题、使用场景..."></textarea>
+              </label>
+              <div class="story-drop-hint" aria-hidden="true">松开即可导入到当前视频任务</div>
             </div>
-            <label class="sales-field sales-doc">
-              <span>分镜脚本 / 素材说明 / 卖点文档</span>
-              <textarea id="storyDoc" rows="6" placeholder="也可以直接粘贴分镜、镜头内容、素材包主题、目标行业、使用场景或客户要求..."></textarea>
-            </label>
 
             <details class="task-more-settings">
               <summary><span>更多要求</span><small>默认由 AI 自动判断，无需设置</small></summary>
@@ -377,27 +380,35 @@
 
         <!-- 项目（多视频）切换栏 -->
         <div class="card" id="projectsCard" style="display:none;">
-          <div class="ct"><div class="ctd"></div>视频项目
-            <span class="proj-count" id="projCount"></span>
+          <div class="project-queue-head">
+            <div>
+              <div class="ct"><div class="ctd"></div>视频任务
+                <span class="proj-count" id="projCount"></span>
+              </div>
+              <div class="proj-hint">每个视频独立保存文档与结果，点击即可切换</div>
+            </div>
+            <button type="button" class="project-add-btn" id="projectAddVideosBtn" onclick="document.getElementById('vInput').click()">
+              <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+              添加视频
+            </button>
           </div>
           <div class="proj-tabs" id="projTabs"></div>
-          <div class="proj-hint">每个视频是独立项目，帧、挑选与拼图互不干扰</div>
         </div>
 
         <!-- Upload -->
         <div class="card upload-compact-card">
           <div class="ct"><div class="ctd"></div>视频素材</div>
-          <div class="upzone" id="upzone" role="button" tabindex="0" aria-label="选择或拖拽上传视频文件">
+          <div class="upzone" id="upzone" role="button" tabindex="0" aria-label="选择或拖拽一个或多个视频文件">
             <div class="up-icon">
               <svg viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
             </div>
-            <div class="up-t">拖拽视频文件至此</div>
-            <div class="up-s">或点击选择文件</div>
+            <div class="up-t" id="videoDropTitle">拖入一个或多个视频</div>
+            <div class="up-s" id="videoDropMeta">或点击批量选择，每个视频建立独立任务</div>
             <div class="fmts">
               <span class="fmt">MP4</span><span class="fmt">MOV</span>
               <span class="fmt">AVI</span><span class="fmt">MKV</span><span class="fmt">WEBM</span>
             </div>
-            <input type="file" id="vInput" accept="video/*" style="display:none"/>
+            <input type="file" id="vInput" accept="video/*" multiple style="display:none"/>
           </div>
           <div id="vCon">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
@@ -1526,6 +1537,7 @@ function saveActiveProject(){
   p.salesFeedback=readSalesFeedbackInputs();
   // 分镜/卖点文档随项目保存（清空视频/切换项目时一并隔离、清除）
   p.storyDoc   = (document.getElementById('storyDoc')?.value || '');
+  p.storyFileLabel = (document.getElementById('storyFileName')?.textContent || '');
   // 视频源信息（用于切换时恢复预览）
   p.videoUrl   = vPrev.src || p.videoUrl;
   p.sourceMeta = getSourceMeta();
@@ -1557,7 +1569,11 @@ function restoreProject(p){
   if(_docEl){
     _docEl.value = p.storyDoc || '';
     const _fn=document.getElementById('storyFileName');
-    if(_fn && !(p.storyDoc||'').trim()){ _fn.textContent='支持 TXT、Markdown、CSV、JSON、RTF、DOC、DOCX'; _fn.classList.remove('has-file'); }
+    if(_fn){
+      const hasDoc=!!(p.storyDoc||'').trim();
+      _fn.textContent=hasDoc?(p.storyFileLabel||'已保存当前任务的内容说明'):'可拖入一个或多个 TXT、DOCX 等文档';
+      _fn.classList.toggle('has-file',hasDoc);
+    }
   }
   if(p.formState){
     ['salesPackType','salesGoal','heroGradStyle','heroFontScale','heroBandPos'].forEach(id=>{ const el=document.getElementById(id); if(el&&p.formState[id]!=null) el.value=p.formState[id]; });
@@ -1582,6 +1598,8 @@ function restoreProject(p){
       document.getElementById('capBtn').disabled  = false;
       document.getElementById('superBtn').disabled= false;
       updateSalesPrimaryState(true);
+      p.sourceMeta=getSourceMeta();
+      scheduleWorkspaceSave();
     };
   }
   // 截帧模式 UI
@@ -1608,6 +1626,7 @@ function restoreProject(p){
   }
   updateFinalAssetUI();
   loadSalesFeedback(p.salesFeedback);
+  renderProjectTabs();
 }
 
 // 整体重建帧缩略图墙
@@ -1654,7 +1673,8 @@ function createProject(file){
     fileSize: fmtSz(file.size), fileFmt: file.name.split('.').pop().toUpperCase(),
     videoUrl: URL.createObjectURL(file), videoBlob:file,
     frames:[], selected:[], batches:[], aiScores:[], imgCache:new Map(),
-    captureMode:'interval', batchIdCnt:0, storyDoc:'', sourceMeta:null,
+    captureMode:'interval', batchIdCnt:0, storyDoc:'', storyFileLabel:'', sourceMeta:null,
+    fileKey:videoFileKey(file),
     finalCoverId:null, finalDetailId:null, salesPlan:null,
   };
   PROJECTS.list.push(p);
@@ -1758,20 +1778,26 @@ function renderProjectTabs(){
   const cnt =document.getElementById('projCount');
   if(!tabs) return;
   // 单个项目时也显示（便于命名），0 个时隐藏
+  const uploadCard=document.querySelector('.upload-compact-card');
+  uploadCard?.classList.toggle('has-projects',PROJECTS.list.length>0);
   if(PROJECTS.list.length===0){ card.style.display='none'; return; }
   card.style.display='';
-  cnt.textContent='（'+PROJECTS.list.length+'）';
-  tabs.innerHTML = PROJECTS.list.map(p=>{
+  const activeIndex=Math.max(0,PROJECTS.list.findIndex(p=>p.id===PROJECTS.activeId));
+  cnt.textContent='当前 '+(activeIndex+1)+' / '+PROJECTS.list.length;
+  tabs.innerHTML = PROJECTS.list.map((p,index)=>{
     const active=p.id===PROJECTS.activeId;
     // 活动项目读取实时 S 计数，非活动读取已保存快照
     const fc=active ? S.frames.length  : (p.frames?p.frames.length:0);
     const bc=active ? S.batches.length : (p.batches?p.batches.length:0);
-    return '<div class="proj-tab'+(active?' active':'')+'" onclick="switchProject('+p.id+')" ondblclick="renameProject('+p.id+')" title="双击重命名">'+
+    const hasResult=!!(active?(typeof SALES!=='undefined'&&SALES.plan):p.salesPlan);
+    const state=hasResult?'已生成':(fc?'已分析':'待生成');
+    return '<div class="proj-tab'+(active?' active':'')+(hasResult?' is-complete':'')+'" role="button" tabindex="0" aria-current="'+(active?'true':'false')+'" onclick="switchProject('+p.id+')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();switchProject('+p.id+');}" ondblclick="renameProject('+p.id+')" title="点击切换，双击重命名">'+
+      '<span class="proj-index">'+(index+1)+'</span>'+
       '<div class="proj-tab-main">'+
         '<div class="proj-tab-name">'+escapeHtml(p.name)+'</div>'+
-        '<div class="proj-tab-meta">'+fc+' 帧 · '+bc+' 拼图</div>'+
+        '<div class="proj-tab-meta"><span class="proj-state">'+state+'</span><span>'+fc+' 个候选画面'+(bc?' · '+bc+' 项资产':'')+'</span></div>'+
       '</div>'+
-      '<div class="proj-tab-del" onclick="event.stopPropagation();deleteProject('+p.id+')" title="删除项目">×</div>'+
+      '<button type="button" class="proj-tab-del" onclick="event.stopPropagation();deleteProject('+p.id+')" title="删除任务" aria-label="删除 '+escapeHtml(p.name)+'">×</button>'+
     '</div>';
   }).join('');
 }
@@ -1867,73 +1893,71 @@ upzone.addEventListener('click', ()=>vInput.click());
 upzone.addEventListener('keydown',e=>{
   if(e.key==='Enter'||e.key===' '){ e.preventDefault(); vInput.click(); }
 });
-upzone.addEventListener('dragover', e=>{e.preventDefault();upzone.classList.add('drag');});
-upzone.addEventListener('dragleave', ()=>upzone.classList.remove('drag'));
-upzone.addEventListener('drop', e=>{
+upzone.addEventListener('dragover', e=>{e.preventDefault();if(e.dataTransfer)e.dataTransfer.dropEffect='copy';upzone.classList.add('drag');});
+upzone.addEventListener('dragleave', e=>{if(!upzone.contains(e.relatedTarget))upzone.classList.remove('drag');});
+upzone.addEventListener('drop', async e=>{
   e.preventDefault(); upzone.classList.remove('drag');
-  const f = e.dataTransfer.files[0];
-  if(f && f.type.startsWith('video/')) loadVideo(f);
-  else toast('请上传视频文件','err');
+  await importVideoFiles(e.dataTransfer.files);
 });
-vInput.addEventListener('change', e=>{ if(e.target.files[0]) loadVideo(e.target.files[0]); });
+vInput.addEventListener('change', async e=>{
+  await importVideoFiles(e.target.files);
+  e.target.value='';
+});
 
 const vPrev = document.getElementById('vPrev');
-function loadVideo(file){
-  const cur = PROJECTS.list.find(x=>x.id===PROJECTS.activeId);
-  let p;
+const VIDEO_EXTENSIONS=new Set(['mp4','mov','avi','mkv','webm','m4v','mpeg','mpg']);
+function videoFileKey(file){
+  return [file.name,file.size,file.lastModified||0].join('|');
+}
+function isVideoFile(file){
+  const ext=(file?.name?.split('.').pop()||'').toLowerCase();
+  return !!file&&(file.type?.startsWith('video/')||VIDEO_EXTENSIONS.has(ext));
+}
+async function importVideoFiles(fileList){
+  if(RUN_STATE.active){ toast('生成进行中，请先取消后再添加视频','warn'); return; }
+  const files=Array.from(fileList||[]);
+  if(!files.length) return;
+  const valid=files.filter(isVideoFile);
+  const invalidCount=files.length-valid.length;
+  if(!valid.length){ toast('没有识别到支持的视频文件','err'); return; }
 
-  if(PROJECTS.list.length===0){
-    // 首次加载：把当前全局状态（含初始默认批次）收编为首个项目，不清空
-    p = createProject(file);
-    PROJECTS.activeId = p.id;
-    saveActiveProject(); // 立即把当前 S（默认批次等）写入该项目
-  } else {
-    const curEmpty = cur && (!S.frames || S.frames.length===0)
-      && (!S.batches || S.batches.length===0 || !S.batches.some(b=>b.cells.some(c=>c!==null)));
-    if(curEmpty){
-      // 当前项目尚未真正使用（无帧、无已填充拼图）→ 复用，仅替换视频
-      if(cur.videoUrl){ try{ URL.revokeObjectURL(cur.videoUrl); }catch(e){} }
-      cur.fileName=file.name; cur.fileSize=fmtSz(file.size); cur.fileFmt=file.name.split('.').pop().toUpperCase();
-      cur.videoUrl=URL.createObjectURL(file);
-      cur.videoBlob=file;
-      cur.name=file.name.replace(/\.[^.]+$/,'').slice(0,24)||cur.name;
-      p=cur;
-    } else {
-      // 保存当前 → 新建独立项目（带默认批次，避免“请先添加批次”）
-      saveActiveProject();
-      p=createProject(file);
-      PROJECTS.activeId=p.id;
-      S.frames=[];S.selected=[];S.aiScores=[];S.imgCache=new Map();S.captureMode='interval';batchIdCnt=0;
-      clearStoryDoc(); // 新视频 = 新项目 → 文档清空，不残留上一个视频的分镜/卖点
-      // 清空旧批次 DOM，生成套件时再创建真实资产
-      S.batches=[];
-      document.getElementById('batchList').querySelectorAll('.batch').forEach(el=>el.remove());
-      const empty=document.getElementById('batchEmpty'); if(empty) empty.style.display='none';
-      if(typeof HISTORY!=='undefined'){HISTORY.stack.length=0;HISTORY.future.length=0;if(typeof updateUndoRedoUI==='function')updateUndoRedoUI();}
-      renderAllFrames();
-      updateSelBadge(); updateDlBtns(); updateAiBtns();
-      document.getElementById('totalN').textContent='0';
-    }
+  const pendingDoc=PROJECTS.activeId==null?(document.getElementById('storyDoc')?.value||''):'';
+  const pendingDocLabel=PROJECTS.activeId==null?(document.getElementById('storyFileName')?.textContent||''):'';
+  saveActiveProject();
+  const existingKeys=new Map(PROJECTS.list.map(p=>[p.fileKey||videoFileKey(p.videoBlob||{}),p]));
+  const selectionKeys=new Set();
+  const created=[];
+  let duplicateCount=0;
+  for(const file of valid){
+    const key=videoFileKey(file);
+    if(existingKeys.has(key)||selectionKeys.has(key)){ duplicateCount++; continue; }
+    selectionKeys.add(key);
+    const project=createProject(file);
+    created.push(project);
   }
 
-  vPrev.src = p.videoUrl;
-  updateSalesPrimaryState(false);
-  document.getElementById('vCon').style.display = 'block';
-  document.getElementById('iSz').textContent  = p.fileSize;
-  document.getElementById('iFmt').textContent = p.fileFmt;
-  vPrev.onloadedmetadata = ()=>{
-    document.getElementById('iDur').textContent = fmtT(vPrev.duration);
-    document.getElementById('iRes').textContent = vPrev.videoWidth+'×'+vPrev.videoHeight;
-    document.getElementById('edt').placeholder  = Math.floor(vPrev.duration)+'s';
-    document.getElementById('capBtn').disabled  = false;
-    document.getElementById('superBtn').disabled = false;
-    updateSalesPrimaryState(true);
-    p.sourceMeta=getSourceMeta();
-    scheduleWorkspaceSave();
-    updateListingChecklist();
-    toast('视频「'+p.name+'」加载成功，可开始截帧');
-  };
+  if(!created.length){
+    const existing=existingKeys.get(videoFileKey(valid[0]));
+    if(existing) switchProject(existing.id);
+    toast('所选视频已在任务队列中','warn');
+    return;
+  }
+
+  if(pendingDoc.trim()){
+    created[0].storyDoc=pendingDoc;
+    created[0].storyFileLabel=pendingDocLabel||'已保存当前任务的内容说明';
+  }
+  PROJECTS.activeId=created[0].id;
+  restoreProject(created[0]);
   renderProjectTabs();
+  scheduleWorkspaceSave();
+  const notes=[];
+  if(duplicateCount) notes.push('跳过 '+duplicateCount+' 个重复文件');
+  if(invalidCount) notes.push('忽略 '+invalidCount+' 个非视频文件');
+  toast('已添加 '+created.length+' 个视频任务'+(notes.length?'，'+notes.join('，'):''));
+}
+function loadVideo(file){
+  return importVideoFiles([file]);
 }
 function fmtSz(b){ return b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB'; }
 function fmtT(s){ return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'); }
@@ -5572,7 +5596,7 @@ function clearStoryDoc(){
   const area=document.getElementById('storyDoc');
   if(area) area.value='';
   const fn=document.getElementById('storyFileName');
-  if(fn){ fn.textContent='支持 TXT、Markdown、CSV、JSON、RTF、DOC、DOCX'; fn.classList.remove('has-file'); }
+  if(fn){ fn.textContent='可拖入一个或多个 TXT、DOCX 等文档'; fn.classList.remove('has-file'); }
   const fi=document.getElementById('storyFileInput');
   if(fi){ try{ fi.value=''; }catch(_){} }
   // 重置销售策略缓存，避免残留上一个视频的卖点
@@ -5669,24 +5693,73 @@ async function readStoryFile(file){
   return text.slice(0,12000);
 }
 
+const STORY_EXTENSIONS=new Set(['txt','md','csv','json','doc','docx','rtf']);
+function isStoryFile(file){
+  const ext=(file?.name?.split('.').pop()||'').toLowerCase();
+  return !!file&&STORY_EXTENSIONS.has(ext);
+}
+async function importStoryFiles(fileList){
+  const files=Array.from(fileList||[]);
+  if(!files.length) return;
+  const valid=files.filter(isStoryFile);
+  const label=document.getElementById('storyFileName');
+  if(!valid.length){
+    if(label) label.textContent='未识别到支持的文本或 Word 文档';
+    toast('请拖入 TXT、Markdown、CSV、JSON、RTF、DOC 或 DOCX','err');
+    return;
+  }
+  const imported=[];
+  const failed=[];
+  let totalChars=0;
+  for(let i=0;i<valid.length;i++){
+    const file=valid[i];
+    try{
+      if(label) label.textContent='正在读取 '+(i+1)+' / '+valid.length+'：'+file.name;
+      const text=await readStoryFile(file);
+      imported.push(valid.length>1?'【'+file.name+'】\n'+text:text);
+      totalChars+=text.length;
+    }catch(err){
+      failed.push({name:file.name,message:err.message||'读取失败'});
+    }
+  }
+  if(imported.length){
+    const area=document.getElementById('storyDoc');
+    const merged=imported.join('\n\n');
+    area.value=area.value.trim()?(area.value.trim()+'\n\n'+merged):merged;
+    if(label){
+      label.textContent='已导入 '+imported.length+' 份文档 · '+totalChars+' 字'+(failed.length?' · '+failed.length+' 份失败':'');
+      label.classList.add('has-file');
+    }
+    saveActiveProject();
+    scheduleWorkspaceSave();
+    updateTaskFlowState();
+    toast('已导入 '+imported.length+' 份文档到当前任务'+(failed.length?'，'+failed.length+' 份读取失败':''),failed.length?'warn':'ok');
+  }else{
+    if(label) label.textContent='文档读取失败：'+failed.map(x=>x.name).join('、');
+    toast(failed[0]?.message||'文档导入失败','err');
+  }
+}
+
 document.getElementById('storyFileBtn')?.addEventListener('click',()=>document.getElementById('storyFileInput')?.click());
 document.getElementById('storyFileInput')?.addEventListener('change',async e=>{
-  const file=e.target.files&&e.target.files[0];
-  if(!file) return;
-  const label=document.getElementById('storyFileName');
-  try{
-    if(label) label.textContent='正在读取：'+file.name;
-    const text=await readStoryFile(file);
-    const area=document.getElementById('storyDoc');
-    area.value = area.value.trim() ? (area.value.trim()+'\n\n'+text) : text;
-    if(label) label.textContent='已导入：'+file.name+' · '+text.length+' 字';
-    toast('已导入分镜/素材文档');
-  }catch(err){
-    if(label) label.textContent='导入失败：'+file.name;
-    toast(err.message||'文档导入失败','err');
-  }finally{
-    e.target.value='';
-  }
+  await importStoryFiles(e.target.files);
+  e.target.value='';
+});
+const storyDropzone=document.getElementById('storyDropzone');
+storyDropzone?.addEventListener('dragover',e=>{
+  e.preventDefault();
+  e.stopPropagation();
+  if(e.dataTransfer)e.dataTransfer.dropEffect='copy';
+  storyDropzone.classList.add('is-dragging');
+});
+storyDropzone?.addEventListener('dragleave',e=>{
+  if(!storyDropzone.contains(e.relatedTarget)) storyDropzone.classList.remove('is-dragging');
+});
+storyDropzone?.addEventListener('drop',async e=>{
+  e.preventDefault();
+  e.stopPropagation();
+  storyDropzone.classList.remove('is-dragging');
+  await importStoryFiles(e.dataTransfer.files);
 });
 
 function showSalesResults(plan){
@@ -5733,6 +5806,7 @@ function showSalesResults(plan){
   document.getElementById('seoKeywords').value=(plan.keywords||[]).join(' ');
   updateListingChecklist();
   updateTaskFlowState();
+  renderProjectTabs();
 }
 
 function docKeywords(doc, type){

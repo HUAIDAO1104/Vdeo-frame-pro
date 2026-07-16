@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const html=await readFile(new URL('../public/app.html',import.meta.url),'utf8');
 const readme=await readFile(new URL('../README.md',import.meta.url),'utf8');
+const css=await readFile(new URL('../public/static/style.css',import.meta.url),'utf8');
 
 test('inline application scripts parse',()=>{
   const scripts=[...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
@@ -73,4 +74,28 @@ test('copy cover and detail can retry independently',()=>{
 test('listing validation requires exactly fifty unique keywords',()=>{
   assert.match(html,/const keywordsOk=keywords\.length===50/);
   assert.match(html,/keywordCount!==50/);
+});
+
+test('video intake imports every selected or dropped video as a project',()=>{
+  assert.match(html,/id="vInput"[^>]*multiple/);
+  assert.match(html,/async function importVideoFiles\(fileList\)/);
+  assert.match(html,/const files=Array\.from\(fileList\|\|\[\]\)/);
+  assert.match(html,/for\(const file of valid\)/);
+  assert.match(html,/importVideoFiles\(e\.dataTransfer\.files\)/);
+  assert.doesNotMatch(html,/e\.dataTransfer\.files\[0\]/);
+});
+
+test('batch project queue is surfaced before the editing columns',()=>{
+  assert.match(html,/id="projectsCard"/);
+  assert.match(html,/当前 '\+\(activeIndex\+1\)\+' \/ '\+PROJECTS\.list\.length/);
+  assert.match(css,/grid-template-areas:"projects projects" "upload kit"/);
+  assert.match(css,/\.upload-compact-card\.has-projects \.upzone/);
+});
+
+test('story documents support multi-select and drag-drop import',()=>{
+  assert.match(html,/id="storyFileInput"[^>]*multiple/);
+  assert.match(html,/id="storyDropzone"/);
+  assert.match(html,/async function importStoryFiles\(fileList\)/);
+  assert.match(html,/storyDropzone\?\.addEventListener\('drop'/);
+  assert.match(html,/importStoryFiles\(e\.dataTransfer\.files\)/);
 });
