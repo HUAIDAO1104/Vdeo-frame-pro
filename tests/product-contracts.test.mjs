@@ -76,6 +76,15 @@ test('listing validation requires exactly fifty unique keywords',()=>{
   assert.match(html,/keywordCount!==50/);
 });
 
+test('SEO model responses normalize common schemas and retry incomplete JSON once',()=>{
+  assert.match(html,/function normalizeSeoPayload\(parsed\)/);
+  assert.match(html,/source\.seoTitle\?\?source\.seo_title\?\?source\.mainTitle/);
+  assert.match(html,/function seoPayloadIssues\(payload\)/);
+  assert.match(html,/let result=await requestSeoPayload\(input,prompt,\{maxTokens:4200,temperature:\.25\}\)/);
+  assert.match(html,/上一轮 SEO 文案结果的数据结构不完整/);
+  assert.match(html,/连续两次未返回完整结构/);
+});
+
 test('video intake imports every selected or dropped video as a project',()=>{
   assert.match(html,/id="vInput"[^>]*multiple/);
   assert.match(html,/async function importVideoFiles\(fileList\)/);

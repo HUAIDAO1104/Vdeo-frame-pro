@@ -6590,6 +6590,68 @@ async function aiSalesPlan(input){
   return parsed;
 }
 
+function chatCompletionText(data){
+  const message=data?.choices?.[0]?.message||{};
+  if(typeof message.content==='string') return message.content.trim();
+  if(Array.isArray(message.content)){
+    const text=message.content.map(part=>typeof part==='string'?part:(part?.text||part?.content||'')).join('\n').trim();
+    if(text) return text;
+  }
+  return String(message.output_text||data?.output_text||message.reasoning_content||'').trim();
+}
+
+function splitSeoList(value){
+  if(Array.isArray(value)) return value.flatMap(item=>typeof item==='string'?[item]:(item==null?[]:[String(item)]));
+  if(value&&typeof value==='object') return Object.values(value).map(String);
+  return String(value||'').split(/[\n,，、;；|]+|\s{2,}/);
+}
+
+function normalizeSeoPayload(parsed){
+  const roots=[parsed,parsed?.result,parsed?.data,parsed?.output].filter(value=>value&&typeof value==='object');
+  const source=roots.find(value=>value.seoTitle||value.seo_title||value.title||value.mainTitle||value['主推标题'])||roots[0]||{};
+  const title=source.seoTitle??source.seo_title??source.mainTitle??source.main_title??source.title??source['主推标题'];
+  const intro=source.seoIntro??source.seo_intro??source.introduction??source.description??source.intro??source['作品简介'];
+  const altValue=source.seoTitleAlts??source.seo_title_alts??source.alternativeTitles??source.alternative_titles??source.altTitles??source['备选标题'];
+  const keywordValue=source.keywords??source.seoKeywords??source.seo_keywords??source.tags??source['关键词'];
+  let alts=splitSeoList(altValue).map(value=>String(value||'').replace(/^备选(?:标题)?[A-B一二12]?[:：\s]*/,'').trim()).filter(Boolean);
+  if(alts.length<2&&typeof altValue==='string') alts=altValue.split(/\s*\|\|\s*|\n+/).map(value=>value.trim()).filter(Boolean);
+  let keywords=[...new Set(splitSeoList(keywordValue).flatMap(value=>String(value||'').split(/\s+/)).map(value=>value.trim()).filter(Boolean))];
+  return {
+    seoTitle:String(Array.isArray(title)?title[0]:(title||'')).trim(),
+    seoTitleAlts:alts,
+    seoIntro:String(Array.isArray(intro)?intro.join(''):(intro||'')).trim(),
+    keywords
+  };
+}
+
+function seoPayloadIssues(payload){
+  const issues=[];
+  if(!payload.seoTitle) issues.push('主推标题缺失');
+  if(payload.seoTitleAlts.length<2) issues.push('备选标题 '+payload.seoTitleAlts.length+'/2');
+  if(!payload.seoIntro) issues.push('作品简介缺失');
+  if(payload.keywords.length<50) issues.push('关键词 '+payload.keywords.length+'/50');
+  return issues;
+}
+
+async function requestSeoPayload(input,prompt,options={}){
+  const resp=await fetch('https://llm-api.mcisaas.com/v1/chat/completions',{
+    method:'POST',
+    signal:currentRunSignal(),
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+input.apiKey},
+    body:JSON.stringify({
+      model:input.seoModel,
+      messages:[{role:'user',content:prompt}],
+      max_tokens:options.maxTokens||3600,
+      temperature:options.temperature??.2
+    })
+  });
+  if(!resp.ok) throw new Error('SEO文案AI失败 '+resp.status+': '+(await resp.text()).slice(0,180));
+  const data=await resp.json();
+  const raw=chatCompletionText(data);
+  const parsed=robustParseJSON(raw);
+  return {payload:parsed?normalizeSeoPayload(parsed):null,raw,finishReason:data?.choices?.[0]?.finish_reason||''};
+}
+
 async function aiSeoOptimize(input, plan){
   if(!input.apiKey) return plan;
   const resolution=getResolutionInfo(input.sourceMeta);
@@ -6624,33 +6686,30 @@ async function aiSeoOptimize(input, plan){
     '视觉方向：'+(plan.visualDirection||'')+'\n'+
     '详情结构：'+(plan.detailRows||[]).map(r=>r.label+' '+(r.text||'')+' '+r.count+'图').join('；')+'\n'+
     '分镜/素材文档：\n'+(input.doc||'用户未提供文档，请根据素材类型和已有策略生成。');
-  const resp=await fetch('https://llm-api.mcisaas.com/v1/chat/completions',{
-    method:'POST',
-    signal:currentRunSignal(),
-    headers:{'Content-Type':'application/json','Authorization':'Bearer '+input.apiKey},
-    body:JSON.stringify({
-      model:input.seoModel,
-      messages:[{role:'user', content:prompt}],
-      max_tokens:2400,
-      temperature:.42
-    })
-  });
-  if(!resp.ok) throw new Error('SEO文案AI失败 '+resp.status+': '+(await resp.text()).slice(0,180));
-  const raw=(await resp.json()).choices?.[0]?.message?.content?.trim()||'';
-  const parsed=robustParseJSON(raw);
-  if(!parsed) throw new Error('SEO文案模型已返回内容，但JSON格式无法解析。原始返回前120字：'+raw.slice(0,120));
-  const keywords=Array.isArray(parsed.keywords)?parsed.keywords:String(parsed.keywords||'').split(/\s+/);
-  if(!parsed.seoTitle||!parsed.seoIntro||!Array.isArray(parsed.seoTitleAlts)||parsed.seoTitleAlts.length<2||keywords.length<50){
-    throw new Error('SEO 文案模型返回字段不完整，已停止生成；请重试或更换模型');
+  let result=await requestSeoPayload(input,prompt,{maxTokens:4200,temperature:.25});
+  if(!result.payload) throw new Error('SEO文案模型 '+input.seoModel+' 已返回内容，但JSON格式无法解析。原始返回前120字：'+result.raw.slice(0,120));
+  let issues=seoPayloadIssues(result.payload);
+  if(issues.length){
+    const repairPrompt=
+      '你上一轮 SEO 文案结果的数据结构不完整。请只修复格式并补齐缺失内容，不要解释，不要代码块。\n'+
+      '严格返回 JSON：{"seoTitle":"主推标题","seoTitleAlts":["备选1","备选2"],"seoIntro":"作品简介","keywords":["关键词1",...]}。\n'+
+      'seoTitle 必须非空；seoTitleAlts 必须恰好2条；seoIntro 必须非空；keywords 必须恰好50个互不重复的中文短词。\n'+
+      '真实性约束：'+specRule+'；'+aiRule+'。不得增加未经确认的属性。\n'+
+      '主题：'+(plan.theme||input.type)+'\n核心卖点：'+(plan.sellingPoints||[]).join(' / ')+'\n'+
+      '上一轮缺失：'+issues.join('、')+'\n上一轮返回：\n'+result.raw.slice(0,7000);
+    result=await requestSeoPayload(input,repairPrompt,{maxTokens:3600,temperature:0});
+    if(!result.payload) throw new Error('SEO文案模型 '+input.seoModel+' 第二次返回仍无法解析为JSON，请切换推荐文案模型');
+    issues=seoPayloadIssues(result.payload);
   }
-  plan.seoTitle=String(parsed.seoTitle).trim();
-  // 2 个备选标题
-  let alts=[];
-  if(Array.isArray(parsed.seoTitleAlts)) alts=parsed.seoTitleAlts;
-  else if(parsed.seoTitleAlts) alts=[String(parsed.seoTitleAlts)];
-  plan.seoTitleAlts=alts.map(x=>String(x||'').trim()).filter(Boolean).slice(0,2);
-  plan.seoIntro=String(parsed.seoIntro).trim();
-  plan.keywords=[...new Set(keywords.map(x=>String(x).trim()).filter(Boolean))];
+  if(issues.length){
+    const stopped=result.finishReason==='length'?'；输出因长度限制被截断':'';
+    throw new Error('SEO文案模型 '+input.seoModel+' 连续两次未返回完整结构：'+issues.join('、')+stopped+'。请重试或切换推荐文案模型');
+  }
+  const parsed=result.payload;
+  plan.seoTitle=parsed.seoTitle;
+  plan.seoTitleAlts=parsed.seoTitleAlts.slice(0,2);
+  plan.seoIntro=parsed.seoIntro;
+  plan.keywords=[...new Set(parsed.keywords.map(x=>String(x).trim()).filter(Boolean))];
   plan.keywords=[...new Set(plan.keywords)].slice(0,50);
   plan.seoTitle=sanitizeSeoClaims(plan.seoTitle,input);
   plan.seoTitleAlts=plan.seoTitleAlts.map(x=>sanitizeSeoClaims(x,input));
