@@ -153,12 +153,22 @@ test('detail long images repair missing frames and balance extension rows',()=>{
   assert.match(html,/const img=\(await loadImg\(S\.frames\[fi\]\?\.dataUrl\)\)\|\|fallbackImg/);
 });
 
-test('detail editing uses a large lazy-loaded frame browser',()=>{
+test('detail editing keeps a persistent paged frame dock beside the long image',()=>{
   assert.match(html,/className='frame-picker-mask'/);
-  assert.match(html,/if\(i<18\) img\.src=f\.dataUrl; else img\.dataset\.src=f\.dataUrl/);
+  assert.match(html,/id="pmFrameDock"/);
+  assert.match(html,/function mountPagedFrameGrid\(grid,cur,onPick,chunkSize=36\)/);
+  assert.match(html,/mountPagedFrameGrid\(grid,cur,detailSlotPickDone,32\)/);
   assert.match(html,/new IntersectionObserver/);
-  assert.match(css,/#previewModal\.detail-open #pmCanvasWrap/);
-  assert.match(css,/\.frame-picker-grid\{[^}]*grid-template-columns:repeat\(auto-fill,minmax\(210px,1fr\)\)/);
+  assert.match(css,/#previewModal\.detail-open\{[^}]*grid-template-columns:minmax\(0,1fr\) 390px/);
+  assert.match(css,/#pmFrameDock \.frame-picker-grid\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(css,/\.frame-picker-item\{[^}]*aspect-ratio:16\/9/);
+});
+
+test('the replacement gallery uses nearly the full desktop viewport without compressing rows',()=>{
+  assert.match(css,/\.frame-picker-dialog\{width:calc\(100vw - 44px\);height:calc\(100vh - 44px\)/);
+  assert.match(css,/\.frame-picker-grid\{[^}]*grid-template-columns:repeat\(auto-fill,minmax\(230px,1fr\)\)/);
+  assert.match(css,/\.frame-picker-grid\{[^}]*grid-auto-rows:max-content/);
+  assert.match(css,/\.frame-picker-item\{[^}]*height:auto!important;aspect-ratio:16\/9/);
 });
 
 test('workspace persistence is deferred away from active editing',()=>{
@@ -171,11 +181,14 @@ test('wide desktop generation uses available space without a central bottleneck'
   assert.match(css,/#tabPane0\.active\.has-projects\{grid-template-columns:minmax\(210px,\.62fr\) minmax\(280px,\.78fr\) minmax\(420px,1\.2fr\)/);
 });
 
-test('new 4K cover candidates enable their truthful badge by default',()=>{
-  assert.match(html,/b\.assetKind='cover';\s*b\.hasBadge=getResolutionInfo\(\)\.is4K/);
+test('new cover candidates enable the 4K badge by default and remember manual overrides',()=>{
+  assert.match(html,/hasBadge:isCover, badgeTouched:false/);
+  assert.match(html,/addBatch\(2,2,false,'cover'\)/);
+  assert.match(html,/if\(b\.assetKind==='cover'&&b\.badgeTouched!==true\) b\.hasBadge=true/);
+  assert.match(html,/b\.badgeTouched=true/);
   assert.match(html,/onchange="setBatchBadge\('/);
   assert.match(html,/封面默认开启，可随时关闭/);
-  assert.match(html,/源视频不足 4K，不能添加 4K 角标/);
+  assert.match(html,/if\(badgeChk\?\.checked && !S\.badgeImg && S\.badgeReady\) await S\.badgeReady/);
 });
 
 test('history is explicit and never auto-restores into a fresh workspace',()=>{
