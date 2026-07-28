@@ -771,6 +771,15 @@ body::before {
   transition:border-color .2s, box-shadow .2s;
 }
 .cinput:focus { outline:none; border-color:var(--accent); box-shadow:0 0 12px var(--accent-glow); }
+.user-defaults-row {
+  display:flex; align-items:center; justify-content:space-between; gap:14px;
+  margin-top:16px; padding:12px; border:1px solid var(--b); border-radius:8px;
+  background:var(--card3);
+}
+.user-defaults-row > div:first-child { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.user-defaults-row strong { color:var(--tp); font-size:var(--fs-sm); }
+.user-defaults-row small { color:var(--tm); font-size:var(--fs-2xs); }
+.user-defaults-row > div:last-child { display:flex; gap:6px; flex-shrink:0; }
 
 /* 截帧模式切换（分段控件） */
 .mode-switch {

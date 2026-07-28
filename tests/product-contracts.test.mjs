@@ -6,6 +6,7 @@ const html=await readFile(new URL('../public/app.html',import.meta.url),'utf8');
 const readme=await readFile(new URL('../README.md',import.meta.url),'utf8');
 const css=await readFile(new URL('../public/static/style.css',import.meta.url),'utf8');
 const desktopRust=await readFile(new URL('../src-tauri/src/lib.rs',import.meta.url),'utf8');
+const desktopMain=await readFile(new URL('../src-tauri/src/main.rs',import.meta.url),'utf8');
 const windowsConfig=await readFile(new URL('../src-tauri/tauri.windows.conf.json',import.meta.url),'utf8');
 const windowsWorkflow=await readFile(new URL('../.github/workflows/windows-desktop.yml',import.meta.url),'utf8');
 const ffmpegScript=await readFile(new URL('../scripts/prepare-windows-ffmpeg.ps1',import.meta.url),'utf8');
@@ -272,11 +273,33 @@ test('desktop generation has bounded extraction and AI deadlines',()=>{
   assert.match(html,/id="mxf"[^>]*value="300"[^>]*max="600"/);
   assert.match(html,/const SALES_RUN_LIMIT_MS=8\*60\*1000/);
   assert.match(html,/async function fetchWithDeadline\(/);
+  assert.match(html,/const body=await response\.arrayBuffer\(\)/);
+  assert.match(html,/function loadImageElement\(src,timeoutMs=10000\)/);
+  assert.match(html,/Promise\.all\(sampleIdx\.map/);
+  assert.match(html,/正在等待销售策略模型响应/);
+  assert.match(html,/正在校验销售策略模型结果/);
+  assert.match(html,/getProjectModelContext\(PROJECTS\.activeId,24000\)/);
   assert.match(html,/const MAX_SEND = 40/);
   assert.match(html,/const BATCH = 10/);
   assert.match(desktopRust,/run_command_with_timeout/);
   assert.match(desktopRust,/\.clamp\(1, 600\)/);
   assert.match(desktopRust,/requested_interval\.max\(segment_duration \/ max_frames as f64\)/);
+});
+
+test('windows release and media tools never open console windows',()=>{
+  assert.match(desktopMain,/windows_subsystem = "windows"/);
+  assert.match(desktopRust,/CREATE_NO_WINDOW/);
+  assert.match(desktopRust,/background_command\(ffmpeg\)/);
+  assert.match(desktopRust,/background_command\(ffprobe\)/);
+});
+
+test('user workflow parameters can be saved and restored across restarts',()=>{
+  assert.match(html,/const USER_DEFAULTS_STORAGE='vfp_user_defaults_v1'/);
+  assert.match(html,/function saveUserDefaults\(\)/);
+  assert.match(html,/function resetUserDefaults\(\)/);
+  assert.match(html,/applyUserDefaults\(\{silent:true\}\)/);
+  assert.match(html,/captureMode:defaults\.captureMode/);
+  assert.match(html,/export:\{format:EXPORT\.format,quality:EXPORT\.quality,scale:EXPORT\.scale\}/);
 });
 
 test('windows installer bundles FFmpeg and has a reproducible CI build',()=>{
@@ -286,4 +309,6 @@ test('windows installer bundles FFmpeg and has a reproducible CI build',()=>{
   assert.match(ffmpegScript,/"ffmpeg-\$TargetTriple\.exe"/);
   assert.match(windowsWorkflow,/runs-on: windows-latest/);
   assert.match(windowsWorkflow,/npm run desktop:build/);
+  assert.match(windowsWorkflow,/SalesKitStudio_\$\{version\}_x64-setup\.exe/);
+  assert.match(windowsWorkflow,/softprops\/action-gh-release@v2/);
 });

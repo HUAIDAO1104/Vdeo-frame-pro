@@ -506,6 +506,13 @@
           <div class="crow"><span class="clabel">开始时间（秒）</span><input type="number" id="stt" class="cinput" value="0" min="0" step="0.1"/></div>
           <div class="crow"><span class="clabel">结束时间（秒）</span><input type="number" id="edt" class="cinput" placeholder="末尾"/></div>
           <div class="crow" style="margin-bottom:0"><span class="clabel">最多截取帧数</span><input type="number" id="mxf" class="cinput" value="300" min="20" max="600"/></div>
+          <div class="user-defaults-row">
+            <div><strong>默认参数</strong><small id="userDefaultsStatus">修改后可保存，重启自动恢复</small></div>
+            <div>
+              <button type="button" class="btn-sm" onclick="saveUserDefaults()">保存当前参数</button>
+              <button type="button" class="btn-sm" onclick="resetUserDefaults()">恢复系统默认</button>
+            </div>
+          </div>
           <div class="sep"></div>
           <button class="btn-p subtle-action" id="capBtn" disabled>仅提取候选画面</button>
 
@@ -1494,7 +1501,12 @@ async function fetchWithDeadline(url,options={},timeoutMs=120000,label='网络�
     controller.abort(new DOMException(label+'超时','TimeoutError'));
   },timeoutMs);
   try{
-    return await fetch(url,{...options,signal:controller.signal});
+    const response=await fetch(url,{...options,signal:controller.signal});
+    const body=await response.arrayBuffer();
+    const headers=new Headers(response.headers);
+    headers.delete('content-encoding');
+    headers.delete('content-length');
+    return new Response(body,{status:response.status,statusText:response.statusText,headers});
   }catch(error){
     if(timedOut){
       throw new Error(label+'超过 '+Math.ceil(timeoutMs/1000)+' 秒仍未响应，已停止等待。请检查网络、模型状态或更换模型后重试');
@@ -1846,13 +1858,15 @@ function createProject(file){
   const name=file.name.replace(/\.[^.]+$/,'').slice(0,24) || ('视频'+id);
   const desktopPath=file.desktopPath||'';
   const videoUrl=desktopPath?DESKTOP_NATIVE.fileUrl(desktopPath):URL.createObjectURL(file);
+  const defaults=projectDefaultsSnapshot();
   const p={
     id, name, fileName:file.name,
     fileSize: fmtSz(file.size), fileFmt: file.name.split('.').pop().toUpperCase(),
     videoUrl, videoBlob:desktopPath?null:file, desktopPath,
     nativeMeta:desktopPath?{duration:Number(file.duration)||0,width:Number(file.width)||0,height:Number(file.height)||0}:null,
     frames:[], selected:[], batches:[], aiScores:[], imgCache:new Map(),
-    captureMode:'interval', batchIdCnt:0, storyDoc:'', manualStoryDoc:'', sourceMeta:null,
+    captureMode:defaults.captureMode, batchIdCnt:0, storyDoc:'', manualStoryDoc:'', sourceMeta:null,
+    formState:defaults.formState,
     fileKey:videoFileKey(file),
     finalCoverId:null, finalDetailId:null, salesPlan:null, generationStatus:'pending', generationError:null,
   };
@@ -1985,9 +1999,7 @@ async function startNewBatch(){
   document.getElementById('superBtn').disabled=true;
   const story=document.getElementById('storyDoc'); if(story) story.value='';
   const storyInput=document.getElementById('storyFileInput'); if(storyInput) storyInput.value='';
-  const packType=document.getElementById('salesPackType'); if(packType) packType.value='自定义';
-  const goal=document.getElementById('salesGoal'); if(goal) goal.value='由AI自动判断';
-  const aiGenerated=document.getElementById('salesAiGenerated'); if(aiGenerated) aiGenerated.checked=false;
+  applyUserDefaults({silent:true});
   document.getElementById('salesResultPanel').style.display='none';
   renderAllFrames(); renderAllBatches(); renderProjectTabs(); renderDocumentMatches();
   updateSelBadge(); updateDlBtns(); updateAiBtns(); updateSalesPrimaryState(false);
@@ -4222,11 +4234,31 @@ function fillModelSelect(id, models, preferred, groupLabel){
   sel.value=unique.includes(current)?current:(unique.includes(preferred)?preferred:unique[0]);
 }
 
-// -------- 本地算法：Laplacian + 亮度 + 饱和度 --------
-function aiAnalyzeFrame(dataUrl){
+function loadImageElement(src,timeoutMs=10000){
   return new Promise(resolve=>{
     const img=new Image();
-    img.onload=()=>{
+    let settled=false;
+    const finish=value=>{
+      if(settled) return;
+      settled=true;
+      clearTimeout(timer);
+      img.onload=null;
+      img.onerror=null;
+      resolve(value);
+    };
+    const timer=setTimeout(()=>finish(null),timeoutMs);
+    img.onload=()=>finish(img);
+    img.onerror=()=>finish(null);
+    img.src=src;
+  });
+}
+
+// -------- 本地算法：Laplacian + 亮度 + 饱和度 --------
+async function aiAnalyzeFrame(dataUrl){
+  const empty={sharpness:0,brightScore:0,saturation:0,thumbUrl:'',meanLum:0};
+  const img=await loadImageElement(dataUrl,10000);
+  if(!img) return empty;
+  try{
       const SZ=64;
       const c=document.createElement('canvas'); c.width=SZ; c.height=Math.round(SZ*img.height/img.width)||36;
       const ctx=c.getContext('2d'); ctx.drawImage(img,0,0,c.width,c.height);
@@ -4257,19 +4289,19 @@ function aiAnalyzeFrame(dataUrl){
       const maxC=Math.max(meanR,meanG,meanB), minC=Math.min(meanR,meanG,meanB);
       const saturation=maxC>0?(maxC-minC)/maxC:0;
       const thumbUrl=c.toDataURL('image/jpeg',.4);
-      resolve({sharpness, brightScore:Math.max(0,brightScore), saturation, thumbUrl, meanLum:meanL});
-    };
-    img.onerror=()=>resolve({sharpness:0,brightScore:0,saturation:0,thumbUrl:'',meanLum:0});
-    img.src=dataUrl;
-  });
+      return {sharpness, brightScore:Math.max(0,brightScore), saturation, thumbUrl, meanLum:meanL};
+  }catch(error){
+    console.warn('本地画面分析失败',error);
+    return empty;
+  }
 }
 
 // -------- Vision API：压缩帧 → base64 → 批量评分 --------
 // 压缩到 256×144 (16:9)，满足模型最小10px要求，体积约8-15KB
-function compressFrameForVision(dataUrl){
-  return new Promise(resolve=>{
-    const img=new Image();
-    img.onload=()=>{
+async function compressFrameForVision(dataUrl){
+  const img=await loadImageElement(dataUrl,10000);
+  if(!img) return null;
+  try{
       const c=document.createElement('canvas');
       c.width=256; c.height=144;
       const ctx=c.getContext('2d');
@@ -4280,11 +4312,11 @@ function compressFrameForVision(dataUrl){
       ctx.drawImage(img,sx,sy,sw,sh,0,0,256,144);
       const dataURL=c.toDataURL('image/jpeg',0.75);
       const b64=dataURL.split(',')[1];
-      resolve(b64 && b64.length>100 ? b64 : null);
-    };
-    img.onerror=()=>resolve(null);
-    img.src=dataUrl;
-  });
+      return b64 && b64.length>100 ? b64 : null;
+  }catch(error){
+    console.warn('视觉画面压缩失败',error);
+    return null;
+  }
 }
 
 // 单批次调用 Vision API，frames = [{frameIdx, b64}]（b64必须非null）
@@ -4434,16 +4466,16 @@ function setAiProgress(pct, label){
 async function buildPixCache(frameIndices, getThumbFn){
   const cache={};
   for(const idx of frameIndices){
-    cache[idx] = await new Promise(r=>{
-      const img=new Image();
-      img.onload=()=>{
+    const img=await loadImageElement(getThumbFn(idx),10000);
+    if(!img){
+      cache[idx]=null;
+    }else{
+      try{
         const c=document.createElement('canvas'); c.width=16; c.height=9;
         c.getContext('2d').drawImage(img,0,0,16,9);
-        r(c.getContext('2d').getImageData(0,0,16,9).data);
-      };
-      img.onerror=()=>r(null);
-      img.src = getThumbFn(idx);
-    });
+        cache[idx]=c.getContext('2d').getImageData(0,0,16,9).data;
+      }catch(_){ cache[idx]=null; }
+    }
     await sleep(0);
   }
   return cache;
@@ -5729,6 +5761,131 @@ function checkDlAllBtn(){
 
 // ── 导出选项 ──
 const EXPORT = { format:'jpeg', quality:0.95, scale:1 }; // scale: 0.5 / 1 / 2
+const USER_DEFAULTS_STORAGE='vfp_user_defaults_v1';
+const SYSTEM_USER_DEFAULTS={
+  controls:{
+    salesPackType:'自定义',
+    salesGoal:'由AI自动判断',
+    salesUseText:true,
+    salesMakeAltCovers:true,
+    salesAiGenerated:false,
+    heroGradStyle:'red',
+    heroFontScale:'0.42',
+    heroBandPos:'top',
+    itvl:'1',
+    sceneSens:'30',
+    sceneMinGap:'0.5',
+    mxf:'300',
+    aiN:'15',
+    aiPromptHint:'',
+    aiModel:'qwen3-vl-flash-2026-01-22',
+    aiSeoModel:'claude-opus-4-8'
+  },
+  captureMode:'interval',
+  export:{format:'jpeg',quality:.95,scale:1},
+  thumbSize:130,
+  savedAt:0
+};
+const USER_DEFAULT_CONTROL_IDS=Object.keys(SYSTEM_USER_DEFAULTS.controls);
+
+function readUserDefaults(){
+  let stored={};
+  try{ stored=JSON.parse(localStorage.getItem(USER_DEFAULTS_STORAGE)||'{}')||{}; }catch(_){}
+  return {
+    ...SYSTEM_USER_DEFAULTS,
+    ...stored,
+    controls:{...SYSTEM_USER_DEFAULTS.controls,...(stored.controls||{})},
+    export:{...SYSTEM_USER_DEFAULTS.export,...(stored.export||{})}
+  };
+}
+
+function setDefaultControlValue(id,value){
+  const el=document.getElementById(id);
+  if(!el||value==null) return;
+  if(el.type==='checkbox'){ el.checked=!!value; return; }
+  if(el.tagName==='SELECT'&&!Array.from(el.options).some(option=>option.value===String(value))){
+    el.add(new Option(String(value)+'（已保存）',String(value)));
+  }
+  if(el.type==='number'||el.type==='range'){
+    const min=el.min===''?-Infinity:Number(el.min);
+    const max=el.max===''?Infinity:Number(el.max);
+    const parsed=Number(value);
+    if(Number.isFinite(parsed)) value=String(Math.max(min,Math.min(max,parsed)));
+  }
+  el.value=String(value);
+}
+
+function collectUserDefaults(){
+  const controls={};
+  USER_DEFAULT_CONTROL_IDS.forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    controls[id]=el.type==='checkbox'?!!el.checked:el.value;
+  });
+  return {
+    controls,
+    captureMode:S.captureMode||'interval',
+    export:{format:EXPORT.format,quality:EXPORT.quality,scale:EXPORT.scale},
+    thumbSize:Number(document.getElementById('thumbSizeSlider')?.value)||130,
+    savedAt:Date.now()
+  };
+}
+
+function applyUserDefaults(options={}){
+  const defaults=options.defaults||readUserDefaults();
+  USER_DEFAULT_CONTROL_IDS.forEach(id=>setDefaultControlValue(id,defaults.controls[id]));
+  EXPORT.format=defaults.export.format;
+  EXPORT.quality=Number(defaults.export.quality)||.95;
+  EXPORT.scale=Number(defaults.export.scale)||1;
+  setCaptureMode(defaults.captureMode==='scene'?'scene':'interval');
+  updateSceneSensLabel();
+  syncSalesGoalUI();
+  syncModelPresetUI();
+  const thumb=document.getElementById('thumbSizeSlider');
+  if(thumb){
+    thumb.value=String(defaults.thumbSize||130);
+    thumb.dispatchEvent(new Event('input'));
+  }
+  const status=document.getElementById('userDefaultsStatus');
+  if(status){
+    status.textContent=defaults.savedAt
+      ? '已保存，软件重启后自动恢复'
+      : '当前使用系统默认参数';
+  }
+  if(!options.silent) toast('默认参数已应用');
+  return defaults;
+}
+
+function saveUserDefaults(){
+  const defaults=collectUserDefaults();
+  localStorage.setItem(USER_DEFAULTS_STORAGE,JSON.stringify(defaults));
+  applyUserDefaults({defaults,silent:true});
+  toast('当前模型、抽帧、销售、详情、导出与视图参数已保存为默认');
+}
+
+function resetUserDefaults(){
+  localStorage.removeItem(USER_DEFAULTS_STORAGE);
+  applyUserDefaults({defaults:structuredClone(SYSTEM_USER_DEFAULTS),silent:true});
+  toast('已恢复系统默认参数');
+}
+
+function projectDefaultsSnapshot(){
+  const defaults=readUserDefaults();
+  const controls=defaults.controls;
+  return {
+    captureMode:defaults.captureMode,
+    formState:{
+      salesPackType:controls.salesPackType,
+      salesGoal:controls.salesGoal,
+      salesUseText:!!controls.salesUseText,
+      salesMakeAltCovers:!!controls.salesMakeAltCovers,
+      salesAiGenerated:!!controls.salesAiGenerated,
+      heroGradStyle:controls.heroGradStyle,
+      heroFontScale:controls.heroFontScale,
+      heroBandPos:controls.heroBandPos
+    }
+  };
+}
 
 function openExportOptions(){
   document.getElementById('exportModal')?.remove();
@@ -5946,9 +6103,7 @@ async function exportListingPackage(){
 
 function loadImg(src){
   if(S.imgCache.has(src)) return S.imgCache.get(src);
-  const p = new Promise(r=>{
-    const img=new Image(); img.onload=()=>r(img); img.onerror=()=>r(null); img.src=src;
-  });
+  const p=loadImageElement(src,12000);
   S.imgCache.set(src, p);
   return p;
 }
@@ -6384,7 +6539,7 @@ function clearStoryDoc(){
 
 function salesInputs(){
   return {
-    doc: getProjectModelContext(PROJECTS.activeId),
+    doc: getProjectModelContext(PROJECTS.activeId,24000),
     type: document.getElementById('salesPackType')?.value || '自定义',
     goal: document.getElementById('salesGoal')?.value || '由AI自动判断',
     useText: !!document.getElementById('salesUseText')?.checked,
@@ -6849,8 +7004,9 @@ function robustParseJSON(raw){
   return p;
 }
 
-async function aiSalesPlan(input){
+async function aiSalesPlan(input,reportStage=()=>{}){
   if(!input.apiKey) return fallbackSalesPlan(input);
+  reportStage('正在准备视频抽样画面...');
   const sampleIdx = pickEvenFrames(Math.min(S.frames.length, 8));
   const content=[{
     type:'text',
@@ -6858,15 +7014,19 @@ async function aiSalesPlan(input){
       '你是光厂视频素材包的高级产品经理、视觉策划和SEO运营。请结合分镜文档、素材类型、销售目标和视频抽样画面，输出适合光厂售卖的上架方案。\n'+
 	      '必须严格输出纯JSON，不要代码块。JSON字段：theme(string), sellingPoints(string[3-5]), visualDirection(string), coverPlans([{name,score,themeScore,clickScore,richnessScore,reason}] 3个，所有分数0-100), detailRows([{label,count,text}] 4-8行，前三行count必须为3，后续每行count为1-3), seoTitle(string), seoIntro(string，不写时长，重点写内容/适用场景/商业用途), keywords(string[50])。\n'+
 	      '封面目标：一眼表达素材包主题、四宫格有点击冲击力。详情目标：前三行是升级版3×3九宫格基础详情，后续按内容延展；每行文字必须精简，label不超过8字，text不超过18字，突出明确卖点。\n'+
-      '素材类型：'+input.type+'\n销售目标：'+input.goal+'\n是否允许详情图文字：'+(input.useText?'允许少量文字':'尽量纯图')+'\n分镜/素材文档：\n'+(input.doc||'用户未提供文档，请根据视频画面和素材类型判断。')
+      '素材类型：'+input.type+'\n销售目标：'+input.goal+'\n是否允许详情图文字：'+(input.useText?'允许少量文字':'尽量纯图')+'\n分镜/素材文档：\n'+(modelContextExcerpt(input.doc,16000)||'用户未提供文档，请根据视频画面和素材类型判断。')
   }];
-  for(const fi of sampleIdx){
-    const b64=await compressFrameForVision(S.frames[fi].dataUrl);
+  const compressedSamples=await Promise.all(sampleIdx.map(async fi=>({
+    fi,
+    b64:await compressFrameForVision(S.frames[fi].dataUrl)
+  })));
+  for(const {fi,b64} of compressedSamples){
     if(b64){
       content.push({type:'text', text:'视频抽样帧 #'+(fi+1)+'，时间 '+S.frames[fi].time.toFixed(1)+'s'});
       content.push({type:'image_url', image_url:{url:'data:image/jpeg;base64,'+b64, detail:'low'}});
     }
   }
+  reportStage('正在等待销售策略模型响应...');
   const resp=await fetchWithDeadline('https://llm-api.mcisaas.com/v1/chat/completions',{
     method:'POST',
     signal:currentRunSignal(),
@@ -6879,6 +7039,7 @@ async function aiSalesPlan(input){
     })
   },150000,'销售策略模型');
   if(!resp.ok) throw new Error('销售策略AI失败 '+resp.status+': '+(await resp.text()).slice(0,180));
+  reportStage('正在校验销售策略模型结果...');
   const raw=(await resp.json()).choices?.[0]?.message?.content?.trim()||'';
   const parsed=robustParseJSON(raw);
   if(!parsed || !parsed.theme){
@@ -7894,7 +8055,9 @@ async function retrySalesPart(kind,button){
   try{
     if(kind==='copy'){
       setSalesProgress(20,'正在重新理解文案要求...');
-      let plan=input.apiKey?await aiSalesPlan(input):fallbackSalesPlan(input);
+      let plan=input.apiKey
+        ? await aiSalesPlan(input,text=>setSalesProgress(20,text))
+        : fallbackSalesPlan(input);
       ensureRunCurrent(run);
       setSalesProgress(65,input.apiKey?'正在重新优化标题、简介和关键词...':'正在重新整理本地基础文案...');
       plan=await aiSeoOptimize(input,plan); ensureRunCurrent(run);
@@ -7951,7 +8114,7 @@ async function runSalesCopyOnly(){
   const run=beginSalesRun();
   try{
     setSalesProgress(20,input.apiKey?'正在分析销售策略...':'正在生成本地基础文案...');
-    let plan=await aiSalesPlan(input); ensureRunCurrent(run);
+    let plan=await aiSalesPlan(input,text=>setSalesProgress(20,text)); ensureRunCurrent(run);
     setSalesProgress(68,input.apiKey?'正在优化 SEO 文案...':'正在整理标题与关键词...');
     plan=await aiSeoOptimize(input,plan); ensureRunCurrent(run);
     plan.generationMode=input.generationMode;
@@ -7999,7 +8162,7 @@ async function runSalesKit(options={}){
     if(!(await ensureSalesFrames())) throw new Error('未能提取候选画面');
     ensureRunCurrent(run);
     progress(24,input.apiKey?'正在理解内容与销售卖点...':'正在生成本地基础策略...');
-    let plan=await aiSalesPlan(input); ensureRunCurrent(run);
+    let plan=await aiSalesPlan(input,text=>progress(24,text)); ensureRunCurrent(run);
     progress(36,input.apiKey?'正在优化标题、简介和关键词...':'正在整理基础文案...');
     plan=await aiSeoOptimize(input, plan); ensureRunCurrent(run);
     plan.generationMode=input.generationMode;
@@ -8868,6 +9031,7 @@ try{ relocateUnifiedPanels(0); }catch(_){}
 
 // 初始化拼图意图提示 + 记录用户是否手动改过推荐帧数
 try{ setAiIntent(S.aiIntent || 'auto'); }catch(_){}
+try{ applyUserDefaults({silent:true}); }catch(error){ console.warn('恢复默认参数失败',error); }
 try{ const nEl=document.getElementById('aiN'); if(nEl) nEl.addEventListener('input', ()=>{ nEl._userTouched=true; }); }catch(_){}
 document.addEventListener('input',e=>{
   if(e.target?.id==='aiApiKey') updateAiConnectionUI();

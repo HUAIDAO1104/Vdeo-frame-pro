@@ -3,7 +3,9 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
-    env, fs,
+    env,
+    ffi::OsStr,
+    fs,
     io::Read,
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -78,6 +80,22 @@ struct TimedProcessOutput {
     success: bool,
     timed_out: bool,
     stderr: Vec<u8>,
+}
+
+fn background_command<S: AsRef<OsStr>>(program: S) -> Command {
+    let command = Command::new(program);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let mut command = command;
+        command.creation_flags(CREATE_NO_WINDOW);
+        command
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        command
+    }
 }
 
 fn run_command_with_timeout(
@@ -180,7 +198,7 @@ fn executable_name(tool: &str) -> String {
 }
 
 fn tool_works(path: &Path) -> bool {
-    Command::new(path)
+    background_command(path)
         .arg("-version")
         .output()
         .map(|output| output.status.success())
@@ -218,7 +236,7 @@ fn find_tool(app: &AppHandle, tool: &str) -> Option<PathBuf> {
 }
 
 fn detect_hardware_accelerations(ffmpeg: &Path) -> Vec<String> {
-    let Ok(output) = Command::new(ffmpeg)
+    let Ok(output) = background_command(ffmpeg)
         .args(["-hide_banner", "-hwaccels"])
         .output()
     else {
@@ -242,7 +260,7 @@ fn detect_hardware_accelerations(ffmpeg: &Path) -> Vec<String> {
 }
 
 fn probe_video(ffprobe: &Path, path: &Path) -> Result<(f64, u32, u32), String> {
-    let output = Command::new(ffprobe)
+    let output = background_command(ffprobe)
         .args([
             "-v",
             "error",
@@ -594,7 +612,7 @@ fn extract_video_frames_blocking(
     let output_pattern = cache_dir.join("frame-%06d.jpg");
     let run_capture =
         |use_hardware: bool, timeout: Duration| -> Result<TimedProcessOutput, String> {
-            let mut command = Command::new(&ffmpeg);
+            let mut command = background_command(&ffmpeg);
             command.args(["-hide_banner", "-loglevel", "info"]);
             if use_hardware {
                 command.args(["-hwaccel", "auto"]);
