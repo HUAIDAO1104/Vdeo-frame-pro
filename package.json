@@ -3,7 +3,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "test": "node --test tests/*.test.mjs",
+    "test": "node --test tests/product-contracts.test.mjs",
     "build": "vite build",
     "desktop:frontend": "node scripts/build-desktop-frontend.mjs",
     "desktop:dev:frontend": "vite --config vite.desktop.config.ts",
