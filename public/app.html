@@ -1717,6 +1717,7 @@ function saveActiveProject(){
 
 // 从项目载回到全局 S 并整体重渲染
 function restoreProject(p){
+  clearDesktopCanvasSourceCache();
   S.frames     = p.frames     || [];
   S.selected   = p.selected   || [];
   S.batches    = p.batches    || [];
@@ -1989,6 +1990,7 @@ async function startNewBatch(){
   BATCH_DOCUMENTS.list=[]; BATCH_DOCUMENTS.idCnt=0; BATCH_DOCUMENTS.lastMode='none'; BATCH_DOCUMENTS.lastError='';
   WORKSPACE_SESSION_ID='session-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
   WORKSPACE_HISTORY_NAME='';
+  clearDesktopCanvasSourceCache();
   S.frames=[]; S.selected=[]; S.batches=[]; S.aiScores=[]; S.imgCache=new Map();
   S.finalCoverId=null; S.finalDetailId=null; S.lastPick=null; S.dirty=false; batchIdCnt=0;
   SALES.plan=null; SALES.detailCanvas=null; SALES.detailRows=[]; SALES.usedFrames=null; SALES.versions=[];
@@ -2022,6 +2024,7 @@ function deleteProjectNoConfirm(id){
   PROJECTS.list.splice(idx,1);
   if(PROJECTS.list.length===0){
     PROJECTS.activeId=null;
+    clearDesktopCanvasSourceCache();
     S.frames=[];S.selected=[];S.batches=[];S.aiScores=[];S.imgCache=new Map();batchIdCnt=0;
     clearStoryDoc(); // 视频已全部移除 → 文档一并清除
     vPrev.removeAttribute('src'); vPrev.load();
@@ -2499,6 +2502,7 @@ async function doDesktopCapture(project,mode='interval'){
   const sens=parseInt(document.getElementById('sceneSens').value)||30;
   if(!duration||st>=ed){ toast('视频时间范围有误','err'); return true; }
 
+  clearDesktopCanvasSourceCache();
   S.frames=[]; S.selected=[]; S.aiScores=[]; S.imgCache=new Map();
   if(S.onlySelected){ S.onlySelected=false; syncOnlySelBtn(); }
   updateSelBadge(); updateDlBtns();
@@ -2598,6 +2602,7 @@ async function doCapture(){
   const times=[];
   for(let t=st; t<=ed&&times.length<mx; t=Math.round((t+iv)*1000)/1000) times.push(t);
 
+  clearDesktopCanvasSourceCache();
   S.frames=[]; S.selected=[]; S.aiScores=[]; S.imgCache = new Map();
   if(S.onlySelected){ S.onlySelected=false; syncOnlySelBtn(); }  // 重新截帧时退出「只看已选」
   updateSelBadge();
@@ -2703,6 +2708,7 @@ async function doCaptureScene(){
   // 探测间隔：在时间轴上以较密的步长扫描
   const probeStep = Math.max(0.2, Math.min(1, minGap/2));
 
+  clearDesktopCanvasSourceCache();
   S.frames=[]; S.selected=[]; S.aiScores=[]; S.imgCache = new Map();
   if(S.onlySelected){ S.onlySelected=false; syncOnlySelBtn(); }  // 重新截帧时退出「只看已选」
   updateSelBadge(); updateDlBtns();
@@ -3146,10 +3152,10 @@ async function idbClearAll(){
 }
 
 // ── 压缩帧为小尺寸缩略图存储（120×68，约 3-5KB）──
-function compressForMemory(dataUrl){
-  return new Promise(res=>{
-    const img = new Image();
-    img.onload = ()=>{
+async function compressForMemory(dataUrl){
+  const img=await loadImageElement(dataUrl,10000);
+  if(!img) return null;
+  try{
       const c = document.createElement('canvas');
       c.width=120; c.height=68;
       const ctx = c.getContext('2d');
@@ -3158,11 +3164,11 @@ function compressForMemory(dataUrl){
       if(ar>120/68){ sw=Math.round(img.height*(120/68)); sx=(img.width-sw)/2; }
       else          { sh=Math.round(img.width/(120/68)); sy=(img.height-sh)/2; }
       ctx.drawImage(img,sx,sy,sw,sh,0,0,120,68);
-      res(c.toDataURL('image/jpeg',0.6));
-    };
-    img.onerror = ()=>res(null);
-    img.src = dataUrl;
-  });
+      return c.toDataURL('image/jpeg',0.6);
+  }catch(error){
+    LAST_FRAME_LOAD_ERROR=error?.message||String(error);
+    return null;
+  }
 }
 
 // ── 清除所有审美记忆 ──
@@ -4234,22 +4240,84 @@ function fillModelSelect(id, models, preferred, groupLabel){
   sel.value=unique.includes(current)?current:(unique.includes(preferred)?preferred:unique[0]);
 }
 
+const DESKTOP_CANVAS_SOURCES=new Map();
+const DESKTOP_CANVAS_PENDING=new Map();
+const DESKTOP_CANVAS_SOURCE_LIMIT=96;
+let LAST_FRAME_LOAD_ERROR='';
+
+function clearDesktopCanvasSourceCache(){
+  DESKTOP_CANVAS_SOURCES.forEach(url=>URL.revokeObjectURL(url));
+  DESKTOP_CANVAS_SOURCES.clear();
+  DESKTOP_CANVAS_PENDING.clear();
+}
+
+function frameForCanvasSource(src){
+  return S.frames.find(frame=>frame?.filePath&&frame.dataUrl===src)||null;
+}
+
+function ipcFrameBytes(payload){
+  if(payload instanceof ArrayBuffer) return new Uint8Array(payload);
+  if(ArrayBuffer.isView(payload)) return new Uint8Array(payload.buffer,payload.byteOffset,payload.byteLength);
+  if(Array.isArray(payload)) return Uint8Array.from(payload);
+  throw new Error('桌面端返回了无法识别的帧数据');
+}
+
+async function canvasSafeFrameSource(src){
+  if(!DESKTOP_NATIVE.enabled||!src||src.startsWith('blob:')||src.startsWith('data:')) return src;
+  const frame=frameForCanvasSource(src);
+  if(!frame) return src;
+  const key=frame.filePath+'|'+src;
+  if(DESKTOP_CANVAS_SOURCES.has(key)){
+    const cached=DESKTOP_CANVAS_SOURCES.get(key);
+    DESKTOP_CANVAS_SOURCES.delete(key);
+    DESKTOP_CANVAS_SOURCES.set(key,cached);
+    return cached;
+  }
+  if(DESKTOP_CANVAS_PENDING.has(key)) return DESKTOP_CANVAS_PENDING.get(key);
+  const pending=DESKTOP_NATIVE.invoke('read_cached_frame',{path:frame.filePath}).then(payload=>{
+    const bytes=ipcFrameBytes(payload);
+    const extension=String(frame.filePath).split('.').pop().toLowerCase();
+    const mime=extension==='png'?'image/png':extension==='webp'?'image/webp':'image/jpeg';
+    const url=URL.createObjectURL(new Blob([bytes],{type:mime}));
+    DESKTOP_CANVAS_SOURCES.set(key,url);
+    while(DESKTOP_CANVAS_SOURCES.size>DESKTOP_CANVAS_SOURCE_LIMIT){
+      const oldest=DESKTOP_CANVAS_SOURCES.keys().next().value;
+      const oldUrl=DESKTOP_CANVAS_SOURCES.get(oldest);
+      DESKTOP_CANVAS_SOURCES.delete(oldest);
+      if(oldUrl) URL.revokeObjectURL(oldUrl);
+    }
+    return url;
+  }).finally(()=>DESKTOP_CANVAS_PENDING.delete(key));
+  DESKTOP_CANVAS_PENDING.set(key,pending);
+  return pending;
+}
+
 function loadImageElement(src,timeoutMs=10000){
   return new Promise(resolve=>{
-    const img=new Image();
+    let img=null;
     let settled=false;
     const finish=value=>{
       if(settled) return;
       settled=true;
       clearTimeout(timer);
-      img.onload=null;
-      img.onerror=null;
+      if(img){ img.onload=null; img.onerror=null; }
       resolve(value);
     };
     const timer=setTimeout(()=>finish(null),timeoutMs);
-    img.onload=()=>finish(img);
-    img.onerror=()=>finish(null);
-    img.src=src;
+    canvasSafeFrameSource(src).then(safeSrc=>{
+      if(settled) return;
+      img=new Image();
+      img.onload=()=>finish(img);
+      img.onerror=()=>{
+        LAST_FRAME_LOAD_ERROR='图片资源无法解码';
+        finish(null);
+      };
+      img.src=safeSrc;
+    }).catch(error=>{
+      LAST_FRAME_LOAD_ERROR=error?.message||String(error);
+      console.warn('读取桌面帧失败',error);
+      finish(null);
+    });
   });
 }
 
@@ -4314,6 +4382,7 @@ async function compressFrameForVision(dataUrl){
       const b64=dataURL.split(',')[1];
       return b64 && b64.length>100 ? b64 : null;
   }catch(error){
+    LAST_FRAME_LOAD_ERROR=error?.message||String(error);
     console.warn('视觉画面压缩失败',error);
     return null;
   }
@@ -4632,6 +4701,7 @@ async function runVisionPick(N, apiKey, model, hintText, intent){
   }
 
   // Step1: compress sampled frames
+  LAST_FRAME_LOAD_ERROR='';
   setAiProgress(0, '正在压缩帧（共'+sendIndices.length+'帧）...');
   const compressed = [];
   for(let j=0; j<sendIndices.length; j++){
@@ -4641,7 +4711,9 @@ async function runVisionPick(N, apiKey, model, hintText, intent){
     if(j%5===0) setAiProgress(j/sendIndices.length*28, '压缩帧 '+(j+1)+'/'+sendIndices.length);
     await sleep(0);
   }
-  if(compressed.length === 0) throw new Error('所有帧压缩失败，请检查视频帧数据');
+  if(compressed.length === 0){
+    throw new Error('所有帧压缩失败'+(LAST_FRAME_LOAD_ERROR?'：'+LAST_FRAME_LOAD_ERROR:'，请检查视频帧数据'));
+  }
 
   // 每批 10 张，最多 4 次模型请求；最终替换图库仍保留全部本地候选帧。
   const BATCH = 10;
@@ -5353,7 +5425,7 @@ function pickFrame(b, ci, fromPreview=false){
 }
 
 function showFramePicker(b, ci){
-  document.getElementById('framePicker')?.remove();
+  closeFramePicker();
   const current = b.cells[ci];
   const picker = document.createElement('div');
   picker.id='framePicker';
@@ -5361,13 +5433,13 @@ function showFramePicker(b, ci){
   picker.innerHTML=
     '<div class="frame-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="framePickerTitle">'+
       '<header><div><span>替换封面画面</span><h3 id="framePickerTitle">'+escapeHtmlSafe(b.title||'销售图 #'+b.id)+'</h3><p>位置 #'+(ci+1)+(current!==null?' · 当前为第 '+(current+1)+' 帧':'')+'，单击候选画面即可替换</p></div>'+
-      '<button type="button" class="frame-picker-close" aria-label="关闭" onclick="document.getElementById(\'framePicker\')?.remove()">×</button></header>'+
+      '<button type="button" class="frame-picker-close" aria-label="关闭" onclick="closeFramePicker()">×</button></header>'+
       '<div class="frame-picker-toolbar"><strong>全部候选画面</strong><div style="display:flex;align-items:center;gap:10px;">'+
-        (current!==null?'<button class="btn-sm" onclick="removeCell('+b.id+','+ci+');document.getElementById(\'framePicker\')?.remove();">清除此格</button>':'')+
-        '<span>'+S.frames.length+' 张 · 滚动时按需加载</span></div></div>'+
+        (current!==null?'<button class="btn-sm" onclick="removeCell('+b.id+','+ci+');closeFramePicker();">清除此格</button>':'')+
+        '<span>'+S.frames.length+' 张 · 视口虚拟化加载</span></div></div>'+
       '<div id="fpGrid" class="frame-picker-grid"></div>'+
     '</div>';
-  picker.addEventListener('click', e=>{ if(e.target===picker) picker.remove(); });
+  picker.addEventListener('click', e=>{ if(e.target===picker) closeFramePicker(); });
   document.body.appendChild(picker);
   const fpGrid = picker.querySelector('#fpGrid');
   renderFramePickerGrid(fpGrid, b, ci);
@@ -5375,11 +5447,11 @@ function showFramePicker(b, ci){
 }
 
 function renderFramePickerGrid(grid, b, ci){
-  mountPagedFrameGrid(grid,b.cells[ci],fi=>pickDone(b.id,ci,fi),40);
+  mountVirtualFrameGrid(grid,b.cells[ci],fi=>pickDone(b.id,ci,fi));
 }
 
 function pickDone(bid, ci, fi){
-  document.getElementById('framePicker')?.remove();
+  closeFramePicker();
   const b=S.batches.find(x=>x.id===bid); if(!b) return;
   pushHistory();
   b.cells[ci]=fi; renderCell(b,ci);
@@ -8540,7 +8612,7 @@ function openDetailSlotPicker(b, slot){
   showDetailFramePicker(b, slot, cur);
 }
 
-function createFramePickerItem(i,cur,onPick,imageObserver){
+function createFramePickerItem(i,cur,onPick){
   const f=S.frames[i];
   const item=document.createElement('button');
   item.type='button';
@@ -8551,8 +8623,7 @@ function createFramePickerItem(i,cur,onPick,imageObserver){
   img.alt='第 '+(i+1)+' 帧';
   img.decoding='async';
   img.loading='lazy';
-  if(imageObserver){ img.dataset.src=f?.dataUrl||''; imageObserver.observe(img); }
-  else img.src=f?.dataUrl||'';
+  img.src=f?.dataUrl||'';
   item.appendChild(img);
   const meta=document.createElement('span');
   meta.innerHTML='<b>第 '+(i+1)+' 帧</b><small>'+fmtT(f?.time||0)+'</small>';
@@ -8561,53 +8632,119 @@ function createFramePickerItem(i,cur,onPick,imageObserver){
   return item;
 }
 
-// 只在用户滚动接近底部时追加下一批节点，避免数百张截图同时参与布局与解码。
-function mountPagedFrameGrid(grid,cur,onPick,chunkSize=36){
-  if(!grid) return;
-  const token=String(Date.now())+'-'+Math.random();
-  grid.dataset.renderToken=token;
-  grid.innerHTML='';
-  let offset=0;
-  let loading=false;
-  const imageObserver='IntersectionObserver' in window?new IntersectionObserver(entries=>entries.forEach(entry=>{
-    if(!entry.isIntersecting) return;
-    const img=entry.target;
-    if(img.dataset.src){ img.src=img.dataset.src; delete img.dataset.src; }
-    imageObserver.unobserve(img);
-  }),{root:grid,rootMargin:'360px 0px'}):null;
-  const sentinel=document.createElement('div');
-  sentinel.className='frame-picker-sentinel';
-  sentinel.textContent='继续向下滚动加载';
-  grid.appendChild(sentinel);
+function closeFramePicker(){
+  const picker=document.getElementById('framePicker');
+  const grid=picker?.querySelector('.frame-picker-grid');
+  grid?._frameVirtualCleanup?.();
+  picker?.remove();
+}
 
-  const appendChunk=()=>{
-    if(loading||grid.dataset.renderToken!==token||offset>=S.frames.length) return;
-    loading=true;
-    const end=Math.min(offset+chunkSize,S.frames.length);
+// 窗口化帧库：滚动范围覆盖全部帧，但 DOM 始终只保留视口附近的几行。
+function mountVirtualFrameGrid(grid,cur,onPick){
+  if(!grid) return;
+  grid._frameVirtualCleanup?.();
+  grid.innerHTML='';
+  grid.classList.add('is-virtualized');
+  const surface=document.createElement('div');
+  surface.className='frame-picker-virtual-surface';
+  grid.appendChild(surface);
+  const compact=!!grid.closest('#pmFrameDock');
+  const gap=compact?10:14;
+  const padX=compact?12:18;
+  const padTop=compact?12:16;
+  const padBottom=compact?12:22;
+  const minCell=compact?150:230;
+  const overscanRows=3;
+  let columns=1;
+  let cellWidth=0;
+  let cellHeight=0;
+  let rowStride=0;
+  let startIndex=-1;
+  let endIndex=-1;
+  let frameRequest=0;
+  let current=Number.isInteger(cur)?cur:null;
+  let initialPositioned=false;
+
+  const renderWindow=(force=false)=>{
+    frameRequest=0;
+    const width=Math.max(1,grid.clientWidth);
+    const usable=Math.max(1,width-padX*2);
+    const nextColumns=Math.max(1,Math.floor((usable+gap)/(minCell+gap)));
+    const nextCellWidth=(usable-gap*(nextColumns-1))/nextColumns;
+    const nextCellHeight=nextCellWidth*9/16;
+    const geometryChanged=nextColumns!==columns||Math.abs(nextCellWidth-cellWidth)>.5;
+    columns=nextColumns;
+    cellWidth=nextCellWidth;
+    cellHeight=nextCellHeight;
+    rowStride=cellHeight+gap;
+    const totalRows=Math.ceil(S.frames.length/columns);
+    const totalHeight=padTop+Math.max(0,totalRows*cellHeight+(totalRows-1)*gap)+padBottom;
+    surface.style.height=totalHeight+'px';
+
+    if(!initialPositioned&&current!=null&&current>=0){
+      const currentRow=Math.floor(current/columns);
+      grid.scrollTop=Math.max(0,padTop+currentRow*rowStride-(grid.clientHeight-cellHeight)/2);
+      initialPositioned=true;
+    }
+    const firstRow=Math.max(0,Math.floor(Math.max(0,grid.scrollTop-padTop)/Math.max(1,rowStride))-overscanRows);
+    const visibleRows=Math.ceil(grid.clientHeight/Math.max(1,rowStride))+overscanRows*2;
+    const lastRow=Math.min(totalRows,firstRow+visibleRows);
+    const nextStart=firstRow*columns;
+    const nextEnd=Math.min(S.frames.length,lastRow*columns);
+    if(!force&&!geometryChanged&&nextStart===startIndex&&nextEnd===endIndex) return;
+    startIndex=nextStart;
+    endIndex=nextEnd;
+    surface.replaceChildren();
     const frag=document.createDocumentFragment();
-    for(let i=offset;i<end;i++) frag.appendChild(createFramePickerItem(i,cur,onPick,imageObserver));
-    grid.insertBefore(frag,sentinel);
-    offset=end;
-    loading=false;
-    if(!imageObserver) grid.querySelectorAll('img[data-src]').forEach(img=>{ img.src=img.dataset.src; delete img.dataset.src; });
-    if(offset>=S.frames.length){
-      sentinel.textContent='已显示全部 '+S.frames.length+' 张';
-      sentinel.classList.add('is-done');
-      pageObserver?.disconnect();
+    for(let i=startIndex;i<endIndex;i++){
+      const row=Math.floor(i/columns);
+      const col=i%columns;
+      const item=createFramePickerItem(i,current,onPick);
+      item.setAttribute('aria-setsize',String(S.frames.length));
+      item.setAttribute('aria-posinset',String(i+1));
+      item.style.position='absolute';
+      item.style.left=(padX+col*(cellWidth+gap))+'px';
+      item.style.top=(padTop+row*rowStride)+'px';
+      item.style.width=cellWidth+'px';
+      item.style.setProperty('height',cellHeight+'px','important');
+      frag.appendChild(item);
+    }
+    surface.appendChild(frag);
+  };
+  const scheduleRender=()=>{
+    if(frameRequest) return;
+    frameRequest=requestAnimationFrame(()=>renderWindow(false));
+  };
+  const revealFrame=index=>{
+    if(!Number.isInteger(index)||index<0||!rowStride) return;
+    const row=Math.floor(index/columns);
+    const top=padTop+row*rowStride;
+    const bottom=top+cellHeight;
+    if(top<grid.scrollTop||bottom>grid.scrollTop+grid.clientHeight){
+      grid.scrollTop=Math.max(0,top-(grid.clientHeight-cellHeight)/2);
     }
   };
-  const pageObserver='IntersectionObserver' in window?new IntersectionObserver(entries=>{
-    if(entries.some(entry=>entry.isIntersecting)) appendChunk();
-  },{root:grid,rootMargin:'480px 0px'}):null;
-  if(pageObserver) pageObserver.observe(sentinel);
-  appendChunk();
-  if(!pageObserver){
-    const onScroll=()=>{ if(grid.scrollTop+grid.clientHeight>=grid.scrollHeight-420) appendChunk(); };
-    grid.addEventListener('scroll',onScroll,{passive:true});
-  }
+  grid._frameVirtualSetCurrent=(next,reveal=false)=>{
+    current=Number.isInteger(next)?next:null;
+    if(reveal&&current!=null) revealFrame(current);
+    renderWindow(true);
+  };
+  const resizeObserver='ResizeObserver' in window?new ResizeObserver(scheduleRender):null;
+  resizeObserver?.observe(grid);
+  grid.addEventListener('scroll',scheduleRender,{passive:true});
+  grid._frameVirtualCleanup=()=>{
+    if(frameRequest) cancelAnimationFrame(frameRequest);
+    resizeObserver?.disconnect();
+    grid.removeEventListener('scroll',scheduleRender);
+    delete grid._frameVirtualSetCurrent;
+    delete grid._frameVirtualCleanup;
+  };
+  renderWindow(true);
 }
 
 function syncDetailDockSelection(cur){
+  const grid=document.getElementById('pmFrameDockGrid');
+  grid?._frameVirtualSetCurrent?.(cur,true);
   document.querySelectorAll('#pmFrameDockGrid .frame-picker-item').forEach(item=>item.classList.toggle('is-current',Number(item.dataset.frameIndex)===cur));
 }
 
@@ -8628,31 +8765,31 @@ function renderDetailFrameDock(b,slot,cur){
   }
   _detailDockBatch=b;
   grid.dataset.batchId=String(b.id);
-  mountPagedFrameGrid(grid,cur,detailSlotPickDone,32);
+  mountVirtualFrameGrid(grid,cur,detailSlotPickDone);
 }
 
 function showDetailFramePicker(b, slot, cur){
-  document.getElementById('framePicker')?.remove();
+  closeFramePicker();
   const picker=document.createElement('div');
   picker.id='framePicker';
   picker.className='frame-picker-mask';
   picker.innerHTML=
     '<div class="frame-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="framePickerTitle">'+
       '<header><div><span>替换详情画面</span><h3 id="framePickerTitle">'+escapeHtmlSafe(b.title||'详情长图')+'</h3><p>大图浏览全部候选画面，单击即可替换当前格'+(cur!=null?' · 当前为第 '+(cur+1)+' 帧':'')+'</p></div>'+
-      '<button type="button" class="frame-picker-close" aria-label="关闭" onclick="document.getElementById(\'framePicker\')?.remove()">×</button></header>'+
-      '<div class="frame-picker-toolbar"><strong>全部候选画面</strong><span>'+S.frames.length+' 张 · 图片仅在滚动到附近时加载</span></div>'+
+      '<button type="button" class="frame-picker-close" aria-label="关闭" onclick="closeFramePicker()">×</button></header>'+
+      '<div class="frame-picker-toolbar"><strong>全部候选画面</strong><span>'+S.frames.length+' 张 · 视口虚拟化加载</span></div>'+
       '<div id="fpGrid" class="frame-picker-grid"></div>'+
     '</div>';
-  picker.addEventListener('click', e=>{ if(e.target===picker) picker.remove(); });
+  picker.addEventListener('click', e=>{ if(e.target===picker) closeFramePicker(); });
   document.body.appendChild(picker);
   const grid=picker.querySelector('#fpGrid');
-  mountPagedFrameGrid(grid,cur,detailSlotPickDone,40);
+  mountVirtualFrameGrid(grid,cur,detailSlotPickDone);
   picker.querySelector('.frame-picker-close')?.focus();
 }
 let _detailRegenTimer=null;
 let _detailRegenSeq=0;
 function detailSlotPickDone(fi){
-  document.getElementById('framePicker')?.remove();
+  closeFramePicker();
   if(!_detailPickTarget) return;
   const { b, slot }=_detailPickTarget;
   pushHistory();
@@ -8993,11 +9130,14 @@ document.addEventListener('keydown', e=>{
   // ? 打开帮助（不受其它面板限制）
   if(e.key==='?'){ e.preventDefault(); openHelp(); return; }
   if(lb.classList.contains('open')) return;
+  if(document.getElementById('framePicker')){
+    if(e.key==='Escape'){ e.preventDefault(); closeFramePicker(); }
+    return;
+  }
   if(document.getElementById('previewModal').classList.contains('open')){
     if(e.key==='Escape') closePreviewModal();
     return;
   }
-  if(document.getElementById('framePicker')) return;
 
   // 撤销 / 重做
   if((e.ctrlKey||e.metaKey)&&(e.key==='z'||e.key==='Z')&&!e.shiftKey){ e.preventDefault(); if(typeof undo==='function') undo(); return; }

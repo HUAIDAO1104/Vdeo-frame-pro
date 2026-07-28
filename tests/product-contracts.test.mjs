@@ -167,21 +167,23 @@ test('detail long images repair missing frames and balance extension rows',()=>{
   assert.match(html,/const img=\(await loadImg\(S\.frames\[fi\]\?\.dataUrl\)\)\|\|fallbackImg/);
 });
 
-test('detail editing keeps a persistent paged frame dock beside the long image',()=>{
+test('detail editing keeps a persistent virtual frame dock beside the long image',()=>{
   assert.match(html,/className='frame-picker-mask'/);
   assert.match(html,/id="pmFrameDock"/);
-  assert.match(html,/function mountPagedFrameGrid\(grid,cur,onPick,chunkSize=36\)/);
-  assert.match(html,/mountPagedFrameGrid\(grid,cur,detailSlotPickDone,32\)/);
-  assert.match(html,/new IntersectionObserver/);
+  assert.match(html,/function mountVirtualFrameGrid\(grid,cur,onPick\)/);
+  assert.match(html,/mountVirtualFrameGrid\(grid,cur,detailSlotPickDone\)/);
+  assert.match(html,/const overscanRows=3/);
+  assert.match(html,/surface\.replaceChildren\(\)/);
+  assert.match(html,/grid\?\._frameVirtualCleanup\?\.\(\)/);
   assert.match(css,/#previewModal\.detail-open\{[^}]*grid-template-columns:minmax\(0,1fr\) 390px/);
-  assert.match(css,/#pmFrameDock \.frame-picker-grid\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(css,/\.frame-picker-grid\.is-virtualized/);
   assert.match(css,/\.frame-picker-item\{[^}]*aspect-ratio:16\/9/);
 });
 
 test('the replacement gallery uses nearly the full desktop viewport without compressing rows',()=>{
   assert.match(css,/\.frame-picker-dialog\{width:calc\(100vw - 44px\);height:calc\(100vh - 44px\)/);
-  assert.match(css,/\.frame-picker-grid\{[^}]*grid-template-columns:repeat\(auto-fill,minmax\(230px,1fr\)\)/);
-  assert.match(css,/\.frame-picker-grid\{[^}]*grid-auto-rows:max-content/);
+  assert.match(html,/const minCell=compact\?150:230/);
+  assert.match(html,/const nextCellHeight=nextCellWidth\*9\/16/);
   assert.match(css,/\.frame-picker-item\{[^}]*height:auto!important;aspect-ratio:16\/9/);
 });
 
@@ -253,6 +255,18 @@ test('desktop runtime stores extracted frames as local files instead of base64 p
   assert.match(html,/filePath:frame\.path/);
   assert.match(desktopRust,/join\("frame-cache"\)/);
   assert.match(desktopRust,/frame-%06d\.jpg/);
+});
+
+test('desktop canvas reads cached frames through raw IPC instead of the cross-origin asset protocol',()=>{
+  assert.match(desktopRust,/fn read_cached_frame\(/);
+  assert.match(desktopRust,/tauri::ipc::Response::new\(bytes\)/);
+  assert.match(desktopRust,/只能读取应用生成的本地帧缓存/);
+  assert.match(html,/async function canvasSafeFrameSource\(src\)/);
+  assert.match(html,/DESKTOP_NATIVE\.invoke\('read_cached_frame'/);
+  assert.match(html,/URL\.createObjectURL\(new Blob\(\[bytes\]/);
+  assert.match(html,/const DESKTOP_CANVAS_SOURCE_LIMIT=96/);
+  assert.match(html,/async function compressForMemory\(dataUrl\)\{[\s\S]*?loadImageElement\(dataUrl,10000\)/);
+  assert.match(html,/所有帧压缩失败'\+\(LAST_FRAME_LOAD_ERROR/);
 });
 
 test('desktop frame browsing mounts bounded chunks while preserving 16 by 9 geometry',()=>{

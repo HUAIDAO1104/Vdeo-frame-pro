@@ -563,6 +563,39 @@ fn read_document_files(paths: Vec<String>) -> Result<Vec<DocumentDescriptor>, St
         .collect()
 }
 
+fn cached_frame_path(app: &AppHandle, value: &str) -> Result<PathBuf, String> {
+    let cache_root = app_data_dir(app)?.join("frame-cache");
+    let canonical_root = cache_root
+        .canonicalize()
+        .map_err(|error| format!("无法定位本地帧缓存：{error}"))?;
+    let canonical_path = PathBuf::from(value)
+        .canonicalize()
+        .map_err(|error| format!("本地帧不存在或已被清理：{error}"))?;
+    if !canonical_path.starts_with(&canonical_root) {
+        return Err("只能读取应用生成的本地帧缓存".to_string());
+    }
+    let extension = canonical_path
+        .extension()
+        .and_then(|item| item.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if !matches!(extension.as_str(), "jpg" | "jpeg" | "png" | "webp") {
+        return Err("本地帧格式不受支持".to_string());
+    }
+    Ok(canonical_path)
+}
+
+#[tauri::command]
+fn read_cached_frame(app: AppHandle, path: String) -> Result<tauri::ipc::Response, String> {
+    let path = cached_frame_path(&app, &path)?;
+    let metadata = fs::metadata(&path).map_err(|error| format!("无法读取本地帧信息：{error}"))?;
+    if metadata.len() > 24 * 1024 * 1024 {
+        return Err("单张本地帧超过 24 MB，已停止读取".to_string());
+    }
+    let bytes = fs::read(path).map_err(|error| format!("无法读取本地帧：{error}"))?;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
 fn extract_video_frames_blocking(
     app: AppHandle,
     request: ExtractFramesRequest,
@@ -888,6 +921,7 @@ pub fn run() {
             inspect_video_files,
             authorize_file_paths,
             read_document_files,
+            read_cached_frame,
             extract_video_frames,
             clear_project_cache,
             save_workspace,
