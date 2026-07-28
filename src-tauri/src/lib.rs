@@ -4,9 +4,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
     env, fs,
+    io::Read,
     path::{Path, PathBuf},
-    process::Command,
-    time::UNIX_EPOCH,
+    process::{Command, Stdio},
+    thread,
+    time::{Duration, Instant, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Manager};
 
@@ -70,6 +72,56 @@ struct FrameDescriptor {
     width: u32,
     height: u32,
     size: u64,
+}
+
+struct TimedProcessOutput {
+    success: bool,
+    timed_out: bool,
+    stderr: Vec<u8>,
+}
+
+fn run_command_with_timeout(
+    mut command: Command,
+    timeout: Duration,
+) -> Result<TimedProcessOutput, String> {
+    command.stdout(Stdio::null()).stderr(Stdio::piped());
+    let mut child = command
+        .spawn()
+        .map_err(|error| format!("无法启动 FFmpeg：{error}"))?;
+    let mut stderr = child.stderr.take().ok_or("无法读取 FFmpeg 运行日志")?;
+    let stderr_reader = thread::spawn(move || {
+        let mut output = Vec::new();
+        let _ = stderr.read_to_end(&mut output);
+        output
+    });
+    let started = Instant::now();
+
+    loop {
+        match child
+            .try_wait()
+            .map_err(|error| format!("无法读取 FFmpeg 状态：{error}"))?
+        {
+            Some(status) => {
+                let stderr = stderr_reader.join().unwrap_or_default();
+                return Ok(TimedProcessOutput {
+                    success: status.success(),
+                    timed_out: false,
+                    stderr,
+                });
+            }
+            None if started.elapsed() >= timeout => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let stderr = stderr_reader.join().unwrap_or_default();
+                return Ok(TimedProcessOutput {
+                    success: false,
+                    timed_out: true,
+                    stderr,
+                });
+            }
+            None => thread::sleep(Duration::from_millis(200)),
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -513,10 +565,16 @@ fn extract_video_frames_blocking(
         .unwrap_or(duration)
         .max(start_time)
         .min(duration);
-    let max_frames = request.max_frames.unwrap_or(240).clamp(1, 1200);
-    let interval = request.interval.unwrap_or(5.0).clamp(0.2, 3600.0);
+    let max_frames = request.max_frames.unwrap_or(300).clamp(1, 600);
+    let requested_interval = request.interval.unwrap_or(5.0).clamp(0.2, 3600.0);
     let width_limit = request.preview_width.unwrap_or(1920).clamp(640, 3840);
     let mode = request.mode.as_deref().unwrap_or("interval");
+    let segment_duration = (end_time - start_time).max(1.0);
+    let interval = if mode == "interval" {
+        requested_interval.max(segment_duration / max_frames as f64)
+    } else {
+        requested_interval
+    };
 
     let cache_dir = app_data_dir(&app)?
         .join("frame-cache")
@@ -534,36 +592,45 @@ fn extract_video_frames_blocking(
         format!("fps=1/{interval:.6},{scale}")
     };
     let output_pattern = cache_dir.join("frame-%06d.jpg");
-    let run_capture = |use_hardware: bool| -> Result<std::process::Output, String> {
-        let mut command = Command::new(&ffmpeg);
-        command.args(["-hide_banner", "-loglevel", "info"]);
-        if use_hardware {
-            command.args(["-hwaccel", "auto"]);
-        }
-        command
-            .arg("-ss")
-            .arg(format!("{start_time:.6}"))
-            .arg("-i")
-            .arg(&video_path);
-        if end_time > start_time {
-            command.args(["-t", &format!("{:.6}", end_time - start_time)]);
-        }
-        command
-            .args(["-vf", &filter, "-frames:v"])
-            .arg(max_frames.to_string())
-            .args(["-q:v", "2", "-threads", "0"]);
-        if mode == "scene" {
-            command.args(["-fps_mode", "vfr"]);
-        }
-        command
-            .arg("-y")
-            .arg(&output_pattern)
-            .output()
-            .map_err(|error| format!("无法启动 FFmpeg：{error}"))
-    };
+    let run_capture =
+        |use_hardware: bool, timeout: Duration| -> Result<TimedProcessOutput, String> {
+            let mut command = Command::new(&ffmpeg);
+            command.args(["-hide_banner", "-loglevel", "info"]);
+            if use_hardware {
+                command.args(["-hwaccel", "auto"]);
+            }
+            command
+                .arg("-ss")
+                .arg(format!("{start_time:.6}"))
+                .arg("-i")
+                .arg(&video_path);
+            if end_time > start_time {
+                command.args(["-t", &format!("{:.6}", end_time - start_time)]);
+            }
+            command
+                .args(["-vf", &filter, "-frames:v"])
+                .arg(max_frames.to_string())
+                .args(["-q:v", "2", "-threads", "0"]);
+            if mode == "scene" {
+                command.args(["-fps_mode", "vfr"]);
+            }
+            command.arg("-y").arg(&output_pattern);
+            run_command_with_timeout(command, timeout)
+        };
     let prefer_hardware = cfg!(target_os = "windows") && request.prefer_hardware.unwrap_or(true);
-    let mut output = run_capture(prefer_hardware)?;
-    if !output.status.success() && prefer_hardware {
+    let hardware_timeout_secs =
+        (45.0 + segment_duration * 0.16 + max_frames as f64 * 0.12).clamp(75.0, 150.0);
+    let cpu_timeout_secs =
+        (75.0 + segment_duration * 0.28 + max_frames as f64 * 0.18).clamp(120.0, 240.0);
+    let mut output = run_capture(
+        prefer_hardware,
+        Duration::from_secs_f64(if prefer_hardware {
+            hardware_timeout_secs
+        } else {
+            cpu_timeout_secs
+        }),
+    )?;
+    if !output.success && prefer_hardware {
         if let Ok(entries) = fs::read_dir(&cache_dir) {
             for entry in entries.filter_map(Result::ok) {
                 if entry.path().extension().and_then(|item| item.to_str()) == Some("jpg") {
@@ -571,9 +638,15 @@ fn extract_video_frames_blocking(
                 }
             }
         }
-        output = run_capture(false)?;
+        output = run_capture(false, Duration::from_secs_f64(cpu_timeout_secs))?;
     }
-    if !output.status.success() {
+    if !output.success {
+        if output.timed_out {
+            return Err(format!(
+                "本地截帧超过 {} 分钟，已自动终止。请缩短截取范围、调大截取间隔或减少最多帧数后重试",
+                (cpu_timeout_secs / 60.0).ceil() as u64
+            ));
+        }
         let detail = String::from_utf8_lossy(&output.stderr);
         let tail = detail.lines().rev().take(8).collect::<Vec<_>>();
         return Err(format!(
@@ -589,6 +662,11 @@ fn extract_video_frames_blocking(
         .filter(|path| path.extension().and_then(|item| item.to_str()) == Some("jpg"))
         .collect::<Vec<_>>();
     files.sort();
+    if files.is_empty() {
+        return Err(
+            "FFmpeg 已结束但没有生成画面，请检查截取范围、视频编码或场景灵敏度".to_string(),
+        );
+    }
     let scene_times = if mode == "scene" {
         parse_scene_times(&String::from_utf8_lossy(&output.stderr))
     } else {

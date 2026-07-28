@@ -264,8 +264,19 @@ test('desktop frame browsing mounts bounded chunks while preserving 16 by 9 geom
 test('windows desktop processing prefers GPU decoding and falls back to CPU',()=>{
   assert.match(desktopRust,/detect_hardware_accelerations/);
   assert.match(desktopRust,/command\.args\(\["-hwaccel", "auto"\]\)/);
-  assert.match(desktopRust,/output = run_capture\(false\)/);
+  assert.match(desktopRust,/output = run_capture\(false,/);
   assert.match(html,/preferHardware:true/);
+});
+
+test('desktop generation has bounded extraction and AI deadlines',()=>{
+  assert.match(html,/id="mxf"[^>]*value="300"[^>]*max="600"/);
+  assert.match(html,/const SALES_RUN_LIMIT_MS=8\*60\*1000/);
+  assert.match(html,/async function fetchWithDeadline\(/);
+  assert.match(html,/const MAX_SEND = 40/);
+  assert.match(html,/const BATCH = 10/);
+  assert.match(desktopRust,/run_command_with_timeout/);
+  assert.match(desktopRust,/\.clamp\(1, 600\)/);
+  assert.match(desktopRust,/requested_interval\.max\(segment_duration \/ max_frames as f64\)/);
 });
 
 test('windows installer bundles FFmpeg and has a reproducible CI build',()=>{

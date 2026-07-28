@@ -505,7 +505,7 @@
 
           <div class="crow"><span class="clabel">开始时间（秒）</span><input type="number" id="stt" class="cinput" value="0" min="0" step="0.1"/></div>
           <div class="crow"><span class="clabel">结束时间（秒）</span><input type="number" id="edt" class="cinput" placeholder="末尾"/></div>
-          <div class="crow" style="margin-bottom:0"><span class="clabel">最多截取帧数</span><input type="number" id="mxf" class="cinput" value="10000" min="1" max="99999"/></div>
+          <div class="crow" style="margin-bottom:0"><span class="clabel">最多截取帧数</span><input type="number" id="mxf" class="cinput" value="300" min="20" max="600"/></div>
           <div class="sep"></div>
           <button class="btn-p subtle-action" id="capBtn" disabled>仅提取候选画面</button>
 
@@ -1448,18 +1448,25 @@ let batchIdCnt = 0;
 
 const RUN_STATE = { seq:0, active:null };
 const BATCH_RUN = { active:false, cancelled:false };
+const SALES_RUN_LIMIT_MS=8*60*1000;
 globalThis.__vfpBatchRun=BATCH_RUN;
 
 function beginSalesRun(){
   const projectId=PROJECTS.activeId;
-  const run={ id:++RUN_STATE.seq, projectId, controller:new AbortController(), cancelled:false };
+  const run={ id:++RUN_STATE.seq, projectId, controller:new AbortController(), cancelled:false, timedOut:false, deadlineTimer:null };
   RUN_STATE.active=run;
+  run.deadlineTimer=setTimeout(()=>{
+    if(RUN_STATE.active!==run) return;
+    run.timedOut=true;
+    run.controller.abort(new DOMException('单个任务生成超时','TimeoutError'));
+  },SALES_RUN_LIMIT_MS);
   document.body.classList.add('generation-running');
   updateTaskFlowState();
   return run;
 }
 
 function finishSalesRun(run){
+  if(run?.deadlineTimer){ clearTimeout(run.deadlineTimer); run.deadlineTimer=null; }
   if(RUN_STATE.active===run) RUN_STATE.active=null;
   document.body.classList.remove('generation-running');
   updateTaskFlowState();
@@ -1471,6 +1478,33 @@ function ensureRunCurrent(run){
 }
 
 function currentRunSignal(){ return RUN_STATE.active?.controller?.signal; }
+function salesRunTimeoutError(){
+  return new Error('单个任务生成超过 8 分钟，已自动停止。请查看失败阶段；可减少候选帧数、切换推荐模型或检查网络后重试');
+}
+
+async function fetchWithDeadline(url,options={},timeoutMs=120000,label='网络请求'){
+  const controller=new AbortController();
+  const parentSignal=options.signal;
+  let timedOut=false;
+  const abortFromParent=()=>controller.abort(parentSignal?.reason);
+  if(parentSignal?.aborted) abortFromParent();
+  else parentSignal?.addEventListener('abort',abortFromParent,{once:true});
+  const timer=setTimeout(()=>{
+    timedOut=true;
+    controller.abort(new DOMException(label+'超时','TimeoutError'));
+  },timeoutMs);
+  try{
+    return await fetch(url,{...options,signal:controller.signal});
+  }catch(error){
+    if(timedOut){
+      throw new Error(label+'超过 '+Math.ceil(timeoutMs/1000)+' 秒仍未响应，已停止等待。请检查网络、模型状态或更换模型后重试');
+    }
+    throw error;
+  }finally{
+    clearTimeout(timer);
+    parentSignal?.removeEventListener('abort',abortFromParent);
+  }
+}
 
 function cancelSalesRun(){
   const run=RUN_STATE.active;
@@ -2446,7 +2480,9 @@ async function doDesktopCapture(project,mode='interval'){
   const edv=document.getElementById('edt').value;
   const duration=Number(project.nativeMeta?.duration||vPrev.duration||0);
   const ed=edv?parseFloat(edv):duration;
-  const mx=parseInt(document.getElementById('mxf').value)||10000;
+  const requestedMx=parseInt(document.getElementById('mxf').value)||300;
+  const mx=Math.max(20,Math.min(600,requestedMx));
+  if(requestedMx!==mx) document.getElementById('mxf').value=String(mx);
   const iv=parseFloat(document.getElementById('itvl').value)||1;
   const sens=parseInt(document.getElementById('sceneSens').value)||30;
   if(!duration||st>=ed){ toast('视频时间范围有误','err'); return true; }
@@ -2467,7 +2503,15 @@ async function doDesktopCapture(project,mode='interval'){
   pLbl.textContent=mode==='scene'?'FFmpeg 正在分析场景变化...':'FFmpeg 正在提取高清画面...';
   capBtn.disabled=true;
   capBtn.innerHTML='<span class="spin"></span>本地处理中...';
+  project.captureError=null;
   const started=performance.now();
+  const nativeProgressTimer=setInterval(()=>{
+    const elapsed=Math.floor((performance.now()-started)/1000);
+    const estimatedPct=Math.min(82,18+elapsed/3);
+    pFill.style.width=estimatedPct+'%';
+    pNum.textContent=elapsed+'s';
+    pLbl.textContent=(mode==='scene'?'正在分析场景变化':'正在提取高清画面')+' · 已用 '+elapsed+' 秒 · 异常时会自动切换解码方式';
+  },1000);
   try{
     const frames=await DESKTOP_NATIVE.invoke('extract_video_frames',{request:{
       videoPath:project.desktopPath,
@@ -2496,6 +2540,7 @@ async function doDesktopCapture(project,mode='interval'){
     });
     project.frames=S.frames;
     project.localFrameCache=true;
+    project.captureError=null;
     renderAllFrames();
     document.getElementById('totalN').textContent=String(S.frames.length);
     pFill.style.width='100%'; pNum.textContent='100%';
@@ -2508,9 +2553,11 @@ async function doDesktopCapture(project,mode='interval'){
     scheduleWorkspaceSave();
   }catch(error){
     console.error('本地截帧失败',error);
+    project.captureError='本地截帧失败：'+(error?.message||error);
     pLbl.textContent='本地提取失败';
-    toast('本地提取失败：'+(error?.message||error),'err');
+    toast(project.captureError,'err');
   }finally{
+    clearInterval(nativeProgressTimer);
     capBtn.disabled=false;
     capBtn.innerHTML='分析视频并提取候选画面';
     setTimeout(()=>{ prog.style.display='none'; },1600);
@@ -2533,7 +2580,7 @@ async function doCapture(){
   const st  = parseFloat(document.getElementById('stt').value)||0;
   const edv = document.getElementById('edt').value;
   const ed  = edv ? parseFloat(edv) : vPrev.duration;
-  const mx  = parseInt(document.getElementById('mxf').value)||10000;
+  const mx  = parseInt(document.getElementById('mxf').value)||300;
   if(iv<=0||st>=ed){ toast('参数有误','err'); return; }
 
   const times=[];
@@ -2633,7 +2680,7 @@ async function doCaptureScene(){
   const st  = parseFloat(document.getElementById('stt').value)||0;
   const edv = document.getElementById('edt').value;
   const ed  = edv ? parseFloat(edv) : vPrev.duration;
-  const mx  = parseInt(document.getElementById('mxf').value)||10000;
+  const mx  = parseInt(document.getElementById('mxf').value)||300;
   const sens = parseInt(document.getElementById('sceneSens').value)||30; // 10~60
   const minGap = parseFloat(document.getElementById('sceneMinGap').value)||0.5;
   if(st>=ed){ toast('参数有误','err'); return; }
@@ -3641,12 +3688,12 @@ async function aiSmartLayoutWithVision(apiKey){
       contentParts.push({type:'image_url', image_url:{url:'data:image/jpeg;base64,'+f.b64, detail:'low'}});
     });
 
-    const resp = await fetch('https://llm-api.mcisaas.com/v1/chat/completions',{
+    const resp = await fetchWithDeadline('https://llm-api.mcisaas.com/v1/chat/completions',{
       method:'POST',
       signal:currentRunSignal(),
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
       body: JSON.stringify({ model, messages:[{role:'user', content:contentParts}], max_tokens:500, temperature:0 })
-    });
+    },120000,'AI 排版');
     if(!resp.ok) throw new Error('API错误 '+resp.status);
     const json = await resp.json();
     const raw = (json.choices?.[0]?.message?.content||'').trim();
@@ -4243,7 +4290,7 @@ function compressFrameForVision(dataUrl){
 // 单批次调用 Vision API，frames = [{frameIdx, b64}]（b64必须非null）
 // 返回 [{frameIdx, clarity, composition, appeal, overall}]
 // goodRefImages / badRefImages：base64 数组（不含 data: 前缀），AI 会直接看见这些参考图
-async function visionScoreBatch(frames, apiKey, model, hintText, goodRefImages=[], badRefImages=[], intentPreset=null){
+async function visionScoreBatch(frames, apiKey, model, hintText, goodRefImages=[], badRefImages=[], intentPreset=null, timeoutMs=75000){
   // skip frames where compression failed
   const validFrames = frames.filter(f => f.b64);
   if(validFrames.length === 0) return [];
@@ -4310,7 +4357,7 @@ async function visionScoreBatch(frames, apiKey, model, hintText, goodRefImages=[
     });
   });
 
-  const resp = await fetch('https://llm-api.mcisaas.com/v1/chat/completions',{
+  const resp = await fetchWithDeadline('https://llm-api.mcisaas.com/v1/chat/completions',{
     method:'POST',
     signal:currentRunSignal(),
     headers:{
@@ -4320,10 +4367,10 @@ async function visionScoreBatch(frames, apiKey, model, hintText, goodRefImages=[
     body: JSON.stringify({
       model,
       messages:[{role:'user', content:contentParts}],
-      max_tokens: 800,
+      max_tokens: 1400,
       temperature: 0
     })
-  });
+  },timeoutMs,'视觉模型评分');
 
   if(!resp.ok){
     const errText = await resp.text();
@@ -4540,8 +4587,8 @@ async function runVisionPick(N, apiKey, model, hintText, intent){
   if(goodRefImages.length + badRefImages.length > 0){
     toast('已加载 '+goodRefImages.length+' 张偏好参考图发给AI学习...', 'info');
   }
-  // sample up to 60 frames evenly to avoid timeout
-  const MAX_SEND = 60;
+  // 保留全片时间覆盖，但控制视觉请求总量，避免桌面批量任务长时间串行等待。
+  const MAX_SEND = 40;
   const total = S.frames.length;
   let sendIndices;
   if(total <= MAX_SEND){
@@ -4564,15 +4611,18 @@ async function runVisionPick(N, apiKey, model, hintText, intent){
   }
   if(compressed.length === 0) throw new Error('所有帧压缩失败，请检查视频帧数据');
 
-  // Step2: score in batches of 4
-  const BATCH = 4;
+  // 每批 10 张，最多 4 次模型请求；最终替换图库仍保留全部本地候选帧。
+  const BATCH = 10;
   const allScores = [];
   const batches = [];
   for(let i=0; i<compressed.length; i+=BATCH) batches.push(compressed.slice(i, i+BATCH));
 
   const scoreStartTs = performance.now();
+  const scoreDeadline=scoreStartTs+210000;
   let okBatches = 0, failBatches = 0, firstErr = null;
   for(let bi=0; bi<batches.length; bi++){
+    const remainingMs=scoreDeadline-performance.now();
+    if(remainingMs<=0) throw new Error('视觉评分超过 210 秒，已停止等待。请检查网络或切换推荐视觉模型');
     let etaTxt='';
     if(bi>=1){
       const elapsed=(performance.now()-scoreStartTs)/1000;
@@ -4585,7 +4635,7 @@ async function runVisionPick(N, apiKey, model, hintText, intent){
       // 仅第一批次传入参考图（避免每批都带大量图片增加 token）
       const refGood = bi===0 ? goodRefImages : [];
       const refBad  = bi===0 ? badRefImages  : [];
-      const scores = await visionScoreBatch(batches[bi], apiKey, model, hintText, refGood, refBad, preset);
+      const scores = await visionScoreBatch(batches[bi], apiKey, model, hintText, refGood, refBad, preset, Math.min(75000,remainingMs));
       allScores.push(...scores);
       okBatches++;
     } catch(batchErr){
@@ -6475,11 +6525,11 @@ async function requestAiDocumentMatches(documents){
   const videos=PROJECTS.list.map(project=>({id:project.id,fileName:project.fileName,name:project.name}));
   const docs=documents.map(doc=>({id:doc.id,fileName:doc.name,excerpt:String(doc.text||'').slice(0,1800)}));
   const prompt='你要把一批视频文档自动对应到一批视频任务。请根据视频文件名、文档文件名和文档内容摘要判断对应关系。文档数不超过视频数时必须尽量一对一；文档更多时也要按内容均衡分配，不要把所有文档分给同一个视频。严格输出纯JSON：{"assignments":[{"documentId":数字,"projectId":数字,"confidence":0到100,"reason":"简短原因"}]}。只能使用给定ID。\n视频：'+JSON.stringify(videos)+'\n文档：'+JSON.stringify(docs);
-  const resp=await fetch('https://llm-api.mcisaas.com/v1/chat/completions',{
+  const resp=await fetchWithDeadline('https://llm-api.mcisaas.com/v1/chat/completions',{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
     body:JSON.stringify({model,messages:[{role:'user',content:prompt}],max_tokens:1400,temperature:.1})
-  });
+  },90000,'AI 文档匹配');
   if(!resp.ok) throw new Error('AI 文档匹配失败 '+resp.status+': '+(await resp.text()).slice(0,140));
   const raw=(await resp.json()).choices?.[0]?.message?.content?.trim()||'';
   const parsed=robustParseJSON(raw);
@@ -6817,7 +6867,7 @@ async function aiSalesPlan(input){
       content.push({type:'image_url', image_url:{url:'data:image/jpeg;base64,'+b64, detail:'low'}});
     }
   }
-  const resp=await fetch('https://llm-api.mcisaas.com/v1/chat/completions',{
+  const resp=await fetchWithDeadline('https://llm-api.mcisaas.com/v1/chat/completions',{
     method:'POST',
     signal:currentRunSignal(),
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+input.apiKey},
@@ -6827,7 +6877,7 @@ async function aiSalesPlan(input){
       max_tokens:3000,
       temperature:.35
     })
-  });
+  },150000,'销售策略模型');
   if(!resp.ok) throw new Error('销售策略AI失败 '+resp.status+': '+(await resp.text()).slice(0,180));
   const raw=(await resp.json()).choices?.[0]?.message?.content?.trim()||'';
   const parsed=robustParseJSON(raw);
@@ -6895,7 +6945,7 @@ function seoPayloadIssues(payload){
 }
 
 async function requestSeoPayload(input,prompt,options={}){
-  const resp=await fetch('https://llm-api.mcisaas.com/v1/chat/completions',{
+  const resp=await fetchWithDeadline('https://llm-api.mcisaas.com/v1/chat/completions',{
     method:'POST',
     signal:currentRunSignal(),
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+input.apiKey},
@@ -6905,7 +6955,7 @@ async function requestSeoPayload(input,prompt,options={}){
       max_tokens:options.maxTokens||3600,
       temperature:options.temperature??.2
     })
-  });
+  },180000,'SEO 文案模型');
   if(!resp.ok) throw new Error('SEO文案AI失败 '+resp.status+': '+(await resp.text()).slice(0,180));
   const data=await resp.json();
   const raw=chatCompletionText(data);
@@ -7028,12 +7078,12 @@ async function aiDetailHeroTitles(input, plan, need){
       '核心卖点：'+(plan.sellingPoints||[]).join(' / ')+'\n'+
       '视觉方向：'+(plan.visualDirection||'')+'\n'+
       '素材类型：'+input.type;
-    const resp=await fetch('https://llm-api.mcisaas.com/v1/chat/completions',{
+    const resp=await fetchWithDeadline('https://llm-api.mcisaas.com/v1/chat/completions',{
       method:'POST',
       signal:currentRunSignal(),
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+input.apiKey},
       body:JSON.stringify({ model:input.seoModel, messages:[{role:'user',content:prompt}], max_tokens:500, temperature:.5 })
-    });
+    },90000,'详情标题模型');
     if(!resp.ok) throw new Error('标题AI失败 '+resp.status);
     const raw=(await resp.json()).choices?.[0]?.message?.content?.trim()||'';
     const parsed=robustParseJSON(raw);
@@ -7807,6 +7857,10 @@ async function ensureSalesFrames(){
     return false;
   }
   await doCapture();
+  if(!S.frames.length){
+    const project=PROJECTS.list.find(item=>item.id===PROJECTS.activeId);
+    if(project?.captureError) throw new Error(project.captureError);
+  }
   return S.frames.length>0;
 }
 
@@ -7873,6 +7927,7 @@ async function retrySalesPart(kind,button){
     scheduleWorkspaceSave();
     toast(labels[kind]+'已重新生成，其他人工修改已保留');
   }catch(e){
+    if(e?.name==='AbortError'&&run.timedOut) e=salesRunTimeoutError();
     if(archived) restorePreviousVersion();
     if(e?.name==='AbortError') setSalesProgress(-2,'已取消生成，现有内容已保留');
     else{
@@ -7908,6 +7963,7 @@ async function runSalesCopyOnly(){
     scheduleWorkspaceSave();
     toast('文案已生成，可在结果页继续修改');
   }catch(e){
+    if(e?.name==='AbortError'&&run.timedOut) e=salesRunTimeoutError();
     if(e?.name==='AbortError') setSalesProgress(-2,'已取消生成，现有内容已保留');
     else{
       console.error(e);
@@ -7939,6 +7995,7 @@ async function runSalesKit(options={}){
   if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>正在生成上架套件...'; }
   try{
     progress(8,'检查视频与对应文档...');
+    if(!S.frames.length) progress(10,DESKTOP_NATIVE.enabled?'正在本地提取候选画面，异常解码会自动回退...':'正在提取候选画面...');
     if(!(await ensureSalesFrames())) throw new Error('未能提取候选画面');
     ensureRunCurrent(run);
     progress(24,input.apiKey?'正在理解内容与销售卖点...':'正在生成本地基础策略...');
@@ -7974,6 +8031,7 @@ async function runSalesKit(options={}){
     if(!batchMode) toast('上架套件已生成，请确认主封面、主详情和文案');
     return {ok:true};
   } catch(e){
+    if(e?.name==='AbortError'&&run.timedOut) e=salesRunTimeoutError();
     if(activeProject){
       if(e?.name==='AbortError'){ activeProject.generationStatus='pending'; activeProject.generationError=null; }
       else{ markProjectFailure(activeProject,e,currentStage); shouldOpenResult=true; }
