@@ -25,6 +25,14 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Restore FFmpeg cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            src-tauri/binaries/*.exe
+            src-tauri/resources/ffmpeg-LICENSE.txt
+          key: ffmpeg-windows-x64-v1
+
       - name: Prepare bundled FFmpeg
         shell: powershell
         run: powershell -ExecutionPolicy Bypass -File scripts\prepare-windows-ffmpeg.ps1
