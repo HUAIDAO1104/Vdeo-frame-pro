@@ -1,0 +1,45 @@
+name: Publish Windows Release
+
+on:
+  push:
+    tags:
+      - "release-windows-v*"
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download latest successful Windows installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id="$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow windows-desktop.yml \
+            --status success \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId')"
+          if [ -z "$run_id" ]; then
+            echo "No successful Windows Desktop run was found."
+            exit 1
+          fi
+          mkdir -p release-dist
+          gh run download "$run_id" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name sales-kit-studio-windows-x64 \
+            --dir release-dist
+
+      - name: Publish public release download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release-dist/*.exe \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "光厂上架助手 Windows v0.1.0" \
+            --notes "Windows 10/11 x64 安装版。内置 FFmpeg，支持显卡硬件解码与 CPU 自动回退。"
