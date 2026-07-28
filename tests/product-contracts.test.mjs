@@ -5,6 +5,10 @@ import test from 'node:test';
 const html=await readFile(new URL('../public/app.html',import.meta.url),'utf8');
 const readme=await readFile(new URL('../README.md',import.meta.url),'utf8');
 const css=await readFile(new URL('../public/static/style.css',import.meta.url),'utf8');
+const desktopRust=await readFile(new URL('../src-tauri/src/lib.rs',import.meta.url),'utf8');
+const windowsConfig=await readFile(new URL('../src-tauri/tauri.windows.conf.json',import.meta.url),'utf8');
+const windowsWorkflow=await readFile(new URL('../.github/workflows/windows-desktop.yml',import.meta.url),'utf8');
+const ffmpegScript=await readFile(new URL('../scripts/prepare-windows-ffmpeg.ps1',import.meta.url),'utf8');
 
 test('inline application scripts parse',()=>{
   const scripts=[...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
@@ -240,4 +244,35 @@ test('a new batch clears the workbench in one action after saving history',()=>{
   assert.match(html,/async function startNewBatch\(\)/);
   assert.match(html,/await saveWorkspaceNow\(\)/);
   assert.match(html,/BATCH_DOCUMENTS\.list=\[\]/);
+});
+
+test('desktop runtime stores extracted frames as local files instead of base64 payloads',()=>{
+  assert.match(html,/const DESKTOP_NATIVE =/);
+  assert.match(html,/DESKTOP_NATIVE\.invoke\('extract_video_frames'/);
+  assert.match(html,/filePath:frame\.path/);
+  assert.match(desktopRust,/join\("frame-cache"\)/);
+  assert.match(desktopRust,/frame-%06d\.jpg/);
+});
+
+test('desktop frame browsing mounts bounded chunks while preserving 16 by 9 geometry',()=>{
+  assert.match(html,/const chunkSize=96/);
+  assert.match(html,/mainFrameObserver=new IntersectionObserver/);
+  assert.match(html,/iw:1, ih:1, stripStart:0, stripEnd:0/);
+  assert.match(css,/\.fitem \{[\s\S]*?aspect-ratio:16\/9/);
+});
+
+test('windows desktop processing prefers GPU decoding and falls back to CPU',()=>{
+  assert.match(desktopRust,/detect_hardware_accelerations/);
+  assert.match(desktopRust,/command\.args\(\["-hwaccel", "auto"\]\)/);
+  assert.match(desktopRust,/output = run_capture\(false\)/);
+  assert.match(html,/preferHardware:true/);
+});
+
+test('windows installer bundles FFmpeg and has a reproducible CI build',()=>{
+  assert.match(windowsConfig,/"targets": \["nsis"\]/);
+  assert.match(windowsConfig,/"binaries\/ffmpeg"/);
+  assert.match(ffmpegScript,/\$TargetTriple = "x86_64-pc-windows-msvc"/);
+  assert.match(ffmpegScript,/"ffmpeg-\$TargetTriple\.exe"/);
+  assert.match(windowsWorkflow,/runs-on: windows-latest/);
+  assert.match(windowsWorkflow,/npm run desktop:build/);
 });

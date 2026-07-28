@@ -1071,6 +1071,35 @@ body::before {
 .frames-grid::-webkit-scrollbar { width:5px; }
 .frames-grid::-webkit-scrollbar-track { background:var(--card3); border-radius:3px; }
 .frames-grid::-webkit-scrollbar-thumb { background:var(--accent-soft); border-radius:3px; }
+.frame-grid-sentinel {
+  grid-column:1/-1;
+  min-height:42px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--tm);
+  font-size:12px;
+}
+.frame-grid-sentinel.is-done { min-height:28px; opacity:.72; }
+
+body.desktop-file-drag::after {
+  content:"松开以导入视频或文档";
+  position:fixed;
+  inset:18px;
+  z-index:5000;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:2px dashed rgba(210,24,52,.72);
+  border-radius:14px;
+  background:rgba(255,248,249,.9);
+  color:#b7122b;
+  font-size:24px;
+  font-weight:750;
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
+  pointer-events:none;
+}
 
 .fitem {
   position:relative; border-radius:9px; overflow:hidden;

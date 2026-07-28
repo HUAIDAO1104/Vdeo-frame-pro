@@ -419,7 +419,7 @@
               <button type="button" class="project-new-batch-btn" id="projectNewBatchBtn" onclick="startNewBatch()">
                 新建批次
               </button>
-              <button type="button" class="project-add-btn" id="projectAddVideosBtn" onclick="document.getElementById('vInput').click()">
+              <button type="button" class="project-add-btn" id="projectAddVideosBtn" onclick="chooseVideoFiles()">
                 <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
                 添加视频
               </button>
@@ -1379,6 +1379,54 @@ function syncModelPresetUI(){
 // ===================================================================
 // STATE
 // ===================================================================
+const DESKTOP_NATIVE = {
+  enabled: !!window.__TAURI__?.core?.invoke,
+  environment: null,
+  dropUnlisten: null,
+  invoke(command,args={}) {
+    if(!this.enabled) return Promise.reject(new Error('当前不是桌面运行环境'));
+    return window.__TAURI__.core.invoke(command,args);
+  },
+  fileUrl(path) {
+    if(!path) return '';
+    return this.enabled ? window.__TAURI__.core.convertFileSrc(path) : path;
+  },
+  async initialize() {
+    if(!this.enabled) return null;
+    try{
+      this.environment=await this.invoke('get_desktop_environment');
+      document.documentElement.classList.add('desktop-runtime');
+      if(!this.environment?.localProcessingReady){
+        console.warn('桌面端未检测到 FFmpeg，本地视频处理暂不可用');
+      }
+      const getCurrentWebview=window.__TAURI__?.webview?.getCurrentWebview;
+      if(typeof getCurrentWebview==='function'&&!this.dropUnlisten){
+        const currentWebview=getCurrentWebview();
+        if(typeof currentWebview?.onDragDropEvent==='function'){
+          this.dropUnlisten=await currentWebview.onDragDropEvent(event=>{
+            const payload=event?.payload||{};
+            document.body.classList.toggle('desktop-file-drag',payload.type==='over');
+            if(payload.type==='leave') document.body.classList.remove('desktop-file-drag');
+            if(payload.type==='drop'){
+              document.body.classList.remove('desktop-file-drag');
+              importDesktopDroppedPaths(payload.paths||[]).catch(error=>{
+                console.error('桌面拖入文件失败',error);
+                toast('读取拖入文件失败：'+(error?.message||error),'err');
+              });
+            }
+          });
+        }
+      }
+      return this.environment;
+    }catch(error){
+      console.warn('桌面运行环境初始化失败',error);
+      return null;
+    }
+  }
+};
+globalThis.__vfpDesktop=DESKTOP_NATIVE;
+DESKTOP_NATIVE.initialize();
+
 const S = {
   frames: [],       // {dataUrl, time, idx, score}
   selected: [],     // selected frame indices
@@ -1439,9 +1487,9 @@ const AI_CONSENT_STORAGE = 'vfp_ai_data_consent_v1';
 
 function getSourceMeta(){
   const p=PROJECTS.list.find(x=>x.id===PROJECTS.activeId);
-  const width=Number((typeof vPrev!=='undefined' && vPrev.videoWidth)||p?.sourceMeta?.width||0);
-  const height=Number((typeof vPrev!=='undefined' && vPrev.videoHeight)||p?.sourceMeta?.height||0);
-  const duration=Number((typeof vPrev!=='undefined' && vPrev.duration)||p?.sourceMeta?.duration||0);
+  const width=Number((typeof vPrev!=='undefined' && vPrev.videoWidth)||p?.sourceMeta?.width||p?.nativeMeta?.width||0);
+  const height=Number((typeof vPrev!=='undefined' && vPrev.videoHeight)||p?.sourceMeta?.height||p?.nativeMeta?.height||0);
+  const duration=Number((typeof vPrev!=='undefined' && vPrev.duration)||p?.sourceMeta?.duration||p?.nativeMeta?.duration||0);
   return {
     width, height, duration,
     fileName:p?.fileName||'', fileSize:p?.fileSize||'', fileFmt:p?.fileFmt||'',
@@ -1485,7 +1533,7 @@ function openPrivacyNotice(){
   mask.innerHTML='<div class="app-confirm-box privacy-notice" role="dialog" aria-modal="true" aria-labelledby="privacyNoticeTitle">'+
     '<div class="app-confirm-title" id="privacyNoticeTitle">数据处理说明</div>'+
     '<div class="privacy-list">'+
-      '<div><strong>留在本机</strong><span>视频解码、候选帧提取、画面拼接和文件导出均在浏览器中完成。</span></div>'+
+      '<div><strong>留在本机</strong><span>网页版在浏览器中处理视频；Windows 桌面版通过本机 FFmpeg 与磁盘帧缓存处理。原始视频不会上传。</span></div>'+
       '<div><strong>启用 AI 时上传</strong><span>压缩后的抽样画面、分镜文档和你的补充要求会发送到当前配置的 AI 接口，用于选图与生成文案。</span></div>'+
       '<div><strong>API Key</strong><span>默认仅在当前会话使用；勾选长期保存后才写入此浏览器的本地存储。</span></div>'+
     '</div><div class="app-confirm-actions"><button type="button" class="app-confirm-ok" id="privacyNoticeClose">我知道了</button></div></div>';
@@ -1648,6 +1696,7 @@ function restoreProject(p){
 
   // 视频预览
   updateSalesPrimaryState(false);
+  if(DESKTOP_NATIVE.enabled&&p.desktopPath&&!p.videoUrl) p.videoUrl=DESKTOP_NATIVE.fileUrl(p.desktopPath);
   if(p.videoUrl){
     vPrev.src = p.videoUrl;
     document.getElementById('vCon').style.display='block';
@@ -1692,18 +1741,48 @@ function restoreProject(p){
   renderProjectTabs();
 }
 
-// 整体重建帧缩略图墙
+let mainFrameRenderToken=0;
+let mainFrameObserver=null;
+
+// 分段挂载画面墙，避免一次创建数百个图片节点阻塞编辑器。
 function renderAllFrames(){
   const fGrid=document.getElementById('fGrid'); if(!fGrid) return;
+  const token=++mainFrameRenderToken;
+  if(mainFrameObserver){ mainFrameObserver.disconnect(); mainFrameObserver=null; }
   fGrid.innerHTML='';
   if(S.frames.length===0){
     fGrid.innerHTML='<div class="empty"><svg viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 20M6 8h.01" stroke-width="1.5"/></svg><p>上传视频并点击截取后<br/>帧缩略图将显示于此</p></div>';
     return;
   }
-  const frag=document.createDocumentFragment();
-  for(let i=0;i<S.frames.length;i++) addThumb(i, frag);
-  fGrid.appendChild(frag);
-  renderSel(); // 应用选中态 +「只看已选」过滤
+  const chunkSize=96;
+  let cursor=0;
+  const sentinel=document.createElement('div');
+  sentinel.className='frame-grid-sentinel';
+  sentinel.textContent='继续向下浏览更多画面';
+  const appendChunk=()=>{
+    if(token!==mainFrameRenderToken) return;
+    const end=Math.min(S.frames.length,cursor+chunkSize);
+    const frag=document.createDocumentFragment();
+    for(let i=cursor;i<end;i++) addThumb(i,frag);
+    cursor=end;
+    if(sentinel.isConnected) fGrid.insertBefore(frag,sentinel);
+    else fGrid.appendChild(frag);
+    renderSel();
+    if(cursor>=S.frames.length){
+      sentinel.textContent='已显示全部 '+S.frames.length+' 个画面';
+      sentinel.classList.add('is-done');
+      mainFrameObserver?.disconnect();
+      mainFrameObserver=null;
+    }
+  };
+  fGrid.appendChild(sentinel);
+  appendChunk();
+  if(cursor<S.frames.length){
+    mainFrameObserver=new IntersectionObserver(entries=>{
+      if(entries.some(entry=>entry.isIntersecting)) appendChunk();
+    },{root:fGrid,rootMargin:'700px 0px'});
+    mainFrameObserver.observe(sentinel);
+  }
 }
 
 // 整体重建所有批次面板
@@ -1731,10 +1810,13 @@ function renderAllBatches(){
 function createProject(file){
   const id=++PROJECTS.idCnt;
   const name=file.name.replace(/\.[^.]+$/,'').slice(0,24) || ('视频'+id);
+  const desktopPath=file.desktopPath||'';
+  const videoUrl=desktopPath?DESKTOP_NATIVE.fileUrl(desktopPath):URL.createObjectURL(file);
   const p={
     id, name, fileName:file.name,
     fileSize: fmtSz(file.size), fileFmt: file.name.split('.').pop().toUpperCase(),
-    videoUrl: URL.createObjectURL(file), videoBlob:file,
+    videoUrl, videoBlob:desktopPath?null:file, desktopPath,
+    nativeMeta:desktopPath?{duration:Number(file.duration)||0,width:Number(file.width)||0,height:Number(file.height)||0}:null,
     frames:[], selected:[], batches:[], aiScores:[], imgCache:new Map(),
     captureMode:'interval', batchIdCnt:0, storyDoc:'', manualStoryDoc:'', sourceMeta:null,
     fileKey:videoFileKey(file),
@@ -1843,7 +1925,7 @@ async function closeCurrentVideo(){
 
 async function startNewBatch(){
   if(RUN_STATE.active||BATCH_RUN.active){ toast('请先取消正在进行的生成任务','warn'); return; }
-  if(!PROJECTS.list.length&&!BATCH_DOCUMENTS.list.length){ document.getElementById('vInput')?.click(); return; }
+  if(!PROJECTS.list.length&&!BATCH_DOCUMENTS.list.length){ chooseVideoFiles(); return; }
   const ok=await appConfirm({
     title:'开始新批次',
     message:'当前视频、文档与结果会保存在历史记录中，然后清空工作台。',
@@ -1854,7 +1936,7 @@ async function startNewBatch(){
   clearTimeout(_workspaceSaveTimer);
   if(_workspaceIdleHandle!=null&&'cancelIdleCallback' in window){ cancelIdleCallback(_workspaceIdleHandle); _workspaceIdleHandle=null; }
   await saveWorkspaceNow();
-  PROJECTS.list.forEach(project=>{ if(project.videoUrl) try{URL.revokeObjectURL(project.videoUrl);}catch(_){} });
+  PROJECTS.list.forEach(project=>{ if(project.videoUrl&&!project.desktopPath) try{URL.revokeObjectURL(project.videoUrl);}catch(_){} });
   PROJECTS.list=[]; PROJECTS.activeId=null; PROJECTS.idCnt=0;
   BATCH_DOCUMENTS.list=[]; BATCH_DOCUMENTS.idCnt=0; BATCH_DOCUMENTS.lastMode='none'; BATCH_DOCUMENTS.lastError='';
   WORKSPACE_SESSION_ID='session-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
@@ -1886,7 +1968,10 @@ function deleteProjectNoConfirm(id){
   const idx=PROJECTS.list.findIndex(x=>x.id===id); if(idx===-1) return;
   const p=PROJECTS.list[idx];
   BATCH_DOCUMENTS.list.forEach(doc=>{ if(doc.assignedProjectId===id){ doc.assignedProjectId=null; doc.matchMethod='unassigned'; doc.matchReason='原视频任务已删除'; doc.confidence=0; } });
-  if(p.videoUrl){ try{ URL.revokeObjectURL(p.videoUrl); }catch(e){} }
+  if(p.videoUrl&&!p.desktopPath){ try{ URL.revokeObjectURL(p.videoUrl); }catch(e){} }
+  if(DESKTOP_NATIVE.enabled&&p.desktopPath){
+    DESKTOP_NATIVE.invoke('clear_project_cache',{projectId:WORKSPACE_SESSION_ID+'-'+p.id}).catch(error=>console.warn('清理本地帧缓存失败',error));
+  }
   const wasActive = (id===PROJECTS.activeId);
   PROJECTS.list.splice(idx,1);
   if(PROJECTS.list.length===0){
@@ -2205,9 +2290,58 @@ async function warnIfNoDocText(){
 // ===================================================================
 const upzone = document.getElementById('upzone');
 const vInput = document.getElementById('vInput');
-upzone.addEventListener('click', ()=>vInput.click());
+async function chooseVideoFiles(){
+  if(!DESKTOP_NATIVE.enabled){ vInput.click(); return; }
+  try{
+    const selected=await DESKTOP_NATIVE.invoke('plugin:dialog|open',{options:{
+      multiple:true,
+      directory:false,
+      title:'选择一个或多个视频',
+      filters:[{name:'视频文件',extensions:['mp4','mov','avi','mkv','webm','m4v','mpeg','mpg']}]
+    }});
+    const paths=Array.isArray(selected)?selected:(selected?[selected]:[]);
+    if(!paths.length) return;
+    const descriptors=await DESKTOP_NATIVE.invoke('inspect_video_files',{paths});
+    await importVideoFiles(descriptors);
+  }catch(error){
+    console.error('桌面视频导入失败',error);
+    toast('读取视频失败：'+(error?.message||error),'err');
+  }
+}
+globalThis.chooseVideoFiles=chooseVideoFiles;
+
+async function importDesktopDroppedPaths(paths){
+  const unique=[...new Set((paths||[]).map(String).filter(Boolean))];
+  if(!unique.length) return;
+  const extension=path=>{
+    const name=String(path).split(/[\\/]/).pop()||'';
+    return (name.split('.').pop()||'').toLowerCase();
+  };
+  const videoExtensions=new Set(['mp4','mov','avi','mkv','webm','m4v','mpeg','mpg']);
+  const documentExtensions=new Set(['txt','md','csv','json','doc','docx','rtf']);
+  const videoPaths=unique.filter(path=>videoExtensions.has(extension(path)));
+  const documentPaths=unique.filter(path=>documentExtensions.has(extension(path)));
+  const unsupported=unique.length-videoPaths.length-documentPaths.length;
+  if(videoPaths.length){
+    const descriptors=await DESKTOP_NATIVE.invoke('inspect_video_files',{paths:videoPaths});
+    await importVideoFiles(descriptors);
+  }
+  if(documentPaths.length){
+    const descriptors=await DESKTOP_NATIVE.invoke('read_document_files',{paths:documentPaths});
+    const files=descriptors.map(item=>new File(
+      [new Uint8Array(item.bytes||[])],
+      item.name,
+      {type:item.fileType||'application/octet-stream',lastModified:item.lastModified||Date.now()}
+    ));
+    await importStoryFiles(files);
+  }
+  if(unsupported) toast('已忽略 '+unsupported+' 个不支持的文件','warn');
+}
+globalThis.importDesktopDroppedPaths=importDesktopDroppedPaths;
+
+upzone.addEventListener('click', chooseVideoFiles);
 upzone.addEventListener('keydown',e=>{
-  if(e.key==='Enter'||e.key===' '){ e.preventDefault(); vInput.click(); }
+  if(e.key==='Enter'||e.key===' '){ e.preventDefault(); chooseVideoFiles(); }
 });
 upzone.addEventListener('dragover', e=>{e.preventDefault();if(e.dataTransfer)e.dataTransfer.dropEffect='copy';upzone.classList.add('drag');});
 upzone.addEventListener('dragleave', e=>{if(!upzone.contains(e.relatedTarget))upzone.classList.remove('drag');});
@@ -2223,11 +2357,11 @@ vInput.addEventListener('change', async e=>{
 const vPrev = document.getElementById('vPrev');
 const VIDEO_EXTENSIONS=new Set(['mp4','mov','avi','mkv','webm','m4v','mpeg','mpg']);
 function videoFileKey(file){
-  return [file.name,file.size,file.lastModified||0].join('|');
+  return [file.desktopPath||file.name,file.size,file.lastModified||0].join('|');
 }
 function isVideoFile(file){
   const ext=(file?.name?.split('.').pop()||'').toLowerCase();
-  return !!file&&(file.type?.startsWith('video/')||VIDEO_EXTENSIONS.has(ext));
+  return !!file&&((file.type||file.fileType||'').startsWith('video/')||VIDEO_EXTENSIONS.has(ext));
 }
 async function importVideoFiles(fileList){
   if(RUN_STATE.active){ toast('生成进行中，请先取消后再添加视频','warn'); return; }
@@ -2301,7 +2435,95 @@ function updateSceneSensLabel(){
   lbl.textContent = v<=20 ? '低（仅大切换）' : v<=35 ? '中' : v<=50 ? '高' : '极高（细微变化）';
 }
 
+async function doDesktopCapture(project,mode='interval'){
+  if(!project?.desktopPath) return false;
+  const environment=DESKTOP_NATIVE.environment||await DESKTOP_NATIVE.initialize();
+  if(!environment?.localProcessingReady){
+    toast('桌面端没有检测到 FFmpeg，暂时改用浏览器截帧','warn');
+    return false;
+  }
+  const st=parseFloat(document.getElementById('stt').value)||0;
+  const edv=document.getElementById('edt').value;
+  const duration=Number(project.nativeMeta?.duration||vPrev.duration||0);
+  const ed=edv?parseFloat(edv):duration;
+  const mx=parseInt(document.getElementById('mxf').value)||10000;
+  const iv=parseFloat(document.getElementById('itvl').value)||1;
+  const sens=parseInt(document.getElementById('sceneSens').value)||30;
+  if(!duration||st>=ed){ toast('视频时间范围有误','err'); return true; }
+
+  S.frames=[]; S.selected=[]; S.aiScores=[]; S.imgCache=new Map();
+  if(S.onlySelected){ S.onlySelected=false; syncOnlySelBtn(); }
+  updateSelBadge(); updateDlBtns();
+  document.getElementById('fGrid').innerHTML='';
+  document.getElementById('totalN').textContent='0';
+
+  const prog=document.getElementById('prog');
+  const pFill=document.getElementById('pFill');
+  const pLbl=document.getElementById('pLbl');
+  const pNum=document.getElementById('pNum');
+  const capBtn=document.getElementById('capBtn');
+  prog.style.display='block';
+  pFill.style.width='18%'; pNum.textContent='本地';
+  pLbl.textContent=mode==='scene'?'FFmpeg 正在分析场景变化...':'FFmpeg 正在提取高清画面...';
+  capBtn.disabled=true;
+  capBtn.innerHTML='<span class="spin"></span>本地处理中...';
+  const started=performance.now();
+  try{
+    const frames=await DESKTOP_NATIVE.invoke('extract_video_frames',{request:{
+      videoPath:project.desktopPath,
+      projectId:WORKSPACE_SESSION_ID+'-'+project.id,
+      mode,
+      interval:iv,
+      startTime:st,
+      endTime:ed,
+      maxFrames:mx,
+      sceneThreshold:Math.max(.05,Math.min(.8,.18-(sens-10)/50*.15)),
+      previewWidth:1920,
+      preferHardware:true
+    }});
+    const cacheVersion=Date.now();
+    S.frames=(frames||[]).map((frame,index)=>{
+      let dataUrl=DESKTOP_NATIVE.fileUrl(frame.path);
+      dataUrl+=(dataUrl.includes('?')?'&':'?')+'v='+cacheVersion;
+      return {
+        dataUrl,
+        filePath:frame.path,
+        time:Number(frame.time)||0,
+        idx:index,
+        w:Number(frame.width)||1920,
+        h:Number(frame.height)||1080
+      };
+    });
+    project.frames=S.frames;
+    project.localFrameCache=true;
+    renderAllFrames();
+    document.getElementById('totalN').textContent=String(S.frames.length);
+    pFill.style.width='100%'; pNum.textContent='100%';
+    pLbl.textContent='本地提取完成 · '+S.frames.length+' 个高清画面';
+    const seconds=((performance.now()-started)/1000).toFixed(1);
+    toast('本地提取完成：'+S.frames.length+' 个高清画面，用时 '+seconds+' 秒');
+    updateFillBtn(); updateDlBtns(); updateAiBtns();
+    const qb=document.getElementById('quickBar'); if(qb) qb.style.display='';
+    updateQuickBar();
+    scheduleWorkspaceSave();
+  }catch(error){
+    console.error('本地截帧失败',error);
+    pLbl.textContent='本地提取失败';
+    toast('本地提取失败：'+(error?.message||error),'err');
+  }finally{
+    capBtn.disabled=false;
+    capBtn.innerHTML='分析视频并提取候选画面';
+    setTimeout(()=>{ prog.style.display='none'; },1600);
+  }
+  return true;
+}
+
 async function doCapture(){
+  const activeProject=PROJECTS.list.find(item=>item.id===PROJECTS.activeId);
+  if(DESKTOP_NATIVE.enabled&&activeProject?.desktopPath){
+    const handled=await doDesktopCapture(activeProject,S.captureMode);
+    if(handled) return;
+  }
   if(!Number.isFinite(vPrev.duration) || vPrev.duration<=0){
     toast('请先上传并加载视频','err');
     return;
@@ -2403,6 +2625,11 @@ async function doCapture(){
 // ── 场景变化检测截帧 ──
 // 以细粒度探测间隔扫描视频，计算相邻探测帧的像素差异，仅在差异超过阈值时保留为关键帧
 async function doCaptureScene(){
+  const activeProject=PROJECTS.list.find(item=>item.id===PROJECTS.activeId);
+  if(DESKTOP_NATIVE.enabled&&activeProject?.desktopPath){
+    const handled=await doDesktopCapture(activeProject,'scene');
+    if(handled) return;
+  }
   const st  = parseFloat(document.getElementById('stt').value)||0;
   const edv = document.getElementById('edt').value;
   const ed  = edv ? parseFloat(edv) : vPrev.duration;
@@ -5760,6 +5987,7 @@ function serializeProjectDraft(p){
   return {
     ...p,
     videoUrl:'',
+    videoBlob:p.desktopPath?null:p.videoBlob,
     imgCache:null,
     frames:p.frames||[],
     selected:p.selected||[],
@@ -5786,6 +6014,12 @@ async function saveWorkspaceNow(){
     projects:PROJECTS.list.map(serializeProjectDraft)
   };
   try{
+    if(DESKTOP_NATIVE.enabled){
+      await DESKTOP_NATIVE.invoke('save_workspace',{payload});
+      S.dirty=false;
+      updateRailSaveState('历史记录');
+      return;
+    }
     const db=await openWorkspaceDB();
     const historyId=historyIdFromKey(WORKSPACE_SESSION_ID);
     await new Promise((resolve,reject)=>{
@@ -5814,6 +6048,7 @@ function scheduleWorkspaceSave(delay=3200){
 }
 
 async function readWorkspaceHistoryMeta(){
+  if(DESKTOP_NATIVE.enabled) return DESKTOP_NATIVE.invoke('list_workspace_history');
   const db=await openWorkspaceDB();
   const records=await new Promise((resolve,reject)=>{
     const tx=db.transaction(WORKSPACE_META_STORE,'readonly');
@@ -5830,6 +6065,7 @@ async function readWorkspaceHistory(){ return readWorkspaceHistoryMeta(); }
 
 async function readHistoryPayload(historyId){
   const id=historyIdFromKey(historyId);
+  if(DESKTOP_NATIVE.enabled) return DESKTOP_NATIVE.invoke('load_workspace',{historyId:id});
   const db=await openWorkspaceDB();
   const payload=await new Promise((resolve,reject)=>{
     const tx=db.transaction(WORKSPACE_STORE,'readonly');
@@ -5842,6 +6078,10 @@ async function readHistoryPayload(historyId){
 
 async function readHistoryMetaRecord(historyId){
   const id=historyIdFromKey(historyId);
+  if(DESKTOP_NATIVE.enabled){
+    const records=await readWorkspaceHistoryMeta();
+    return records.find(record=>historyIdFromKey(record.historyId)===id)||null;
+  }
   const db=await openWorkspaceDB();
   const meta=await new Promise((resolve,reject)=>{
     const tx=db.transaction(WORKSPACE_META_STORE,'readonly');
@@ -5853,6 +6093,7 @@ async function readHistoryMetaRecord(historyId){
 }
 
 async function trimWorkspaceHistory(limit=20){
+  if(DESKTOP_NATIVE.enabled) return;
   const records=await readWorkspaceHistoryMeta();
   if(records.length<=limit) return;
   const db=await openWorkspaceDB();
@@ -5867,6 +6108,7 @@ async function trimWorkspaceHistory(limit=20){
 }
 
 async function migrateLegacyWorkspaceToHistory(){
+  if(DESKTOP_NATIVE.enabled) return;
   try{
     const db=await openWorkspaceDB();
     await new Promise((resolve,reject)=>{
@@ -5901,10 +6143,15 @@ async function restoreHistoryRecord(historyId){
     updateRailSaveState('正在打开历史','saving');
     const [payload,meta]=await Promise.all([readHistoryPayload(id),readHistoryMetaRecord(id)]);
     if(!payload?.projects?.length){ toast('这条历史记录没有可恢复的视频','err'); updateRailSaveState('历史记录','error'); return false; }
-    PROJECTS.list.forEach(project=>{ if(project.videoUrl) try{URL.revokeObjectURL(project.videoUrl);}catch(_){} });
+    if(DESKTOP_NATIVE.enabled){
+      const paths=payload.projects.map(project=>project.desktopPath).filter(Boolean);
+      if(paths.length) await DESKTOP_NATIVE.invoke('authorize_file_paths',{paths});
+    }
+    PROJECTS.list.forEach(project=>{ if(project.videoUrl&&!project.desktopPath) try{URL.revokeObjectURL(project.videoUrl);}catch(_){} });
     PROJECTS.list=payload.projects.map(p=>({
       ...p,
-      videoUrl:p.videoBlob?URL.createObjectURL(p.videoBlob):'',
+      videoUrl:p.desktopPath?DESKTOP_NATIVE.fileUrl(p.desktopPath):(p.videoBlob?URL.createObjectURL(p.videoBlob):''),
+      frames:(p.frames||[]).map(frame=>frame.filePath?{...frame,dataUrl:DESKTOP_NATIVE.fileUrl(frame.filePath)}:frame),
       imgCache:new Map(),
       batches:(p.batches||[]).map(b=>({...b,canvas:null}))
     }));
@@ -5999,8 +6246,15 @@ async function renameHistoryRecord(id){
   if(!record){ toast('找不到这条历史记录，请重新打开列表','err'); return false; }
   const name=await appPrompt({title:'重命名历史记录',message:'名称用于区分不同素材批次。',value:record.historyName||'批量任务',okText:'保存名称'});
   if(!name) return false;
-  const db=await openWorkspaceDB();
   const nextName=name.trim().slice(0,40);
+  if(DESKTOP_NATIVE.enabled){
+    await DESKTOP_NATIVE.invoke('rename_workspace',{historyId,historyName:nextName});
+    if(WORKSPACE_SESSION_ID===historyId) WORKSPACE_HISTORY_NAME=nextName;
+    toast('历史记录已重命名');
+    openDraftManager();
+    return true;
+  }
+  const db=await openWorkspaceDB();
   await new Promise((resolve,reject)=>{ const tx=db.transaction(WORKSPACE_META_STORE,'readwrite'); tx.objectStore(WORKSPACE_META_STORE).put({...record,historyId,historyName:nextName},historyId); tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error); });
   db.close();
   if(WORKSPACE_SESSION_ID===historyId) WORKSPACE_HISTORY_NAME=nextName;
@@ -6012,6 +6266,13 @@ async function renameHistoryRecord(id){
 async function deleteHistoryRecord(id){
   if(!(await appConfirm({title:'删除历史记录',message:'删除这条历史记录？当前工作台内容不会受到影响。',okText:'删除记录',cancelText:'保留'}))) return;
   const historyId=historyIdFromKey(id);
+  if(DESKTOP_NATIVE.enabled){
+    await DESKTOP_NATIVE.invoke('delete_workspace',{historyId});
+    if(WORKSPACE_SESSION_ID===historyId){ WORKSPACE_SESSION_ID='session-'+Date.now()+'-'+Math.random().toString(36).slice(2,8); WORKSPACE_HISTORY_NAME=''; }
+    toast('历史记录已删除');
+    openDraftManager();
+    return true;
+  }
   const db=await openWorkspaceDB();
   await new Promise((resolve,reject)=>{
     const tx=db.transaction([WORKSPACE_STORE,WORKSPACE_META_STORE],'readwrite');
@@ -8265,7 +8526,7 @@ const LB={
   // panX/panY：图片中心相对于视口中心的偏移（像素，原始尺寸下）
   panX:0, panY:0,
   drag:false, dragStartX:0, dragStartY:0, dragStartPanX:0, dragStartPanY:0,
-  iw:1, ih:1  // 图片自然尺寸
+  iw:1, ih:1, stripStart:0, stripEnd:0
 };
 const lb        =document.getElementById('lb');
 const lbImg     =document.getElementById('lbImg');
@@ -8279,31 +8540,24 @@ function openLightbox(frameIdx){
   buildStrip(); showFrame(LB.idx,true);
 }
 function closeLightbox(){ lb.classList.remove('open'); lbImg.src=''; }
-function buildStrip(){
+function buildStrip(center=LB.idx){
   lbStrip.innerHTML='';
   const total = S.frames.length;
-  const CHUNK = 180;
-  let offset = 0;
-  function appendChunk(){
-    const end = Math.min(offset + CHUNK, total);
-    const frag = document.createDocumentFragment();
-    for(let i=offset;i<end;i++){
-      const f=S.frames[i];
-      const el=document.createElement('div');
-      el.className='lb-strip-item'+(i===LB.idx?' active':'');
-      el.dataset.fi=i;
-      el.innerHTML='<img src="'+f.dataUrl+'" loading="lazy"/>';
-      el.addEventListener('click',()=>showFrame(i,true));
-      frag.appendChild(el);
-    }
-    lbStrip.appendChild(frag);
-    offset = end;
-    if(offset<total){
-      if('requestIdleCallback' in window) window.requestIdleCallback(appendChunk);
-      else setTimeout(appendChunk, 0);
-    }
+  const radius=64;
+  const start=Math.max(0,center-radius);
+  const end=Math.min(total,center+radius+1);
+  LB.stripStart=start; LB.stripEnd=end;
+  const frag=document.createDocumentFragment();
+  for(let i=start;i<end;i++){
+    const f=S.frames[i];
+    const el=document.createElement('div');
+    el.className='lb-strip-item'+(i===LB.idx?' active':'');
+    el.dataset.fi=i;
+    el.innerHTML='<img src="'+f.dataUrl+'" loading="lazy" decoding="async"/>';
+    el.addEventListener('click',()=>showFrame(i,true));
+    frag.appendChild(el);
   }
-  appendChunk();
+  lbStrip.appendChild(frag);
 }
 function showFrame(i,resetZoom){
   LB.idx=Math.max(0,Math.min(i,S.frames.length-1));
@@ -8313,6 +8567,7 @@ function showFrame(i,resetZoom){
   document.getElementById('lbSub').textContent=f.time.toFixed(2)+'s · '+(LB.idx+1)+' / '+S.frames.length;
   const prevActive = lbStrip.querySelector('.lb-strip-item.active');
   if(prevActive) prevActive.classList.remove('active');
+  if(LB.idx<LB.stripStart+8||LB.idx>=LB.stripEnd-8) buildStrip(LB.idx);
   const active = lbStrip.querySelector('.lb-strip-item[data-fi="'+LB.idx+'"]');
   if(active){
     active.classList.add('active');

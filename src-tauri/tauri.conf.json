@@ -1,0 +1,43 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "光厂上架助手",
+  "version": "0.1.0",
+  "identifier": "com.huaidao.saleskitstudio",
+  "build": {
+    "beforeDevCommand": "npm run desktop:dev:frontend",
+    "devUrl": "http://127.0.0.1:1420/app.html",
+    "beforeBuildCommand": "npm run desktop:frontend",
+    "frontendDist": "../desktop-dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "光厂上架助手",
+        "width": 1500,
+        "height": 940,
+        "minWidth": 1180,
+        "minHeight": 720,
+        "center": true,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$HOME/**",
+          "$APPLOCALDATA/**",
+          "$TEMP/**"
+        ]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "shortDescription": "视频素材包销售图生成工具",
+    "longDescription": "使用本地视频处理与云端 AI 生成封面、详情长图和 SEO 文案。"
+  }
+}

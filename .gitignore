@@ -1,5 +1,16 @@
 # prod
 dist/
+desktop-dist/
+src-tauri/target/
+src-tauri/gen/
+src-tauri/binaries/*.exe
+src-tauri/resources/ffmpeg-LICENSE.txt
+src-tauri/icons/android/
+src-tauri/icons/ios/
+src-tauri/icons/*.icns
+src-tauri/icons/[0-9]*.png
+src-tauri/icons/Square*.png
+src-tauri/icons/StoreLogo.png
 
 # dev
 .yarn/
