@@ -5,9 +5,10 @@ import appHtml from '../public/app.html?raw'
 const app = new Hono()
 
 const WINDOWS_RELEASE_URL =
-  'https://github.com/HUAIDAO1104/Vdeo-frame-pro/releases/download/release-windows-v0.1.0/_0.1.0_x64-setup.exe'
-const WINDOWS_RELEASE_NAME = 'SalesKitStudio_0.1.0_x64-setup.exe'
-const WINDOWS_RELEASE_SHA256 = '52d6472a029650bc50b791f72ae4d70c14e9cb7daecb64eec665ccd7952461c3'
+  'https://github.com/HUAIDAO1104/Vdeo-frame-pro/releases/download/desktop-v0.1.1/SalesKitStudio_0.1.1_x64-setup.exe'
+const WINDOWS_RELEASE_VERSION = '0.1.1'
+const WINDOWS_RELEASE_NAME = 'SalesKitStudio_0.1.1_x64-setup.exe'
+const WINDOWS_RELEASE_SHA256 = '369ffebc413463aead7cb5daf1d109c286e0406b50a627558257daa8a078f2cd'
 
 // 静态资源（统一放在 /static/ 下，由 Cloudflare Pages 直接服务）
 app.use('/static/*', serveStatic({ root: './public' }))
@@ -15,7 +16,9 @@ app.use('/static/*', serveStatic({ root: './public' }))
 app.get('/download/windows', async (c) => {
   const range = c.req.header('Range')
   const cache = caches.default
-  const cacheKey = new Request(new URL('/download/windows', c.req.url).toString())
+  const cacheKey = new Request(
+    new URL(`/download/windows?version=${WINDOWS_RELEASE_VERSION}`, c.req.url).toString(),
+  )
 
   if (!range) {
     const cached = await cache.match(cacheKey)
@@ -44,6 +47,7 @@ app.get('/download/windows', async (c) => {
   headers.set('Cache-Control', 'public, max-age=86400, s-maxage=604800, immutable')
   headers.set('Accept-Ranges', 'bytes')
   headers.set('Access-Control-Allow-Origin', '*')
+  headers.set('X-App-Version', WINDOWS_RELEASE_VERSION)
   headers.set('X-Checksum-SHA256', WINDOWS_RELEASE_SHA256)
 
   for (const name of ['content-length', 'content-range', 'etag', 'last-modified']) {
