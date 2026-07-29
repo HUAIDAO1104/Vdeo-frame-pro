@@ -276,6 +276,17 @@ test('desktop frame browsing mounts bounded chunks while preserving 16 by 9 geom
   assert.match(css,/\.fitem \{[\s\S]*?aspect-ratio:16\/9/);
 });
 
+test('internal image dragging cannot fall through to desktop file upload',()=>{
+  assert.match(html,/const INTERNAL_MEDIA_DRAG = \{/);
+  assert.match(html,/blocksFileImport\(\)/);
+  assert.match(html,/if\(INTERNAL_MEDIA_DRAG\.blocksFileImport\(\)\)\{[\s\S]*?return;/);
+  assert.match(html,/INTERNAL_MEDIA_DRAG\.begin\('candidate-frame'\)/);
+  assert.match(html,/INTERNAL_MEDIA_DRAG\.begin\('asset-cell'\)/);
+  assert.match(html,/INTERNAL_MEDIA_DRAG\.begin\('detail-cell'\)/);
+  assert.match(html,/frameCacheRoot[\s\S]*?startsWith\(frameCacheRoot\+'\/'\)/);
+  assert.match(html,/!isExternalFileDrag\(e\.dataTransfer\)/);
+});
+
 test('windows desktop processing prefers GPU decoding and falls back to CPU',()=>{
   assert.match(desktopRust,/detect_hardware_accelerations/);
   assert.match(desktopRust,/command\.args\(\["-hwaccel", "auto"\]\)/);
@@ -314,6 +325,10 @@ test('user workflow parameters can be saved and restored across restarts',()=>{
   assert.match(html,/applyUserDefaults\(\{silent:true\}\)/);
   assert.match(html,/captureMode:defaults\.captureMode/);
   assert.match(html,/export:\{format:EXPORT\.format,quality:EXPORT\.quality,scale:EXPORT\.scale\}/);
+  assert.match(html,/function scheduleUserDefaultsAutoSave\(delay=400\)/);
+  assert.match(html,/controls\.aiN=String\(Math\.max\(1,Math\.min\(100,/);
+  assert.match(html,/USER_DEFAULT_CONTROL_IDS\.includes\(e\.target\?\.id\)\) scheduleUserDefaultsAutoSave/);
+  assert.match(html,/flushUserDefaultsAutoSave\(\)/);
 });
 
 test('windows installer bundles FFmpeg and has a reproducible CI build',()=>{

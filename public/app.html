@@ -695,7 +695,7 @@
           </div>
 
           <details class="advanced-settings-card ai-generation-advanced">
-            <summary><span><div class="ctd"></div>生成偏好</span><small>候选数量与额外要求</small></summary>
+            <summary><span><div class="ctd"></div>生成偏好</span><small>修改后自动保存</small></summary>
             <div class="advanced-settings-body ai-field-grid">
               <label class="sales-field">
                 <span>候选画面数量</span>
@@ -1234,6 +1234,7 @@ function openSettingsDrawer(){
 function closeSettingsDrawer(){
   const drawer=document.getElementById('settingsDrawer');
   const scrim=document.getElementById('settingsScrim');
+  if(typeof flushUserDefaultsAutoSave==='function') flushUserDefaultsAutoSave();
   drawer?.classList.remove('open');
   drawer?.setAttribute('aria-hidden','true');
   if(drawer) drawer.inert=true;
@@ -1340,6 +1341,7 @@ function setModelPreset(preset,button){
   document.querySelectorAll('[data-model-preset]').forEach(el=>el.classList.toggle('is-active',el===button));
   updateModelPresetMeta(preset);
   if(typeof scheduleWorkspaceSave==='function') scheduleWorkspaceSave();
+  if(typeof scheduleUserDefaultsAutoSave==='function') scheduleUserDefaultsAutoSave();
 }
 function updateModelPresetMeta(preset){
   const messages={
@@ -1386,6 +1388,32 @@ function syncModelPresetUI(){
 // ===================================================================
 // STATE
 // ===================================================================
+const INTERNAL_MEDIA_DRAG = {
+  active: false,
+  kind: '',
+  suppressNativeUntil: 0,
+  begin(kind){
+    this.active=true;
+    this.kind=kind||'media';
+    this.suppressNativeUntil=Number.POSITIVE_INFINITY;
+    document.body.classList.add('internal-media-drag');
+    document.body.classList.remove('desktop-file-drag');
+  },
+  end(){
+    this.active=false;
+    this.kind='';
+    this.suppressNativeUntil=Date.now()+500;
+    document.body.classList.remove('internal-media-drag');
+  },
+  blocksFileImport(){
+    return this.active||Date.now()<this.suppressNativeUntil;
+  }
+};
+function isExternalFileDrag(dataTransfer){
+  if(!dataTransfer) return false;
+  return Array.from(dataTransfer.types||[]).includes('Files');
+}
+
 const DESKTOP_NATIVE = {
   enabled: !!window.__TAURI__?.core?.invoke,
   environment: null,
@@ -1412,9 +1440,14 @@ const DESKTOP_NATIVE = {
         if(typeof currentWebview?.onDragDropEvent==='function'){
           this.dropUnlisten=await currentWebview.onDragDropEvent(event=>{
             const payload=event?.payload||{};
+            if(INTERNAL_MEDIA_DRAG.blocksFileImport()){
+              document.body.classList.remove('desktop-file-drag');
+              return;
+            }
+            const hasPaths=Array.isArray(payload.paths)&&payload.paths.length>0;
             document.body.classList.toggle('desktop-file-drag',payload.type==='over');
             if(payload.type==='leave') document.body.classList.remove('desktop-file-drag');
-            if(payload.type==='drop'){
+            if(payload.type==='drop'&&hasPaths){
               document.body.classList.remove('desktop-file-drag');
               importDesktopDroppedPaths(payload.paths||[]).catch(error=>{
                 console.error('桌面拖入文件失败',error);
@@ -2360,7 +2393,11 @@ async function chooseVideoFiles(){
 globalThis.chooseVideoFiles=chooseVideoFiles;
 
 async function importDesktopDroppedPaths(paths){
-  const unique=[...new Set((paths||[]).map(String).filter(Boolean))];
+  if(INTERNAL_MEDIA_DRAG.blocksFileImport()) return;
+  const normalizePath=path=>String(path||'').replace(/\\/g,'/').replace(/\/+$/,'').toLowerCase();
+  const frameCacheRoot=normalizePath(DESKTOP_NATIVE.environment?.frameCacheDir);
+  const unique=[...new Set((paths||[]).map(String).filter(Boolean))]
+    .filter(path=>!frameCacheRoot||!normalizePath(path).startsWith(frameCacheRoot+'/'));
   if(!unique.length) return;
   const extension=path=>{
     const name=String(path).split(/[\\/]/).pop()||'';
@@ -2392,10 +2429,18 @@ upzone.addEventListener('click', chooseVideoFiles);
 upzone.addEventListener('keydown',e=>{
   if(e.key==='Enter'||e.key===' '){ e.preventDefault(); chooseVideoFiles(); }
 });
-upzone.addEventListener('dragover', e=>{e.preventDefault();if(e.dataTransfer)e.dataTransfer.dropEffect='copy';upzone.classList.add('drag');});
+upzone.addEventListener('dragover', e=>{
+  if(INTERNAL_MEDIA_DRAG.blocksFileImport()||!isExternalFileDrag(e.dataTransfer)) return;
+  e.preventDefault();
+  if(e.dataTransfer)e.dataTransfer.dropEffect='copy';
+  upzone.classList.add('drag');
+});
 upzone.addEventListener('dragleave', e=>{if(!upzone.contains(e.relatedTarget))upzone.classList.remove('drag');});
 upzone.addEventListener('drop', async e=>{
-  e.preventDefault(); upzone.classList.remove('drag');
+  if(INTERNAL_MEDIA_DRAG.blocksFileImport()||!isExternalFileDrag(e.dataTransfer)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  upzone.classList.remove('drag');
   await importVideoFiles(e.dataTransfer.files);
 });
 vInput.addEventListener('change', async e=>{
@@ -3852,6 +3897,8 @@ function addThumb(i, parent){
   thumbIO.observe(img);
   // dragstart 时才按需取 dataUrl（不提前持有引用）
   el.addEventListener('dragstart', e=>{
+    e.stopPropagation();
+    INTERNAL_MEDIA_DRAG.begin('candidate-frame');
     S.dragFrameIdx=i; el.classList.add('dragging');
     const ghost=document.getElementById('dragGhost');
     document.getElementById('dragGhostImg').src=f.dataUrl;
@@ -3863,6 +3910,7 @@ function addThumb(i, parent){
     el.classList.remove('dragging');
     document.getElementById('dragGhost').style.display='none';
     S.dragFrameIdx=null; clearDropTargets();
+    INTERNAL_MEDIA_DRAG.end();
   });
   if(parent) parent.appendChild(el);
   else document.getElementById('fGrid').appendChild(el);
@@ -5290,11 +5338,12 @@ function initBatchEvents(el, b){
 
 function bindDropEvents(cell, b, ci){
   cell.ondragover = e=>{
-    if(S.dragFrameIdx!==null){ e.preventDefault(); cell.classList.add('drop-target'); }
+    if(S.dragFrameIdx!==null){ e.preventDefault(); e.stopPropagation(); cell.classList.add('drop-target'); }
   };
   cell.ondragleave = ()=>cell.classList.remove('drop-target');
   cell.ondrop = e=>{
-    e.preventDefault(); cell.classList.remove('drop-target');
+    if(S.dragFrameIdx===null) return;
+    e.preventDefault(); e.stopPropagation(); cell.classList.remove('drop-target');
     if(S.dragFrameIdx!==null){
       pushHistory();
       b.cells[ci]=S.dragFrameIdx; renderCell(b,ci); clearBatchCanvas(b);
@@ -5394,15 +5443,22 @@ function bindCrossCellDrag(el, bid, slotKey){
   el.setAttribute('draggable','true');
   el.dataset.xbid=bid; el.dataset.xkey=slotKey;
   el.addEventListener('dragstart', (e)=>{
+    e.stopPropagation();
+    INTERNAL_MEDIA_DRAG.begin('asset-cell');
     const b=S.batches.find(x=>x.id===bid);
     _crossDrag={ bid, slotKey, fi:getSlotFrameByKey(b, slotKey) };
     el.classList.add('xdragging');
     if(e.dataTransfer){ e.dataTransfer.effectAllowed='move'; try{ e.dataTransfer.setData('text/plain', bid+'|'+slotKey); }catch(_){} }
   });
-  el.addEventListener('dragend', ()=>{ el.classList.remove('xdragging'); document.querySelectorAll('.xdragover').forEach(x=>x.classList.remove('xdragover')); });
+  el.addEventListener('dragend', ()=>{
+    _crossDrag=null;
+    INTERNAL_MEDIA_DRAG.end();
+    el.classList.remove('xdragging');
+    document.querySelectorAll('.xdragover').forEach(x=>x.classList.remove('xdragover'));
+  });
   el.addEventListener('dragover', (e)=>{
     // 只接受「格子↔格子」拖拽（_crossDrag 存在）；候选帧库拖拽走原 bindDropEvents 逻辑
-    if(_crossDrag){ e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect='move'; el.classList.add('xdragover'); }
+    if(_crossDrag){ e.preventDefault(); e.stopPropagation(); if(e.dataTransfer) e.dataTransfer.dropEffect='move'; el.classList.add('xdragover'); }
   });
   el.addEventListener('dragleave', ()=>{ el.classList.remove('xdragover'); });
   el.addEventListener('drop', async (e)=>{
@@ -5894,6 +5950,7 @@ function collectUserDefaults(){
     if(!el) return;
     controls[id]=el.type==='checkbox'?!!el.checked:el.value;
   });
+  controls.aiN=String(Math.max(1,Math.min(100,Math.round(Number(controls.aiN)||15))));
   return {
     controls,
     captureMode:S.captureMode||'interval',
@@ -5928,14 +5985,36 @@ function applyUserDefaults(options={}){
   return defaults;
 }
 
-function saveUserDefaults(){
+let userDefaultsAutoSaveTimer=null;
+function persistUserDefaults(){
   const defaults=collectUserDefaults();
   localStorage.setItem(USER_DEFAULTS_STORAGE,JSON.stringify(defaults));
+  const status=document.getElementById('userDefaultsStatus');
+  if(status) status.textContent='参数已自动保存，软件重启后自动恢复';
+  return defaults;
+}
+function scheduleUserDefaultsAutoSave(delay=400){
+  clearTimeout(userDefaultsAutoSaveTimer);
+  userDefaultsAutoSaveTimer=setTimeout(()=>{
+    userDefaultsAutoSaveTimer=null;
+    persistUserDefaults();
+  },delay);
+}
+function flushUserDefaultsAutoSave(){
+  clearTimeout(userDefaultsAutoSaveTimer);
+  userDefaultsAutoSaveTimer=null;
+  persistUserDefaults();
+}
+
+function saveUserDefaults(){
+  const defaults=persistUserDefaults();
   applyUserDefaults({defaults,silent:true});
   toast('当前模型、抽帧、销售、详情、导出与视图参数已保存为默认');
 }
 
 function resetUserDefaults(){
+  clearTimeout(userDefaultsAutoSaveTimer);
+  userDefaultsAutoSaveTimer=null;
   localStorage.removeItem(USER_DEFAULTS_STORAGE);
   applyUserDefaults({defaults:structuredClone(SYSTEM_USER_DEFAULTS),silent:true});
   toast('已恢复系统默认参数');
@@ -6879,6 +6958,7 @@ document.getElementById('storyFileInput')?.addEventListener('change',async e=>{
 });
 const storyDropzone=document.getElementById('storyDropzone');
 storyDropzone?.addEventListener('dragover',e=>{
+  if(INTERNAL_MEDIA_DRAG.blocksFileImport()||!isExternalFileDrag(e.dataTransfer)) return;
   e.preventDefault();
   e.stopPropagation();
   if(e.dataTransfer)e.dataTransfer.dropEffect='copy';
@@ -6888,6 +6968,7 @@ storyDropzone?.addEventListener('dragleave',e=>{
   if(!storyDropzone.contains(e.relatedTarget)) storyDropzone.classList.remove('is-dragging');
 });
 storyDropzone?.addEventListener('drop',async e=>{
+  if(INTERNAL_MEDIA_DRAG.blocksFileImport()||!isExternalFileDrag(e.dataTransfer)) return;
   e.preventDefault();
   e.stopPropagation();
   storyDropzone.classList.remove('is-dragging');
@@ -8580,13 +8661,33 @@ function buildDetailLongOverlay(b){
       if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openDetailSlotPicker(b,s.slot); }
     });
     // 拖拽交换
-    cell.addEventListener('dragstart', ()=>{ _detailDragSlot=s.slot; cell.classList.add('pm-dragging'); });
-    cell.addEventListener('dragend', ()=>{ cell.classList.remove('pm-dragging'); });
-    cell.addEventListener('dragover', (e)=>{ e.preventDefault(); cell.classList.add('pm-dragover'); });
+    cell.addEventListener('dragstart', (e)=>{
+      e.stopPropagation();
+      INTERNAL_MEDIA_DRAG.begin('detail-cell');
+      _detailDragSlot=s.slot;
+      cell.classList.add('pm-dragging');
+      if(e.dataTransfer){
+        e.dataTransfer.effectAllowed='move';
+        try{ e.dataTransfer.setData('text/plain','detail|'+detailSlotKey(s.slot)); }catch(_){}
+      }
+    });
+    cell.addEventListener('dragend', ()=>{
+      _detailDragSlot=null;
+      INTERNAL_MEDIA_DRAG.end();
+      cell.classList.remove('pm-dragging');
+      document.querySelectorAll('.pm-dragover').forEach(el=>el.classList.remove('pm-dragover'));
+    });
+    cell.addEventListener('dragover', (e)=>{
+      if(!_detailDragSlot) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if(e.dataTransfer)e.dataTransfer.dropEffect='move';
+      cell.classList.add('pm-dragover');
+    });
     cell.addEventListener('dragleave', ()=>{ cell.classList.remove('pm-dragover'); });
     cell.addEventListener('drop', async (e)=>{
-      e.preventDefault(); cell.classList.remove('pm-dragover');
       if(!_detailDragSlot) return;
+      e.preventDefault(); e.stopPropagation(); cell.classList.remove('pm-dragover');
       const a=_detailDragSlot, bb=s.slot; _detailDragSlot=null;
       const fa=getDetailSlotFrame(b,a), fb=getDetailSlotFrame(b,bb);
       setDetailSlotFrame(b,a,fb); setDetailSlotFrame(b,bb,fa);
@@ -9177,10 +9278,12 @@ document.addEventListener('input',e=>{
   if(e.target?.id==='aiApiKey') updateAiConnectionUI();
   if(e.target?.id==='storyDoc') updateTaskFlowState();
   if(e.target?.id==='feedbackViews'||e.target?.id==='feedbackClicks'||e.target?.id==='feedbackOrders') updateSalesFeedbackSummary();
+  if(USER_DEFAULT_CONTROL_IDS.includes(e.target?.id)) scheduleUserDefaultsAutoSave();
   if(e.target?.matches('input,textarea,select')) scheduleWorkspaceSave();
 });
 document.addEventListener('change',e=>{
   if(e.target?.matches('input,textarea,select')) scheduleWorkspaceSave();
+  if(USER_DEFAULT_CONTROL_IDS.includes(e.target?.id)) scheduleUserDefaultsAutoSave(0);
   if(e.target?.id==='aiModel'||e.target?.id==='aiSeoModel') syncModelPresetUI();
 });
 document.querySelectorAll('button:not([type])').forEach(btn=>btn.type='button');

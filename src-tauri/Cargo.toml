@@ -1,6 +1,6 @@
 [package]
 name = "sales-kit-studio"
-version = "0.1.3"
+version = "0.1.4"
 description = "Local desktop runtime for Sales Kit Studio"
 authors = ["HUAIDAO1104"]
 edition = "2021"
