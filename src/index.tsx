@@ -5,10 +5,10 @@ import appHtml from '../public/app.html?raw'
 const app = new Hono()
 
 const WINDOWS_RELEASE_URL =
-  'https://github.com/HUAIDAO1104/Vdeo-frame-pro/releases/download/desktop-v0.1.3/SalesKitStudio_0.1.3_x64-setup.exe'
-const WINDOWS_RELEASE_VERSION = '0.1.3'
-const WINDOWS_RELEASE_NAME = 'SalesKitStudio_0.1.3_x64-setup.exe'
-const WINDOWS_RELEASE_SHA256 = '9addd7a8b8a750b6ccdd8259fb4452ca9bc9403f6c79d51f9fb4ad8d58b4454a'
+  'https://github.com/HUAIDAO1104/Vdeo-frame-pro/releases/download/desktop-v0.1.4/SalesKitStudio_0.1.4_x64-setup.exe'
+const WINDOWS_RELEASE_VERSION = '0.1.4'
+const WINDOWS_RELEASE_NAME = 'SalesKitStudio_0.1.4_x64-setup.exe'
+const WINDOWS_RELEASE_SHA256 = '2046420d3b447a415ac48585670e48d7540c0a61256a628e3db11242e606818f'
 
 // 静态资源（统一放在 /static/ 下，由 Cloudflare Pages 直接服务）
 app.use('/static/*', serveStatic({ root: './public' }))
