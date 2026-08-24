@@ -15,7 +15,8 @@ const ffmpegScript=await readFile(new URL('../scripts/prepare-windows-ffmpeg.ps1
 const seoParserContext={};
 const jsonParserSource=html.slice(html.indexOf('function balancedJsonCandidates'),html.indexOf('async function aiSalesPlan'));
 const seoParserSource=html.slice(html.indexOf('function chatCompletionTexts'),html.indexOf('async function requestSeoPayload'));
-vm.runInNewContext(jsonParserSource+'\n'+seoParserSource,seoParserContext);
+const detailTitleParserSource=html.slice(html.indexOf('const HERO_TITLE_MAXLEN'),html.indexOf('async function requestDetailHeroTitlePayload'));
+vm.runInNewContext(jsonParserSource+'\n'+seoParserSource+'\n'+detailTitleParserSource,seoParserContext);
 
 test('inline application scripts parse',()=>{
   const scripts=[...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
@@ -114,6 +115,17 @@ test('DeepSeek reasoning output and markdown SEO copy are recovered',()=>{
   assert.equal(parsed.seoTitle,'工业科技视觉素材可商用');
   assert.deepEqual([...parsed.seoTitleAlts],['工业自动化视觉背景可商用','智慧工厂生产线素材可商用']);
   assert.deepEqual([...parsed.keywords],['工业','科技','智造','工厂']);
+});
+
+test('detail hero titles recover DeepSeek fields and never fail the whole detail image',()=>{
+  const reasoning='<think>分析主题</think>\n{"hero_titles":["智慧港口·自动化装卸","远洋货轮·全球物流链","数字航运·港航协同"]}';
+  assert.deepEqual([...seoParserContext.parseDetailHeroTitles(reasoning)],['智慧港口·自动化装卸','远洋货轮·全球物流链','数字航运·港航协同']);
+  const markdown='## 卖点标题\n1. 智慧港口·自动化装卸\n2. 远洋货轮·全球物流链\n3. 数字航运·港航协同';
+  assert.deepEqual([...seoParserContext.parseDetailHeroTitles(markdown)],['智慧港口·自动化装卸','远洋货轮·全球物流链','数字航运·港航协同']);
+  assert.deepEqual([...seoParserContext.parseDetailHeroTitles('<think>尚未输出正文')],[]);
+  assert.match(html,/Math\.max\(requested,2400\)/);
+  assert.match(html,/详情标题模型异常，已使用销售策略中的主题与卖点继续生成/);
+  assert.match(html,/return localFallback\(\)/);
 });
 
 test('video intake imports every selected or dropped video as a project',()=>{

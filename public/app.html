@@ -7551,6 +7551,67 @@ function cleanHeroTitle(s, maxLen){
   }
   return c.join('');
 }
+
+function parseDetailHeroTitles(raw){
+  const parsed=robustParseJSON(raw);
+  const roots=[parsed,parsed?.result,parsed?.data,parsed?.output].filter(value=>value&&typeof value==='object');
+  let value=Array.isArray(parsed)?parsed:null;
+  for(const root of roots){
+    value=value||root.titles||root.heroTitles||root.hero_titles||root.detailTitles||root.detail_titles||root.headlines||root['标题']||root['卖点标题'];
+    if(value) break;
+  }
+  let titles=[];
+  if(Array.isArray(value)){
+    titles=value.map(item=>typeof item==='string'?item:(item?.title||item?.text||item?.content||''));
+  } else if(value&&typeof value==='object'){
+    titles=Object.values(value).map(item=>typeof item==='string'?item:(item?.title||item?.text||''));
+  } else if(typeof value==='string'){
+    titles=splitSeoList(value);
+  }
+  if(!titles.length){
+    if(/<think>/i.test(String(raw||''))&&!/<\/think>/i.test(String(raw||''))) return [];
+    const fence=String.fromCharCode(96).repeat(3);
+    const text=String(raw||'')
+      .replace(/<think>[\s\S]*?<\/think>/gi,'')
+      .replace(new RegExp(fence+'(?:json)?','gi'),'')
+      .trim();
+    const lines=text.split(/\r?\n/).map(line=>line.trim()
+      .replace(/^#{1,6}\s*/,'')
+      .replace(/^\s*(?:[-*]|\d+[.)、])\s*/,'')
+      .replace(/\*\*/g,'')
+      .replace(/^(?:title|标题|卖点标题)\s*[A-C一二三123]?\s*[:：-]?\s*/i,'')
+      .replace(/^["'“”‘’]+|["'“”‘’，,。]+$/g,'')
+      .trim()).filter(Boolean);
+    titles=lines.filter(line=>!(/^(?:以下|这里|根据|输出|说明)/.test(line)));
+    if(titles.length===1&&/[|；;]/.test(titles[0])) titles=titles[0].split(/\s*[|；;]\s*/);
+  }
+  return [...new Set(titles.map(title=>cleanHeroTitle(title)).filter(title=>title&&[...title].length>=2))];
+}
+
+async function requestDetailHeroTitlePayload(input,prompt,options={}){
+  const requested=options.maxTokens||700;
+  const maxTokens=/deepseek/i.test(input.seoModel)?Math.max(requested,2400):requested;
+  const resp=await fetchWithDeadline('https://llm-api.mcisaas.com/v1/chat/completions',{
+    method:'POST',
+    signal:currentRunSignal(),
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+input.apiKey},
+    body:JSON.stringify({
+      model:input.seoModel,
+      messages:[{role:'user',content:prompt}],
+      max_tokens:maxTokens,
+      temperature:options.temperature??.35
+    })
+  },120000,'详情标题模型');
+  if(!resp.ok) throw new Error('标题AI失败 '+resp.status+': '+(await resp.text()).slice(0,160));
+  const data=await resp.json();
+  const candidates=chatCompletionTexts(data);
+  for(const candidate of candidates){
+    const titles=parseDetailHeroTitles(candidate);
+    if(titles.length) return {titles,raw:candidate,finishReason:data?.choices?.[0]?.finish_reason||''};
+  }
+  return {titles:[],raw:candidates[0]||'',finishReason:data?.choices?.[0]?.finish_reason||''};
+}
+
 async function aiDetailHeroTitles(input, plan, need){
   need=need||3;
   const localFallback=()=>{
@@ -7583,22 +7644,33 @@ async function aiDetailHeroTitles(input, plan, need){
       '核心卖点：'+(plan.sellingPoints||[]).join(' / ')+'\n'+
       '视觉方向：'+(plan.visualDirection||'')+'\n'+
       '素材类型：'+input.type;
-    const resp=await fetchWithDeadline('https://llm-api.mcisaas.com/v1/chat/completions',{
-      method:'POST',
-      signal:currentRunSignal(),
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+input.apiKey},
-      body:JSON.stringify({ model:input.seoModel, messages:[{role:'user',content:prompt}], max_tokens:500, temperature:.5 })
-    },90000,'详情标题模型');
-    if(!resp.ok) throw new Error('标题AI失败 '+resp.status);
-    const raw=(await resp.json()).choices?.[0]?.message?.content?.trim()||'';
-    const parsed=robustParseJSON(raw);
-    let titles=Array.isArray(parsed?.titles)?parsed.titles:(Array.isArray(parsed)?parsed:null);
-    if(!titles||!titles.length) throw new Error('标题解析为空');
-    titles=titles.map(t=>cleanHeroTitle(t)).filter(t=>t&&[...t].length>=2);
-    if(!titles.length) throw new Error('标题清洗后为空');
+    let result=await requestDetailHeroTitlePayload(input,prompt,{maxTokens:700,temperature:.4});
+    if(!result.titles.length){
+      const repairPrompt=
+        '请把下面的详情卖点标题结果修复为严格 JSON，不要解释、不要代码块：{"titles":["标题1","标题2","标题3"]}。\n'+
+        '必须返回 '+need+' 个互不重复的中文标题，每个 10~16 字，只写主题与具体内容。\n'+
+        '上一轮返回：\n'+(result.raw.slice(0,4000)||'模型正文为空，可能输出被截断');
+      result=await requestDetailHeroTitlePayload(input,repairPrompt,{maxTokens:700,temperature:0});
+    }
+    if(!result.titles.length){
+      const reason=result.finishReason==='length'?'输出被长度限制截断':'返回字段无法解析';
+      throw new Error(reason+(result.raw?'，开头为：'+result.raw.slice(0,100):'，且没有可用正文'));
+    }
+    const modelTitleCount=result.titles.length;
+    const fallback=localFallback();
+    const titles=[...result.titles];
+    fallback.forEach(title=>{ if(titles.length<need&&!titles.includes(title)) titles.push(title); });
+    plan.detailTitleSource=modelTitleCount>=need?'model':'model+strategy';
     const res=[]; for(let i=0;i<need;i++) res.push(titles[i%titles.length]);
     return res;
-  }catch(e){ throw new Error('详情标题模型调用失败：'+(e?.message||'未知错误')); }
+  }catch(e){
+    const reason=e?.message||'未知错误';
+    console.warn('详情标题模型调用失败，已使用销售策略标题',reason);
+    plan.detailTitleSource='strategy';
+    plan.detailTitleWarning=reason;
+    toast('详情标题模型异常，已使用销售策略中的主题与卖点继续生成','err');
+    return localFallback();
+  }
 }
 // 单张长图重新生成一个标题（用于资产卡上「换标题」按钮）
 async function regenOneHeroTitle(b){
@@ -7951,7 +8023,7 @@ async function createDetailCandidates(plan, ranked, input){
     const b={ id, cols:3, rows:0, cells:[], crops:{}, hasBadge:false, canvas:null, assetKind:'detail',
               isDetail:true, isDetailLong:true, detailIndex:i, detailLayout:layout,
               heroPlan:plan, heroTitle:titles[i], heroShowText:input.useText,
-              title:labels[i], note:'长图·九宫格+'+layout.rows.length+'行 · 与封面去重' };
+              title:labels[i], note:'长图·九宫格+'+layout.rows.length+'行 · 与封面去重'+(plan.detailTitleSource==='strategy'?' · 策略标题':plan.detailTitleSource==='model+strategy'?' · AI标题已补齐':'') };
     S.batches.push(b);
     const empty=document.getElementById('batchEmpty'); if(empty) empty.style.display='none';
     renderDetailBatchCard(b);
@@ -7961,7 +8033,8 @@ async function createDetailCandidates(plan, ranked, input){
   const block=document.getElementById('detailPreviewBlock');
   if(block) block.style.display='';
   const meta=document.getElementById('detailMeta');
-  if(meta) meta.textContent='已生成 '+DETAIL_COUNT+' 张详情长图：前三行固定 3×3，后续按内容使用 1~3 张自适应拼接；画面无缝铺满，不变形、不留黑边。';
+  if(meta) meta.textContent='已生成 '+DETAIL_COUNT+' 张详情长图：前三行固定 3×3，后续按内容使用 1~3 张自适应拼接；画面无缝铺满，不变形、不留黑边。'+
+    (plan.detailTitleSource==='strategy'?' 详情标题模型异常，本次已根据销售策略中的主题与卖点生成标题。':plan.detailTitleSource==='model+strategy'?' 部分标题已根据销售策略补齐。':'');
   updateFillBtn(); updateQuickBar(); checkDlAllBtn();
   refreshUsageTags();
   updateFinalAssetUI();
