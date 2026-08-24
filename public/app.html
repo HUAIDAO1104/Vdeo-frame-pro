@@ -699,7 +699,7 @@
             <div class="advanced-settings-body ai-field-grid">
               <label class="sales-field">
                 <span>候选画面数量</span>
-                <input type="number" id="aiN" value="15" min="1" max="100"/>
+                <input type="number" id="aiN" value="30" min="1" max="100"/>
               </label>
               <label class="sales-field">
                 <span>额外要求</span>
@@ -5092,7 +5092,7 @@ function autoCreateBatchForSelection(n){
 // -------- 主入口 --------
 async function runAIPick(autoFill=false){
   if(S.frames.length===0){ toast('请先分析视频并提取候选画面','err'); return; }
-  const N   = Math.min(parseInt(document.getElementById('aiN').value)||15, S.frames.length);
+  const N   = Math.min(parseInt(document.getElementById('aiN').value)||30, S.frames.length);
   const btn = document.getElementById('aiPickBtn');
   const btn2= document.getElementById('aiAutoFillBtn');
   const starSVG='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:middle;margin-right:4px;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>';
@@ -5314,7 +5314,7 @@ function cellHTML(b,i){
       ? '<img src="'+f.dataUrl+'"/>'+
         '<div class="cell-remove" onclick="removeCell('+b.id+','+i+');event.stopPropagation();">\xd7</div>'+
         '<div class="cell-crop-btn" title="\u8c03\u6574\u88c1\u526a/\u4f4d\u7f6e" onclick="openCropEditor('+b.id+','+i+');event.stopPropagation();"><svg viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14M18 22V8a2 2 0 0 0-2-2H2"/></svg></div>'+
-        '<div class="cell-replace-hint">\u70b9\u51fb\u66ff\u6362</div>'
+        '<div class="cell-replace-hint">\u62d6\u62fd\u4ea4\u6362 \u00b7 \u70b9\u51fb\u66ff\u6362</div>'
       : '<div class="cell-ph"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>\u70b9\u51fb/\u62d6\u5165</span></div>'
     )+
     '<div class="cell-num">'+(i+1)+'</div>'+
@@ -5365,6 +5365,15 @@ function clearDropTargets(){
 // 任意批次的任意格子，可拖到任意批次的任意格子进行「交换」。
 // ===================================================================
 let _crossDrag=null; // { bid, slotKey, fi }
+const CELL_POINTER_DRAG={
+  pointerId:null,
+  source:null,
+  target:null,
+  startX:0,
+  startY:0,
+  active:false,
+  suppressClickUntil:0
+};
 
 function parseSlotKey(b, key){
   const p=String(key).split(':');
@@ -5438,36 +5447,82 @@ async function handleSwapTap(bid,key,el){
   await performCrossSwap(src.bid,src.key,bid,key);
   return true;
 }
-// 给一个 DOM 格子元素绑定「作为跨批次拖拽源 + 落点」的事件
-function bindCrossCellDrag(el, bid, slotKey){
-  el.setAttribute('draggable','true');
-  el.dataset.xbid=bid; el.dataset.xkey=slotKey;
-  el.addEventListener('dragstart', (e)=>{
-    e.stopPropagation();
+function cellPointerTargetAt(x,y){
+  return document.elementFromPoint(x,y)?.closest?.('[data-xbid][data-xkey]')||null;
+}
+function clearCellPointerDrag(){
+  CELL_POINTER_DRAG.source?.el?.classList.remove('xdragging');
+  CELL_POINTER_DRAG.target?.classList.remove('xdragover');
+  document.querySelectorAll('.xdragover').forEach(el=>el.classList.remove('xdragover'));
+  document.body.classList.remove('cell-pointer-swapping');
+  if(CELL_POINTER_DRAG.active) INTERNAL_MEDIA_DRAG.end();
+  CELL_POINTER_DRAG.pointerId=null;
+  CELL_POINTER_DRAG.source=null;
+  CELL_POINTER_DRAG.target=null;
+  CELL_POINTER_DRAG.active=false;
+  _crossDrag=null;
+}
+document.addEventListener('pointermove',e=>{
+  if(CELL_POINTER_DRAG.pointerId!==e.pointerId||!CELL_POINTER_DRAG.source) return;
+  const distance=Math.hypot(e.clientX-CELL_POINTER_DRAG.startX,e.clientY-CELL_POINTER_DRAG.startY);
+  if(!CELL_POINTER_DRAG.active&&distance<8) return;
+  if(!CELL_POINTER_DRAG.active){
+    CELL_POINTER_DRAG.active=true;
     INTERNAL_MEDIA_DRAG.begin('asset-cell');
+    CELL_POINTER_DRAG.source.el.classList.add('xdragging');
+    document.body.classList.add('cell-pointer-swapping');
+  }
+  e.preventDefault();
+  const target=cellPointerTargetAt(e.clientX,e.clientY);
+  if(target!==CELL_POINTER_DRAG.target){
+    CELL_POINTER_DRAG.target?.classList.remove('xdragover');
+    CELL_POINTER_DRAG.target=target;
+    target?.classList.add('xdragover');
+  }
+},{passive:false});
+document.addEventListener('pointerup',e=>{
+  if(CELL_POINTER_DRAG.pointerId!==e.pointerId||!CELL_POINTER_DRAG.source) return;
+  const source=CELL_POINTER_DRAG.source;
+  const target=cellPointerTargetAt(e.clientX,e.clientY)||CELL_POINTER_DRAG.target;
+  const didDrag=CELL_POINTER_DRAG.active;
+  if(didDrag){
+    e.preventDefault();
+    CELL_POINTER_DRAG.suppressClickUntil=Date.now()+700;
+  }
+  clearCellPointerDrag();
+  if(!didDrag||!target) return;
+  const dstBid=Number(target.dataset.xbid);
+  const dstKey=target.dataset.xkey;
+  performCrossSwap(source.bid,source.slotKey,dstBid,dstKey).catch(error=>{
+    console.error('交换画面失败',error);
+    toast('交换画面失败：'+(error?.message||'未知错误'),'err');
+  });
+},{passive:false});
+document.addEventListener('pointercancel',clearCellPointerDrag);
+
+// Windows WebView 会拦截原生 HTML5 拖放，格子交换改用指针事件实现。
+function bindCrossCellDrag(el, bid, slotKey){
+  el.setAttribute('draggable','false');
+  el.dataset.xbid=bid; el.dataset.xkey=slotKey;
+  el.querySelectorAll('img').forEach(img=>img.draggable=false);
+  el.addEventListener('dragstart',e=>e.preventDefault());
+  el.addEventListener('pointerdown',e=>{
+    if(e.button!==0||e.target.closest('button,input,textarea,select,.cell-remove,.cell-crop-btn')) return;
     const b=S.batches.find(x=>x.id===bid);
-    _crossDrag={ bid, slotKey, fi:getSlotFrameByKey(b, slotKey) };
-    el.classList.add('xdragging');
-    if(e.dataTransfer){ e.dataTransfer.effectAllowed='move'; try{ e.dataTransfer.setData('text/plain', bid+'|'+slotKey); }catch(_){} }
+    const fi=getSlotFrameByKey(b,slotKey);
+    if(fi==null) return;
+    clearCellPointerDrag();
+    _crossDrag={bid,slotKey,fi};
+    CELL_POINTER_DRAG.pointerId=e.pointerId;
+    CELL_POINTER_DRAG.source={bid,slotKey,fi,el};
+    CELL_POINTER_DRAG.startX=e.clientX;
+    CELL_POINTER_DRAG.startY=e.clientY;
   });
-  el.addEventListener('dragend', ()=>{
-    _crossDrag=null;
-    INTERNAL_MEDIA_DRAG.end();
-    el.classList.remove('xdragging');
-    document.querySelectorAll('.xdragover').forEach(x=>x.classList.remove('xdragover'));
-  });
-  el.addEventListener('dragover', (e)=>{
-    // 只接受「格子↔格子」拖拽（_crossDrag 存在）；候选帧库拖拽走原 bindDropEvents 逻辑
-    if(_crossDrag){ e.preventDefault(); e.stopPropagation(); if(e.dataTransfer) e.dataTransfer.dropEffect='move'; el.classList.add('xdragover'); }
-  });
-  el.addEventListener('dragleave', ()=>{ el.classList.remove('xdragover'); });
-  el.addEventListener('drop', async (e)=>{
-    if(!_crossDrag) return; // 交给其它 drop 处理
-    e.preventDefault(); e.stopPropagation();
-    el.classList.remove('xdragover');
-    const src=_crossDrag; _crossDrag=null;
-    await performCrossSwap(src.bid, src.slotKey, bid, slotKey);
-  });
+  el.addEventListener('click',e=>{
+    if(Date.now()>=CELL_POINTER_DRAG.suppressClickUntil) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  },true);
 }
 
 // ===================================================================
@@ -5697,9 +5752,10 @@ function renderCell(b, ci){
     ? '<img src="'+f.dataUrl+'"/>'+
       '<div class="cell-remove" onclick="removeCell('+b.id+','+ci+');event.stopPropagation();">×</div>'+
       '<div class="cell-crop-btn" title="调整裁剪/位置" onclick="openCropEditor('+b.id+','+ci+');event.stopPropagation();"><svg viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14M18 22V8a2 2 0 0 0-2-2H2"/></svg></div>'+
-      '<div class="cell-replace-hint">点击替换</div>'
+      '<div class="cell-replace-hint">拖拽交换 · 点击替换</div>'
     : '<div class="cell-ph"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>点击/拖入</span></div>';
   cellEl.innerHTML+='<div class="cell-num">'+(ci+1)+'</div>';
+  cellEl.querySelectorAll('img').forEach(img=>img.draggable=false);
   // 应用裁剪变换到缩略图
   if(hasImg) applyCellCropStyle(cellEl.querySelector('img'), b, ci);
   // re-bind ALL cell events (both empty and has-img)
@@ -5890,7 +5946,9 @@ function checkDlAllBtn(){
 // ── 导出选项 ──
 const EXPORT = { format:'jpeg', quality:0.95, scale:1 }; // scale: 0.5 / 1 / 2
 const USER_DEFAULTS_STORAGE='vfp_user_defaults_v1';
+const USER_DEFAULTS_SCHEMA_VERSION=2;
 const SYSTEM_USER_DEFAULTS={
+  defaultsVersion:USER_DEFAULTS_SCHEMA_VERSION,
   controls:{
     salesPackType:'自定义',
     salesGoal:'由AI自动判断',
@@ -5904,7 +5962,7 @@ const SYSTEM_USER_DEFAULTS={
     sceneSens:'30',
     sceneMinGap:'0.5',
     mxf:'300',
-    aiN:'15',
+    aiN:'30',
     aiPromptHint:'',
     aiModel:'qwen3-vl-flash-2026-01-22',
     aiSeoModel:'claude-opus-4-8'
@@ -5919,6 +5977,9 @@ const USER_DEFAULT_CONTROL_IDS=Object.keys(SYSTEM_USER_DEFAULTS.controls);
 function readUserDefaults(){
   let stored={};
   try{ stored=JSON.parse(localStorage.getItem(USER_DEFAULTS_STORAGE)||'{}')||{}; }catch(_){}
+  if((Number(stored.defaultsVersion)||0)<2&&String(stored.controls?.aiN||'15')==='15'){
+    stored.controls={...(stored.controls||{}),aiN:'30'};
+  }
   return {
     ...SYSTEM_USER_DEFAULTS,
     ...stored,
@@ -5950,8 +6011,9 @@ function collectUserDefaults(){
     if(!el) return;
     controls[id]=el.type==='checkbox'?!!el.checked:el.value;
   });
-  controls.aiN=String(Math.max(1,Math.min(100,Math.round(Number(controls.aiN)||15))));
+  controls.aiN=String(Math.max(1,Math.min(100,Math.round(Number(controls.aiN)||30))));
   return {
+    defaultsVersion:USER_DEFAULTS_SCHEMA_VERSION,
     controls,
     captureMode:S.captureMode||'interval',
     export:{format:EXPORT.format,quality:EXPORT.quality,scale:EXPORT.scale},
@@ -7119,8 +7181,71 @@ function makeSeoIntro(theme, sellingPoints, words){
 
 // 鲁棒 JSON 解析：处理 ```json 代码块、前后缀文字、尾随逗号、单引号、智能引号、
 // 以及被截断的 JSON（缺少结尾括号时尝试补齐）。返回对象或 null。
+function balancedJsonCandidates(value){
+  const text=String(value||'');
+  const out=[];
+  let start=-1,depth=0,inString=false,escaped=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(inString){
+      if(escaped){ escaped=false; continue; }
+      if(ch==='\\'){ escaped=true; continue; }
+      if(ch==='"') inString=false;
+      continue;
+    }
+    if(ch==='"'){ inString=true; continue; }
+    if(ch==='{'||ch==='['){ if(depth===0) start=i; depth++; continue; }
+    if(ch==='}'||ch===']'){
+      if(depth>0) depth--;
+      if(depth===0&&start>=0){ out.push(text.slice(start,i+1)); start=-1; }
+    }
+  }
+  return out;
+}
+
+function normalizeLooseJson(value){
+  const text=String(value||'').replace(/^\uFEFF/,'').replace(/[\u201c\u201d]/g,'"').replace(/[\u2018\u2019]/g,"'");
+  let out='',inString=false,escaped=false;
+  for(const ch of text){
+    if(inString){
+      if(escaped){ out+=ch; escaped=false; continue; }
+      if(ch==='\\'){ out+=ch; escaped=true; continue; }
+      if(ch==='"'){ inString=false; out+=ch; continue; }
+      if(ch==='\n'){ out+='\\n'; continue; }
+      if(ch==='\r') continue;
+      out+=ch;
+      continue;
+    }
+    if(ch==='"'){ inString=true; out+=ch; continue; }
+    out+=ch==='：'?':':ch==='，'?',':ch;
+  }
+  return out
+    .replace(/([{,]\s*)'([^'\n]+)'\s*:/g,'$1"$2":')
+    .replace(/:\s*'([^'\n]*)'(?=\s*[,}])/g,(_,item)=>':'+JSON.stringify(item))
+    .replace(/([{,]\s*)([A-Za-z_][\w-]*)\s*:/g,'$1"$2":')
+    .replace(/,\s*([}\]])/g,'$1');
+}
+
+function parseFlexibleJson(raw){
+  const original=String(raw||'').trim();
+  if(!original) return null;
+  const afterThink=original.includes('</think>')?original.slice(original.lastIndexOf('</think>')+8).trim():'';
+  const candidates=[...balancedJsonCandidates(afterThink),...balancedJsonCandidates(original),afterThink,original].filter(Boolean).reverse();
+  const tryParse=str=>{ try{ return JSON.parse(str); }catch(_){ return null; } };
+  for(const candidate of candidates){
+    let parsed=tryParse(candidate);
+    if(parsed) return parsed;
+    const loose=normalizeLooseJson(candidate);
+    parsed=tryParse(loose);
+    if(parsed) return parsed;
+  }
+  return null;
+}
+
 function robustParseJSON(raw){
   if(!raw) return null;
+  const flexible=parseFlexibleJson(raw);
+  if(flexible) return flexible;
   let s = String(raw).trim();
   // 1) 去掉 markdown 代码块围栏
   s = s.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
@@ -7215,14 +7340,37 @@ async function aiSalesPlan(input,reportStage=()=>{}){
   return parsed;
 }
 
-function chatCompletionText(data){
-  const message=data?.choices?.[0]?.message||{};
-  if(typeof message.content==='string') return message.content.trim();
-  if(Array.isArray(message.content)){
-    const text=message.content.map(part=>typeof part==='string'?part:(part?.text||part?.content||'')).join('\n').trim();
-    if(text) return text;
+function chatCompletionTexts(data){
+  const values=[];
+  const push=value=>{
+    const text=String(value||'').trim();
+    if(text&&!values.includes(text)) values.push(text);
+  };
+  for(const choice of data?.choices||[]){
+    const message=choice?.message||choice?.delta||{};
+    if(typeof message.content==='string') push(message.content);
+    if(Array.isArray(message.content)){
+      push(message.content.map(part=>typeof part==='string'?part:(part?.text||part?.content||part?.output_text||'')).join('\n'));
+    } else if(message.content&&typeof message.content==='object'){
+      push(message.content.text||message.content.content||message.content.output_text);
+    }
+    push(message.output_text);
+    push(choice?.text);
+    for(const call of message.tool_calls||[]) push(call?.function?.arguments);
+    push(message.reasoning_content);
   }
-  return String(message.output_text||data?.output_text||message.reasoning_content||'').trim();
+  push(data?.output_text);
+  for(const item of data?.output||[]){
+    if(typeof item==='string') push(item);
+    else if(Array.isArray(item?.content)) push(item.content.map(part=>part?.text||part?.content||'').join('\n'));
+    else push(item?.text||item?.content);
+  }
+  push(data?.reasoning_content);
+  return values;
+}
+
+function chatCompletionText(data){
+  return chatCompletionTexts(data)[0]||'';
 }
 
 function splitSeoList(value){
@@ -7249,6 +7397,37 @@ function normalizeSeoPayload(parsed){
   };
 }
 
+function parseSeoTextPayload(raw){
+  const fence=String.fromCharCode(96).repeat(3);
+  const text=String(raw||'').replace(/<think>[\s\S]*?<\/think>/gi,'').replace(new RegExp(fence+'(?:json)?','gi'),'').trim();
+  if(!text) return null;
+  const sections={title:[],alts:[],intro:[],keywords:[]};
+  let current='';
+  for(const originalLine of text.split(/\r?\n/)){
+    const line=originalLine.trim()
+      .replace(/^#{1,6}\s*/,'')
+      .replace(/^\s*(?:[-*]|\d+[.)、])\s*/,'')
+      .replace(/\*\*/g,'')
+      .trim();
+    if(!line) continue;
+    let match=line.match(/^(?:seoTitle|SEO标题|主推标题|主标题)\s*[:：]?\s*(.*)$/i);
+    if(match){ current='title'; if(match[1]) sections.title.push(match[1]); continue; }
+    match=line.match(/^(?:seoTitleAlts?|备选标题(?:[AB一二12])?)\s*[:：]?\s*(.*)$/i);
+    if(match){ current='alts'; if(match[1]) sections.alts.push(match[1]); continue; }
+    match=line.match(/^(?:seoIntro|SEO简介|作品简介|简介|描述)\s*[:：]?\s*(.*)$/i);
+    if(match){ current='intro'; if(match[1]) sections.intro.push(match[1]); continue; }
+    match=line.match(/^(?:keywords?|seoKeywords|SEO关键词|关键词|标签)\s*[:：]?\s*(.*)$/i);
+    if(match){ current='keywords'; if(match[1]) sections.keywords.push(match[1]); continue; }
+    if(current) sections[current].push(line);
+  }
+  const title=sections.title.join(' ').replace(/^["']|["'],?$/g,'').trim();
+  const alts=splitSeoList(sections.alts.join('\n')).map(value=>value.replace(/^["']|["'],?$/g,'').trim()).filter(Boolean);
+  const intro=sections.intro.join('').replace(/^["']|["'],?$/g,'').trim();
+  const keywords=splitSeoList(sections.keywords.join(' ')).flatMap(value=>value.split(/\s+/)).map(value=>value.replace(/^["'\[]+|["'\]]+$/g,'').trim()).filter(Boolean);
+  if(!title&&!intro&&!alts.length&&!keywords.length) return null;
+  return normalizeSeoPayload({seoTitle:title,seoTitleAlts:alts,seoIntro:intro,keywords});
+}
+
 function seoPayloadIssues(payload){
   const issues=[];
   if(!payload.seoTitle) issues.push('主推标题缺失');
@@ -7259,6 +7438,7 @@ function seoPayloadIssues(payload){
 }
 
 async function requestSeoPayload(input,prompt,options={}){
+  const maxTokens=/deepseek/i.test(input.seoModel)?Math.max(options.maxTokens||3600,8000):(options.maxTokens||3600);
   const resp=await fetchWithDeadline('https://llm-api.mcisaas.com/v1/chat/completions',{
     method:'POST',
     signal:currentRunSignal(),
@@ -7266,15 +7446,24 @@ async function requestSeoPayload(input,prompt,options={}){
     body:JSON.stringify({
       model:input.seoModel,
       messages:[{role:'user',content:prompt}],
-      max_tokens:options.maxTokens||3600,
+      max_tokens:maxTokens,
       temperature:options.temperature??.2
     })
   },180000,'SEO 文案模型');
   if(!resp.ok) throw new Error('SEO文案AI失败 '+resp.status+': '+(await resp.text()).slice(0,180));
   const data=await resp.json();
-  const raw=chatCompletionText(data);
-  const parsed=robustParseJSON(raw);
-  return {payload:parsed?normalizeSeoPayload(parsed):null,raw,finishReason:data?.choices?.[0]?.finish_reason||''};
+  const candidates=chatCompletionTexts(data);
+  let raw=candidates[0]||'',payload=null;
+  for(const candidate of candidates){
+    const parsed=robustParseJSON(candidate);
+    const normalized=parsed?normalizeSeoPayload(parsed):parseSeoTextPayload(candidate);
+    if(normalized&&(normalized.seoTitle||normalized.seoIntro||normalized.seoTitleAlts.length||normalized.keywords.length)){
+      raw=candidate;
+      payload=normalized;
+      break;
+    }
+  }
+  return {payload,raw,finishReason:data?.choices?.[0]?.finish_reason||''};
 }
 
 async function aiSeoOptimize(input, plan){
@@ -7312,8 +7501,7 @@ async function aiSeoOptimize(input, plan){
     '详情结构：'+(plan.detailRows||[]).map(r=>r.label+' '+(r.text||'')+' '+r.count+'图').join('；')+'\n'+
     '分镜/素材文档：\n'+(input.doc||'用户未提供文档，请根据素材类型和已有策略生成。');
   let result=await requestSeoPayload(input,prompt,{maxTokens:4200,temperature:.25});
-  if(!result.payload) throw new Error('SEO文案模型 '+input.seoModel+' 已返回内容，但JSON格式无法解析。原始返回前120字：'+result.raw.slice(0,120));
-  let issues=seoPayloadIssues(result.payload);
+  let issues=result.payload?seoPayloadIssues(result.payload):['JSON格式无法解析'];
   if(issues.length){
     const repairPrompt=
       '你上一轮 SEO 文案结果的数据结构不完整。请只修复格式并补齐缺失内容，不要解释，不要代码块。\n'+
@@ -7321,9 +7509,12 @@ async function aiSeoOptimize(input, plan){
       'seoTitle 必须非空；seoTitleAlts 必须恰好2条；seoIntro 必须非空；keywords 必须恰好50个互不重复的中文短词。\n'+
       '真实性约束：'+specRule+'；'+aiRule+'。不得增加未经确认的属性。\n'+
       '主题：'+(plan.theme||input.type)+'\n核心卖点：'+(plan.sellingPoints||[]).join(' / ')+'\n'+
-      '上一轮缺失：'+issues.join('、')+'\n上一轮返回：\n'+result.raw.slice(0,7000);
+      '上一轮缺失：'+issues.join('、')+'\n上一轮返回：\n'+(result.raw.slice(0,7000)||'模型未在标准 content 字段中返回可用正文');
     result=await requestSeoPayload(input,repairPrompt,{maxTokens:3600,temperature:0});
-    if(!result.payload) throw new Error('SEO文案模型 '+input.seoModel+' 第二次返回仍无法解析为JSON，请切换推荐文案模型');
+    if(!result.payload){
+      const detail=result.raw?'返回内容仍不是可解析结构，开头为：'+result.raw.slice(0,120):'接口没有返回可用正文';
+      throw new Error('SEO文案模型 '+input.seoModel+' 连续两次失败：'+detail+'。请重试或切换推荐文案模型');
+    }
     issues=seoPayloadIssues(result.payload);
   }
   if(issues.length){

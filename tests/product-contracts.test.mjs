@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import test from 'node:test';
+import vm from 'node:vm';
 
 const html=await readFile(new URL('../public/app.html',import.meta.url),'utf8');
 const readme=await readFile(new URL('../README.md',import.meta.url),'utf8');
@@ -10,6 +11,11 @@ const desktopMain=await readFile(new URL('../src-tauri/src/main.rs',import.meta.
 const windowsConfig=await readFile(new URL('../src-tauri/tauri.windows.conf.json',import.meta.url),'utf8');
 const windowsWorkflow=await readFile(new URL('../.github/workflows/windows-desktop.yml',import.meta.url),'utf8');
 const ffmpegScript=await readFile(new URL('../scripts/prepare-windows-ffmpeg.ps1',import.meta.url),'utf8');
+
+const seoParserContext={};
+const jsonParserSource=html.slice(html.indexOf('function balancedJsonCandidates'),html.indexOf('async function aiSalesPlan'));
+const seoParserSource=html.slice(html.indexOf('function chatCompletionTexts'),html.indexOf('async function requestSeoPayload'));
+vm.runInNewContext(jsonParserSource+'\n'+seoParserSource,seoParserContext);
 
 test('inline application scripts parse',()=>{
   const scripts=[...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
@@ -84,10 +90,30 @@ test('listing validation requires exactly fifty unique keywords',()=>{
 test('SEO model responses normalize common schemas and retry incomplete JSON once',()=>{
   assert.match(html,/function normalizeSeoPayload\(parsed\)/);
   assert.match(html,/source\.seoTitle\?\?source\.seo_title\?\?source\.mainTitle/);
+  assert.match(html,/function chatCompletionTexts\(data\)/);
+  assert.match(html,/push\(message\.reasoning_content\)/);
+  assert.match(html,/function parseFlexibleJson\(raw\)/);
+  assert.match(html,/function parseSeoTextPayload\(raw\)/);
+  assert.match(html,/Math\.max\(options\.maxTokens\|\|3600,8000\)/);
   assert.match(html,/function seoPayloadIssues\(payload\)/);
   assert.match(html,/let result=await requestSeoPayload\(input,prompt,\{maxTokens:4200,temperature:\.25\}\)/);
   assert.match(html,/上一轮 SEO 文案结果的数据结构不完整/);
+  assert.match(html,/JSON格式无法解析/);
   assert.match(html,/连续两次未返回完整结构/);
+});
+
+test('DeepSeek reasoning output and markdown SEO copy are recovered',()=>{
+  const payload={seoTitle:'主推标题',seoTitleAlts:['备选一','备选二'],seoIntro:'简介',keywords:['词一','词二']};
+  const reasoning='<think>先分析内容</think>\n```json\n'+JSON.stringify(payload)+'\n```';
+  const texts=seoParserContext.chatCompletionTexts({choices:[{message:{content:'',reasoning_content:reasoning}}]});
+  assert.equal(texts.length,1);
+  assert.equal(JSON.stringify(seoParserContext.robustParseJSON(texts[0])),JSON.stringify(payload));
+
+  const markdown='## 主推标题：工业科技视觉素材可商用\n## 备选标题\n- 工业自动化视觉背景可商用\n- 智慧工厂生产线素材可商用\n## 作品简介\n呈现工业生产与智能制造画面。\n## 关键词\n工业 科技 智造 工厂';
+  const parsed=seoParserContext.parseSeoTextPayload(markdown);
+  assert.equal(parsed.seoTitle,'工业科技视觉素材可商用');
+  assert.deepEqual([...parsed.seoTitleAlts],['工业自动化视觉背景可商用','智慧工厂生产线素材可商用']);
+  assert.deepEqual([...parsed.keywords],['工业','科技','智造','工厂']);
 });
 
 test('video intake imports every selected or dropped video as a project',()=>{
@@ -287,6 +313,18 @@ test('internal image dragging cannot fall through to desktop file upload',()=>{
   assert.match(html,/!isExternalFileDrag\(e\.dataTransfer\)/);
 });
 
+test('cover cells use pointer dragging so Windows WebView cannot turn swaps into picker clicks',()=>{
+  assert.match(html,/const CELL_POINTER_DRAG=\{/);
+  assert.match(html,/document\.addEventListener\('pointermove'/);
+  assert.match(html,/distance<8/);
+  assert.match(html,/document\.addEventListener\('pointerup'/);
+  assert.match(html,/performCrossSwap\(source\.bid,source\.slotKey,dstBid,dstKey\)/);
+  assert.match(html,/CELL_POINTER_DRAG\.suppressClickUntil=Date\.now\(\)\+700/);
+  assert.match(html,/e\.stopImmediatePropagation\(\)/);
+  assert.match(html,/el\.setAttribute\('draggable','false'\)/);
+  assert.match(html,/\\u62d6\\u62fd\\u4ea4\\u6362 \\u00b7 \\u70b9\\u51fb\\u66ff\\u6362/);
+});
+
 test('windows desktop processing prefers GPU decoding and falls back to CPU',()=>{
   assert.match(desktopRust,/detect_hardware_accelerations/);
   assert.match(desktopRust,/command\.args\(\["-hwaccel", "auto"\]\)/);
@@ -329,6 +367,10 @@ test('user workflow parameters can be saved and restored across restarts',()=>{
   assert.match(html,/controls\.aiN=String\(Math\.max\(1,Math\.min\(100,/);
   assert.match(html,/USER_DEFAULT_CONTROL_IDS\.includes\(e\.target\?\.id\)\) scheduleUserDefaultsAutoSave/);
   assert.match(html,/flushUserDefaultsAutoSave\(\)/);
+  assert.match(html,/id="aiN" value="30"/);
+  assert.match(html,/const USER_DEFAULTS_SCHEMA_VERSION=2/);
+  assert.match(html,/stored\.controls=\{\.\.\.\(stored\.controls\|\|\{\}\),aiN:'30'\}/);
+  assert.match(html,/aiN:'30'/);
 });
 
 test('windows installer bundles FFmpeg and has a reproducible CI build',()=>{

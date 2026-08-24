@@ -1612,6 +1612,8 @@ body.desktop-file-drag::after {
 /* 封面批次格子作为跨批次拖拽源/落点时的视觉反馈 */
 .cell.xdragging { opacity:.4; }
 .cell.xdragover { outline:3px solid var(--accent,#3eb489); outline-offset:-3px; background:rgba(62,180,137,0.18); }
+body.cell-pointer-swapping,body.cell-pointer-swapping *{cursor:grabbing!important;user-select:none!important;}
+.cell.has-img[data-xbid],.detail-thumb-overlay .dt-slot[data-xbid]{cursor:grab;}
 
 /* 让封面格子整体可拖拽：禁用内部 <img> 的原生拖拽，避免抢占 cell 的 dragstart */
 .cell img { -webkit-user-drag:none; user-drag:none; }
