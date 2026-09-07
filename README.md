@@ -14,7 +14,7 @@
 
 ## Windows 下载与更新
 
-[下载 Windows x64 安装包](https://github.com/HUAIDAO1104/Vdeo-frame-pro/releases/latest) 。0.1.6 及更早版本没有更新模块，需要先关闭旧程序、运行一次 0.2.0 安装包，无需预先卸载。
+[下载 Windows 0.2.0 x64 安装包](https://github.com/HUAIDAO1104/Vdeo-frame-pro/releases/download/desktop-v0.2.0/SalesKitStudio_0.2.0_x64-setup.exe)（约 60 MB）。2026-09-07 已发布：[发行说明](https://github.com/HUAIDAO1104/Vdeo-frame-pro/releases/tag/desktop-v0.2.0)、[构建与发布验证](docs/releases/0.2.0-verification.md)。0.1.6 及更早版本没有更新模块，需要先关闭旧程序、运行一次 0.2.0 安装包，无需预先卸载。
 
 0.2.0 起，Windows 启动时和运行中每 6 小时自动检查更新；也可打开“设置 → 版本与更新”。收到新版提示后点击“保存并安装”，程序会保存当前任务、下载并验证签名，再启动安装。视频正在运行或暂停时需要先停止；更新失败可继续使用旧版并重试。
 
@@ -91,7 +91,7 @@ macOS 本地测试（需本机 FFmpeg 与 ffprobe）：
 npm exec -- tauri build --debug --bundles app --no-sign
 ```
 
-输出为 `src-tauri/target/debug/bundle/macos/帧选.app`。这是本机测试构建，未签名或公证，不是公开发行包。0.2.0 源码更新不会自动更改 GitHub Releases 上的旧安装包。
+输出为 `src-tauri/target/debug/bundle/macos/帧选.app`。这是本机测试构建，未签名或公证，不是公开发行包。公开发行包目前为上面的 Windows x64 版本。
 
 ## 主要文件
 
