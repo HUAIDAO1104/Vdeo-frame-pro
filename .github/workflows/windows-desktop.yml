@@ -26,6 +26,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
+          cache-on-failure: true
       - name: Install frontend dependencies
         run: npm ci
       - name: Restore FFmpeg cache
@@ -43,19 +44,21 @@ jobs:
       - name: Test native runtime
         run: |
           npm run desktop:frontend
-          cargo test --manifest-path src-tauri/Cargo.toml --lib --locked
+          cargo test --manifest-path src-tauri/Cargo.toml --release --lib --locked
       - name: Build signed Windows installer
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: npm run desktop:build -- -- --locked
       - name: Prepare installer and update manifest
+        id: prepare
         run: node scripts/prepare-release.mjs
       - name: Smoke test Windows installer
         timeout-minutes: 5
         shell: powershell
         run: powershell -ExecutionPolicy Bypass -File scripts\smoke-windows-release.ps1
       - name: Upload verified installer
+        if: always() && steps.prepare.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: sales-kit-studio-windows-x64

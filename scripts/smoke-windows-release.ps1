@@ -9,8 +9,12 @@ if (-not (Test-Path $binary)) { throw 'Installed application missing' }
 foreach ($tool in @('ffmpeg.exe','ffprobe.exe')) {
   $path = Join-Path $installDir $tool
   if (-not (Test-Path $path)) { throw "Bundled tool missing: $tool" }
-  & $path -version | Select-Object -First 1
-  if ($LASTEXITCODE -ne 0) { throw "Bundled tool cannot run: $tool" }
+  # Consume the entire process output before selecting a line. Piping directly
+  # into Select-Object -First can terminate ffprobe before it exits normally.
+  $toolOutput = & $path -version
+  $toolExit = $LASTEXITCODE
+  $toolOutput | Select-Object -First 1
+  if ($toolExit -ne 0) { throw "Bundled tool cannot run: $tool (exit $toolExit)" }
 }
 $app = Start-Process -FilePath $binary -PassThru
 try {
