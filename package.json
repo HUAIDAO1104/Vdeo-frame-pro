@@ -3,7 +3,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "test": "node --test tests/product-contracts.test.mjs",
+    "test": "node --test tests/*.test.mjs",
     "build": "vite build",
     "desktop:frontend": "node scripts/build-desktop-frontend.mjs",
     "desktop:dev:frontend": "vite --config vite.desktop.config.ts",
@@ -12,7 +12,8 @@
     "desktop:info": "tauri info",
     "preview": "wrangler pages dev",
     "deploy": "npm run build && wrangler pages deploy",
-    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "test:browser": "node tests/workspace.e2e.mjs"
   },
   "dependencies": {
     "hono": "^4.12.9"

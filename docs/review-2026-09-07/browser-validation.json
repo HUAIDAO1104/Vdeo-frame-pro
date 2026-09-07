@@ -1,0 +1,16 @@
+{
+  "checks": [
+    "image-only workflow with clear empty state",
+    "first result is visible and exportable while remaining work is paused",
+    "ZIP contains actual images and source/output metadata only",
+    "delete queued and paused current videos without losing completed output",
+    "stop, restart, and background completion preserve the currently viewed result",
+    "main-version selection, replacement, crop, undo and redo automatically redraw images",
+    "history restores edited images, does not auto-open, and excludes credentials",
+    "mobile queue and results fit the viewport",
+    "AI scores match candidate IDs, preserve zero, and reject ambiguous responses (mock provider)",
+    "regeneration protects previous output from concurrent edits and preserves export after stop",
+    "deleting the last video clears the current history row"
+  ],
+  "errors": []
+}

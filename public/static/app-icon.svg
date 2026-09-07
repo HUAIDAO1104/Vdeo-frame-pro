@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="night" x1=".1" y1="0" x2=".9" y2="1"><stop stop-color="#32304f"/><stop offset="1" stop-color="#141521"/></linearGradient>
+    <linearGradient id="light" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ede5ff"/><stop offset=".48" stop-color="#bfabf4"/><stop offset="1" stop-color="#8c75d6"/></linearGradient>
+    <linearGradient id="warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffcbb0"/><stop offset="1" stop-color="#e7889f"/></linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2=".7" y2="1"><stop stop-color="#fff" stop-opacity=".25"/><stop offset="1" stop-color="#fff" stop-opacity=".02"/></linearGradient>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#090810" flood-opacity=".4"/></filter>
+  </defs>
+  <rect x="32" y="32" width="960" height="960" rx="218" fill="url(#night)"/>
+  <rect x="34" y="34" width="956" height="956" rx="216" fill="none" stroke="url(#edge)" stroke-width="4"/>
+  <g filter="url(#shadow)">
+    <path d="M273 254h176v210H235V292a38 38 0 0 1 38-38Z" fill="url(#light)"/>
+    <path d="M507 254h244a38 38 0 0 1 38 38v172H507Z" fill="url(#warm)"/>
+    <path d="M235 522h214v248H273a38 38 0 0 1-38-38Z" fill="url(#light)"/>
+    <path d="M507 522h282v210a38 38 0 0 1-38 38H507Z" fill="url(#light)"/>
+  </g>
+  <path d="M615 579a12 12 0 0 1 18-10l99 60a12 12 0 0 1 0 21l-99 60a12 12 0 0 1-18-10Z" fill="#322641" fill-opacity=".88"/>
+  <path d="M276 267h158M522 267h217" stroke="#fff" stroke-opacity=".34" stroke-width="3" stroke-linecap="round"/>
+</svg>

@@ -1,8 +1,12 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "bundle": {
-    "targets": ["nsis"],
-    "icon": ["icons/icon.ico"],
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/icon.ico"
+    ],
     "externalBin": [
       "binaries/ffmpeg",
       "binaries/ffprobe"
@@ -18,6 +22,8 @@
       "nsis": {
         "installMode": "currentUser"
       }
-    }
-  }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "productName": "光厂上架助手"
 }

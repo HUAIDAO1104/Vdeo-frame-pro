@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "光厂上架助手",
-  "version": "0.1.6",
+  "productName": "帧选",
+  "version": "0.2.0",
   "identifier": "com.huaidao.saleskitstudio",
   "build": {
     "beforeDevCommand": "npm run desktop:dev:frontend",
@@ -14,11 +14,11 @@
     "windows": [
       {
         "label": "main",
-        "title": "光厂上架助手",
+        "title": "帧选 · 视频图片工作台",
         "width": 1500,
         "height": 940,
-        "minWidth": 1180,
-        "minHeight": 720,
+        "minWidth": 960,
+        "minHeight": 640,
         "center": true,
         "resizable": true
       }
@@ -37,7 +37,23 @@
   },
   "bundle": {
     "active": true,
-    "shortDescription": "视频素材包销售图生成工具",
-    "longDescription": "使用本地视频处理与云端 AI 生成封面、详情长图和 SEO 文案。"
+    "icon": [
+      "icons/icon.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "shortDescription": "视频封面与详情图工作台",
+    "longDescription": "批量提取视频画面，生成封面和详情图片，支持暂停、停止和边生成边编辑。"
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVGMTlGODY4NzU0RTY4MjIKUldRaWFFNTFhUGdaWDJ5bjVlME05TXJjQ0pTTzhlNmU0VUdvREczVlduZ1huNTYzVlZPUmV5dloK",
+      "endpoints": [
+        "https://github.com/HUAIDAO1104/Vdeo-frame-pro/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

@@ -1,0 +1,27 @@
+import {readFile,readdir,mkdir,copyFile,writeFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import {resolve,join} from 'node:path';
+
+const root=resolve(import.meta.dirname,'..');
+const {version}=JSON.parse(await readFile(join(root,'src-tauri/tauri.conf.json'),'utf8'));
+const tag='desktop-v'+version;
+if(process.env.GITHUB_REF_TYPE==='tag'&&process.env.GITHUB_REF_NAME!==tag)throw new Error('Release tag must match app version: '+tag);
+const bundle=join(root,'src-tauri/target/release/bundle/nsis');
+const installers=(await readdir(bundle)).filter(name=>name.endsWith('.exe'));
+if(installers.length!==1)throw new Error('Expected exactly one Windows installer');
+const source=join(bundle,installers[0]);
+const signature=(await readFile(source+'.sig','utf8')).trim();
+if(signature.length<80)throw new Error('Missing updater signature');
+const name='SalesKitStudio_'+version+'_x64-setup.exe';
+const output=join(root,'release-dist');await mkdir(output,{recursive:true});
+const sha256=createHash('sha256').update(await readFile(source)).digest('hex');
+await copyFile(source,join(output,name));
+await writeFile(join(output,name+'.sig'),signature+'\n');
+await writeFile(join(output,name+'.sha256'),sha256+'  '+name+'\n');
+const repo=process.env.GITHUB_REPOSITORY||'HUAIDAO1104/Vdeo-frame-pro';
+const notes=await readFile(join(root,'docs/releases/'+version+'.md'),'utf8');
+await writeFile(join(output,'release-notes.md'),notes);
+const date=new Date().toISOString();
+await writeFile(join(output,'latest.json'),JSON.stringify({version,notes,pub_date:date,platforms:{'windows-x86_64':{signature,url:'https://github.com/'+repo+'/releases/download/'+tag+'/'+name}}},null,2)+'\n');
+await writeFile(join(output,'build-info.json'),JSON.stringify({version,commit:process.env.GITHUB_SHA,run:process.env.GITHUB_RUN_ID,createdAt:date,installer:name,sha256},null,2)+'\n');
+console.log('Prepared signed Windows release:',name,sha256);

@@ -6,25 +6,28 @@ on:
     tags:
       - "desktop-v*"
 
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 45
     permissions:
       contents: write
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-
       - uses: dtolnay/rust-toolchain@stable
-
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
       - name: Install frontend dependencies
         run: npm ci
-
       - name: Restore FFmpeg cache
         uses: actions/cache@v4
         with:
@@ -32,46 +35,41 @@ jobs:
             src-tauri/binaries/*.exe
             src-tauri/resources/ffmpeg-LICENSE.txt
           key: ffmpeg-windows-x64-v1
-
       - name: Prepare bundled FFmpeg
         shell: powershell
         run: powershell -ExecutionPolicy Bypass -File scripts\prepare-windows-ffmpeg.ps1
-
       - name: Test web runtime
         run: npm test
-
-      - name: Build Windows installer
-        run: npm run desktop:build
-
-      - name: Prepare release installer
-        shell: powershell
+      - name: Test native runtime
         run: |
-          $bundleDir = "src-tauri\target\release\bundle\nsis"
-          $installer = Get-ChildItem "$bundleDir\*.exe" | Sort-Object Length -Descending | Select-Object -First 1
-          if (-not $installer) { throw "Windows installer was not generated" }
-          $version = (Get-Content "src-tauri\tauri.conf.json" | ConvertFrom-Json).version
-          $releaseName = "SalesKitStudio_${version}_x64-setup.exe"
-          $releasePath = Join-Path (Resolve-Path $bundleDir).Path $releaseName
-          if ($installer.FullName -ne $releasePath) {
-            Move-Item $installer.FullName $releasePath -Force
-          }
-          $hash = (Get-FileHash $releasePath -Algorithm SHA256).Hash.ToLower()
-          "$hash  $releaseName" | Set-Content "$releasePath.sha256" -Encoding ascii
-
-      - name: Upload NSIS installer
+          npm run desktop:frontend
+          cargo test --manifest-path src-tauri/Cargo.toml --lib --locked
+      - name: Build signed Windows installer
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        run: npm run desktop:build -- -- --locked
+      - name: Prepare installer and update manifest
+        run: node scripts/prepare-release.mjs
+      - name: Smoke test Windows installer
+        timeout-minutes: 5
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File scripts\smoke-windows-release.ps1
+      - name: Upload verified installer
         uses: actions/upload-artifact@v4
         with:
           name: sales-kit-studio-windows-x64
-          path: |
-            src-tauri/target/release/bundle/nsis/SalesKitStudio_*_x64-setup.exe
-            src-tauri/target/release/bundle/nsis/SalesKitStudio_*_x64-setup.exe.sha256
+          path: release-dist/*
           if-no-files-found: error
-
-      - name: Publish GitHub release
+      - name: Create draft GitHub release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          draft: true
+          name: 帧选 ${{ github.ref_name }} · Windows x64
+          body_path: release-dist/release-notes.md
           files: |
-            src-tauri/target/release/bundle/nsis/SalesKitStudio_*_x64-setup.exe
-            src-tauri/target/release/bundle/nsis/SalesKitStudio_*_x64-setup.exe.sha256
+            release-dist/*.exe
+            release-dist/*.sig
+            release-dist/*.sha256
+            release-dist/*.json

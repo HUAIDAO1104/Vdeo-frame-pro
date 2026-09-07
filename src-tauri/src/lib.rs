@@ -3,16 +3,22 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
+    collections::HashMap,
     env,
     ffi::OsStr,
     fs,
     io::Read,
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex, OnceLock,
+    },
     thread,
     time::{Duration, Instant, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Manager};
+mod updates;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -40,20 +46,10 @@ struct VideoDescriptor {
     height: u32,
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct DocumentDescriptor {
-    name: String,
-    size: u64,
-    last_modified: u64,
-    file_type: String,
-    desktop_path: String,
-    bytes: Vec<u8>,
-}
-
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ExtractFramesRequest {
+    request_id: Option<String>,
     video_path: String,
     project_id: String,
     mode: Option<String>,
@@ -64,6 +60,25 @@ struct ExtractFramesRequest {
     scene_threshold: Option<f64>,
     preview_width: Option<u32>,
     prefer_hardware: Option<bool>,
+}
+
+// Each extraction has its own cancellation token. A cancelled job never falls
+// through into CPU retry, and the child is reaped before cache cleanup is allowed.
+static EXTRACTIONS: OnceLock<Mutex<HashMap<String, Arc<AtomicBool>>>> = OnceLock::new();
+
+fn extraction_tokens() -> &'static Mutex<HashMap<String, Arc<AtomicBool>>> {
+    EXTRACTIONS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+#[tauri::command]
+fn cancel_frame_extraction(request_id: String) -> Result<(), String> {
+    let mut tokens = extraction_tokens().lock().map_err(|_| "任务状态不可用")?;
+    // Cancellation may arrive before the async extraction command is scheduled.
+    tokens
+        .entry(request_id)
+        .or_insert_with(|| Arc::new(AtomicBool::new(false)))
+        .store(true, Ordering::SeqCst);
+    Ok(())
 }
 
 #[derive(Serialize)]
@@ -101,7 +116,11 @@ fn background_command<S: AsRef<OsStr>>(program: S) -> Command {
 fn run_command_with_timeout(
     mut command: Command,
     timeout: Duration,
+    cancelled: &AtomicBool,
 ) -> Result<TimedProcessOutput, String> {
+    if cancelled.load(Ordering::SeqCst) {
+        return Err("任务已停止".to_string());
+    }
     command.stdout(Stdio::null()).stderr(Stdio::piped());
     let mut child = command
         .spawn()
@@ -115,6 +134,12 @@ fn run_command_with_timeout(
     let started = Instant::now();
 
     loop {
+        if cancelled.load(Ordering::SeqCst) {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = stderr_reader.join();
+            return Err("任务已停止".to_string());
+        }
         match child
             .try_wait()
             .map_err(|error| format!("无法读取 FFmpeg 状态：{error}"))?
@@ -314,25 +339,6 @@ fn mime_for_path(path: &Path) -> String {
     .to_string()
 }
 
-fn document_mime_for_path(path: &Path) -> String {
-    match path
-        .extension()
-        .and_then(|value| value.to_str())
-        .unwrap_or_default()
-        .to_ascii_lowercase()
-        .as_str()
-    {
-        "docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "doc" => "application/msword",
-        "rtf" => "application/rtf",
-        "json" => "application/json",
-        "csv" => "text/csv",
-        "md" => "text/markdown",
-        _ => "text/plain",
-    }
-    .to_string()
-}
-
 fn safe_project_id(value: &str) -> String {
     let safe: String = value
         .chars()
@@ -521,48 +527,6 @@ fn authorize_file_paths(app: AppHandle, paths: Vec<String>) -> Result<(), String
     Ok(())
 }
 
-#[tauri::command]
-fn read_document_files(paths: Vec<String>) -> Result<Vec<DocumentDescriptor>, String> {
-    paths
-        .into_iter()
-        .map(|value| {
-            let path = PathBuf::from(&value);
-            if !path.is_file() {
-                return Err(format!("文档文件不存在：{value}"));
-            }
-            let metadata =
-                fs::metadata(&path).map_err(|error| format!("无法读取文档信息：{error}"))?;
-            if metadata.len() > 32 * 1024 * 1024 {
-                return Err(format!(
-                    "文档超过 32 MB，请精简后重新导入：{}",
-                    path.file_name()
-                        .and_then(|item| item.to_str())
-                        .unwrap_or("未命名文档")
-                ));
-            }
-            let modified = metadata
-                .modified()
-                .ok()
-                .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
-                .map(|duration| duration.as_millis() as u64)
-                .unwrap_or(0);
-            let bytes = fs::read(&path).map_err(|error| format!("无法读取文档：{error}"))?;
-            Ok(DocumentDescriptor {
-                name: path
-                    .file_name()
-                    .and_then(|item| item.to_str())
-                    .unwrap_or("未命名文档")
-                    .to_string(),
-                size: metadata.len(),
-                last_modified: modified,
-                file_type: document_mime_for_path(&path),
-                desktop_path: path.to_string_lossy().into_owned(),
-                bytes,
-            })
-        })
-        .collect()
-}
-
 fn cached_frame_path(app: &AppHandle, value: &str) -> Result<PathBuf, String> {
     let cache_root = app_data_dir(app)?.join("frame-cache");
     let canonical_root = cache_root
@@ -599,7 +563,11 @@ fn read_cached_frame(app: AppHandle, path: String) -> Result<tauri::ipc::Respons
 fn extract_video_frames_blocking(
     app: AppHandle,
     request: ExtractFramesRequest,
+    cancelled: Arc<AtomicBool>,
 ) -> Result<Vec<FrameDescriptor>, String> {
+    if cancelled.load(Ordering::SeqCst) {
+        return Err("任务已停止".to_string());
+    }
     let ffmpeg =
         find_tool(&app, "ffmpeg").ok_or("未找到 FFmpeg，请安装 FFmpeg 或配置 VFP_FFMPEG_PATH")?;
     let ffprobe = find_tool(&app, "ffprobe")
@@ -610,6 +578,9 @@ fn extract_video_frames_blocking(
     }
 
     let (duration, source_width, source_height) = probe_video(&ffprobe, &video_path)?;
+    if cancelled.load(Ordering::SeqCst) {
+        return Err("任务已停止".to_string());
+    }
     let start_time = request.start_time.unwrap_or(0.0).max(0.0).min(duration);
     let end_time = request
         .end_time
@@ -666,7 +637,7 @@ fn extract_video_frames_blocking(
                 command.args(["-fps_mode", "vfr"]);
             }
             command.arg("-y").arg(&output_pattern);
-            run_command_with_timeout(command, timeout)
+            run_command_with_timeout(command, timeout, &cancelled)
         };
     let prefer_hardware = cfg!(target_os = "windows") && request.prefer_hardware.unwrap_or(true);
     let hardware_timeout_secs =
@@ -763,9 +734,27 @@ async fn extract_video_frames(
     app: AppHandle,
     request: ExtractFramesRequest,
 ) -> Result<Vec<FrameDescriptor>, String> {
-    tauri::async_runtime::spawn_blocking(move || extract_video_frames_blocking(app, request))
-        .await
-        .map_err(|error| format!("本地视频处理线程异常：{error}"))?
+    let id = request.request_id.clone().unwrap_or_else(|| {
+        format!(
+            "legacy-{}",
+            Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        )
+    });
+    let token = extraction_tokens()
+        .lock()
+        .map_err(|_| "任务状态不可用")?
+        .entry(id.clone())
+        .or_insert_with(|| Arc::new(AtomicBool::new(false)))
+        .clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        extract_video_frames_blocking(app, request, token)
+    })
+    .await
+    .map_err(|error| format!("本地视频处理线程异常：{error}"));
+    if let Ok(mut tokens) = extraction_tokens().lock() {
+        tokens.remove(&id);
+    }
+    result?
 }
 
 #[tauri::command]
@@ -907,6 +896,7 @@ fn delete_workspace(app: AppHandle, history_id: String) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let handle = app.handle().clone();
             open_database(&handle).map_err(std::io::Error::other)?;
@@ -918,11 +908,14 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_desktop_environment,
+            updates::desktop_update_status,
+            updates::check_desktop_update,
+            updates::install_desktop_update,
             inspect_video_files,
             authorize_file_paths,
-            read_document_files,
             read_cached_frame,
             extract_video_frames,
+            cancel_frame_extraction,
             clear_project_cache,
             save_workspace,
             list_workspace_history,
@@ -932,4 +925,45 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Sales Kit Studio");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cancelled_operation_does_not_spawn_a_process() {
+        let token = AtomicBool::new(true);
+        let result = run_command_with_timeout(
+            background_command("this-program-does-not-exist"),
+            Duration::from_secs(1),
+            &token,
+        );
+        assert_eq!(result.err().as_deref(), Some("任务已停止"));
+    }
+
+    #[test]
+    fn cancellation_before_registration_is_retained() {
+        let id = "test-cancel-before-register".to_string();
+        cancel_frame_extraction(id.clone()).unwrap();
+        let token = extraction_tokens().lock().unwrap().remove(&id).unwrap();
+        assert!(token.load(Ordering::SeqCst));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cancelling_a_running_child_terminates_and_reaps_it() {
+        let token = Arc::new(AtomicBool::new(false));
+        let worker_token = token.clone();
+        let started = Instant::now();
+        let worker = thread::spawn(move || {
+            let mut command = background_command("/bin/sleep");
+            command.arg("10");
+            run_command_with_timeout(command, Duration::from_secs(20), &worker_token)
+        });
+        thread::sleep(Duration::from_millis(80));
+        token.store(true, Ordering::SeqCst);
+        assert_eq!(worker.join().unwrap().err().as_deref(), Some("任务已停止"));
+        assert!(started.elapsed() < Duration::from_secs(2));
+    }
 }
