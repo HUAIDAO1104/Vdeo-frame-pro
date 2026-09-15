@@ -4,6 +4,11 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import '../public/static/frame-engine.js';
 const {makeAssets,diverse}=globalThis.FrameStudio;
+test('enabled badge fails explicitly when the overlay is missing or undecoded',async()=>{
+  for(const badge of [null,{naturalWidth:0,naturalHeight:0}]){
+    await assert.rejects(globalThis.FrameStudio.renderAsset({hasBadge:true},[],null,null,badge),/4K 角标未加载/);
+  }
+});
 const frames=n=>Array.from({length:n},(_,i)=>({idx:i,w:1920,h:1080,time:i,dataUrl:'frame:'+i}));
 const candidate=(frameIdx,time,gray=100,overall=.7)=>({frameIdx,time,overall,pixels:Array(576).fill(gray)});
 const {sceneRepresentatives,similarFrames}=globalThis.FrameStudio;

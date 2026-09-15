@@ -363,7 +363,7 @@ function relocateUnifiedPanels(idx) {
 function updateListingChecklist() {
   if (typeof S === 'undefined') return;
   const covers = S.batches.filter(b => b.assetKind === 'cover' && b.canvas), details = S.batches.filter(b => b.assetKind === 'detail' && b.canvas);
-  const ready = !!(covers.length || details.length) && !S.batches.some(b => b.rendering);
+  const ready = !!(covers.length || details.length) && !S.batches.some(b => b.rendering || b.needsRender);
   const final = covers.some(b => b.id === S.finalCoverId) && details.some(b => b.id === S.finalDetailId);
   setListingCheck('checkCover', !!covers.length, covers.length + ' 版封面');
   setListingCheck('checkDetail', !!details.length, details.length + ' 版详情');
@@ -399,7 +399,7 @@ async function generateBatch(id, silent = false) {
   const b = S.batches.find(x => x.id === id); if (!b) return;
   const project = PROJECTS.list.find(x => x.id === PROJECTS.activeId), frames = S.frames;
   const revision = (b.renderRevision || 0) + 1; b.renderRevision = revision;
-  b.rendering = true;
+  b.rendering = true; b.needsRender = true;
   ['dl-', 'dl2-'].forEach(prefix => { const el = document.getElementById(prefix + id); if (el) el.disabled = true; });
   updateListingChecklist();
   const button = document.getElementById('gen-' + id); if (button) { button.disabled = true; button.textContent = '更新中…'; }
@@ -434,7 +434,7 @@ function listingPayload() {
     assets: S.batches.filter(b => b.canvas).map(b => ({ id: b.id, kind: b.assetKind, width: b.canvas.width, height: b.canvas.height })) };
 }
 async function exportListingPackage() {
-  if(S.batches.some(b=>b.needsRender)) { toast('标题正在更新，请稍后导出'); return; }
+  if(S.batches.some(b=>b.needsRender)) { toast('图片尚未更新完成，请更新图片后再导出'); return; }
   if (S.batches.some(b => b.rendering)) { toast('图片正在更新，请稍后导出'); return; }
   const ready = S.batches.filter(b => b.canvas).map(b => ({ id: b.id, assetKind: b.assetKind, canvas: b.canvas })); if (!ready.length) return;
   const snapshot = listingPayload();

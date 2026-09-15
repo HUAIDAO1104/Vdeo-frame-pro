@@ -41,6 +41,10 @@ jobs:
         run: powershell -ExecutionPolicy Bypass -File scripts\prepare-windows-ffmpeg.ps1
       - name: Test web runtime
         run: npm test
+      - name: Verify downloaded badge images
+        run: |
+          npx playwright install chromium
+          node tests/badge-export.e2e.mjs
       - name: Test native runtime
         run: |
           npm run desktop:frontend

@@ -13,7 +13,7 @@
     "preview": "wrangler pages dev",
     "deploy": "npm run build && wrangler pages deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
-    "test:browser": "node tests/workspace.e2e.mjs && node tests/image-folders.e2e.mjs"
+    "test:browser": "node tests/workspace.e2e.mjs && node tests/image-folders.e2e.mjs && node tests/badge-export.e2e.mjs"
   },
   "dependencies": {
     "hono": "^4.12.9"

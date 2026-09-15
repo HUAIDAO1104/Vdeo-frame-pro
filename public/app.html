@@ -4577,6 +4577,7 @@ function exportExt(){ return EXPORT.format==='png'?'png':(EXPORT.format==='webp'
 function downloadBatch(bid){
   const b=S.batches.find(x=>x.id===bid);
   if(b?.rendering){ toast('图片正在更新，请稍后下载'); return; }
+  if(b?.needsRender){ toast('图片尚未更新完成，请更新图片后再下载','err'); return; }
   if(!b||!b.canvas){ toast('请先生成图片','err'); return; }
   const outW=Math.round(b.canvas.width*EXPORT.scale);
   const outH=Math.round(b.canvas.height*EXPORT.scale);

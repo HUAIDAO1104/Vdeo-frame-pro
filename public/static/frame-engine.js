@@ -313,6 +313,9 @@
   }
   async function renderAsset(asset, frames, signal, native, badgeImage) {
     check(signal);
+    if (asset.hasBadge && !(badgeImage?.naturalWidth > 0 && badgeImage?.naturalHeight > 0)) {
+      throw new Error('4K 角标未加载，请重启应用后重试');
+    }
     const geometry = assetGeometry(asset, frames);
     const out = canvas(geometry.width, geometry.height), cx = out.getContext('2d');
     cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high'; cx.fillStyle = frames[0]?.sourceName ? '#fff' : '#161a23'; cx.fillRect(0, 0, out.width, out.height);
@@ -327,9 +330,11 @@
       cx.save(); cx.beginPath(); cx.rect(x, y, w, h); cx.clip(); cx.drawImage(image, dx, dy, sw, sh); cx.restore();
     }
     if (asset.isDetailLong) drawManualTitle(cx, asset, out.width, out.height);
-    if (asset.hasBadge && badgeImage) {
-      const width = Math.min(badgeImage.naturalWidth, out.width * .22);
-      cx.drawImage(badgeImage, 0, 0, width, width * badgeImage.naturalHeight / badgeImage.naturalWidth);
+    if (asset.hasBadge) {
+      // This PNG is a full-width transparent overlay, with the ribbon at its
+      // top right. Scale the overlay by output width, not by ribbon width;
+      // preserve its aspect ratio so tall detail images never stretch it.
+      cx.drawImage(badgeImage, 0, 0, out.width, out.width * badgeImage.naturalHeight / badgeImage.naturalWidth);
     }
     return out;
   }
