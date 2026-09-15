@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {mkdtemp, readFile, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
-import {join, resolve, extname} from 'node:path';
+import {join, resolve, extname, sep} from 'node:path';
 import {createServer} from 'node:http';
 import {execFileSync} from 'node:child_process';
 import {chromium} from 'playwright';
@@ -12,7 +12,7 @@ const output=await mkdtemp(join(tmpdir(),'vfp-badge-export-'));
 const types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png'};
 const server=createServer(async(req,res)=>{
   const path=resolve(root,'desktop-dist','.'+new URL(req.url,'http://local').pathname);
-  if(!path.startsWith(join(root,'desktop-dist')+'/'))return res.writeHead(403).end();
+  if(!path.startsWith(join(root,'desktop-dist')+sep))return res.writeHead(403).end();
   try{res.setHeader('Content-Type',types[extname(path)]||'application/octet-stream');res.end(await readFile(path));}
   catch{res.writeHead(404).end();}
 });
