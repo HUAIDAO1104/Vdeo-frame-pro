@@ -51,6 +51,39 @@
     } finally { if (revoke) URL.revokeObjectURL(src); }
   }
   async function capture(project, config, ctx, native) {
+    if (project.sourceKind === 'images') {
+      const frames = [], skipped = [...(project.importWarnings || [])];
+      const sources = project.imageSources || [];
+      for (let i = 0; i < sources.length; i++) {
+        const source = sources[i];
+        const frame = await ctx.step('读取图片 ' + (i + 1) + ' / ' + sources.length, async signal => {
+          let url;
+          try {
+            url = source.blob ? URL.createObjectURL(source.blob) : null;
+            const image = await loadFrame({ filePath: source.filePath, dataUrl: url }, signal, native);
+            check(signal);
+            const scale = Math.min(1, 1920 / Math.max(image.width, image.height));
+            const out = canvas(image.width * scale, image.height * scale);
+            // Flatten transparency consistently for both local scoring and AI.
+            const cx = out.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, out.width, out.height);
+            cx.drawImage(image, 0, 0, out.width, out.height);
+            return { dataUrl: source.filePath ? native.fileUrl(source.filePath) : out.toDataURL('image/jpeg', .92),
+              filePath: source.filePath, sourceName: source.name, downloadName: source.filePath ? source.name : source.name.replace(/\.[^.]+$/, '.jpg'), time: 0, idx: frames.length,
+              w: image.width, h: image.height };
+          } catch (error) {
+            check(signal);
+            if (error.name === 'AbortError') throw error;
+            skipped.push(source.name + '：无法解码或读取'); return null;
+          } finally { if (url) URL.revokeObjectURL(url); }
+        });
+        if (frame) frames.push(frame);
+        ctx.progress(Math.round(5 + 40 * (i + 1) / sources.length));
+        await new Promise(r => setTimeout(r, 0));
+      }
+      if (!frames.length) throw new Error('没有可分析的图片，请检查图片是否损坏或重新选择文件夹');
+      project.imageWarnings = skipped;
+      return frames;
+    }
     if (native?.enabled && project.desktopPath) {
       return ctx.step('本机提取画面', async signal => {
         const requestId = 'extract-' + Date.now() + '-' + Math.random().toString(36).slice(2);
@@ -116,6 +149,7 @@
     for (let i = 0; i < frames.length; i++) {
       items.push(await ctx.step('分析清晰度与画面差异', async signal => {
         const image = await loadFrame(frames[i], signal, native);
+        cx.fillStyle = '#fff'; cx.fillRect(0, 0, 32, 18);
         cx.drawImage(image, 0, 0, 32, 18);
         const rgba = cx.getImageData(0, 0, 32, 18).data;
         const pixels = Array.from({ length: 576 }, (_, j) => .299 * rgba[j * 4] + .587 * rgba[j * 4 + 1] + .114 * rgba[j * 4 + 2]);
@@ -129,7 +163,7 @@
         }
         const clarity = Math.min(1, edge / pixels.length / 45);
         const exposure = 1 - Math.abs(mean - 128) / 128;
-        return { frameIdx: i, pixels, colors, clarity, overall: .7 * clarity + .3 * exposure, time: frames[i].time };
+        return { frameIdx: i, pixels, colors, clarity, overall: .7 * clarity + .3 * exposure, time: frames[i].time, aspect: frames[i].w / frames[i].h };
       }));
       if (i % 12 === 0) { ctx.progress(45 + Math.round(10 * i / frames.length)); await new Promise(r => setTimeout(r, 0)); }
     }
@@ -194,6 +228,17 @@
     }
     return picked.map(x => x.frameIdx);
   }
+  function imageRepresentatives(items) {
+    const groups = [];
+    // Independent pictures have no video timeline. Compare across the folder,
+    // retaining the clearest anchor; never merge different aspect ratios.
+    for (const item of [...items].sort((a, b) => b.overall - a.overall || a.frameIdx - b.frameIdx)) {
+      const group = groups.find(g => Math.abs(g.aspect - item.aspect) < .02 && similarFrames(g, item));
+      if (group) group.memberIds.push(item.frameIdx);
+      else groups.push({ ...item, sceneId: groups.length, memberIds: [item.frameIdx] });
+    }
+    return groups;
+  }
   function makeAssets(order, frames, config, baseId) {
     const fill = (indices, n) => Array.from({ length: n }, (_, i) => indices[i % indices.length]);
     const covers = [], details = [], count = config.variants;
@@ -230,7 +275,7 @@
     // Tall vertical videos must remain within a safe canvas and memory budget.
     const total = heights.reduce((a, b) => a + b, 0), ratio = Math.min(1, 14000 / total, Math.sqrt(22000000 / (width * total)));
     const out = canvas(width * ratio, total * ratio), cx = out.getContext('2d');
-    cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high'; cx.fillStyle = '#161a23'; cx.fillRect(0, 0, out.width, out.height);
+    cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high'; cx.fillStyle = frames[0]?.sourceName ? '#fff' : '#161a23'; cx.fillRect(0, 0, out.width, out.height);
     let y = 0, index = 0;
     for (let r = 0; r < rows.length; r++) {
       const row = rows[r], nextY = r === rows.length - 1 ? out.height : Math.round((heights.slice(0, r + 1).reduce((a, b) => a + b, 0)) * ratio);
@@ -266,7 +311,7 @@
           selectionSummary: null, lastPick: null, generationNote: '已提取 ' + frames.length + ' 张候选，开始生成后将归并相邻相似画面。' };
         if (!work.items) work.items = await inspect(frames, ctx, native);
         const items = work.items.map(x => ({ ...x }));
-        const representatives = sceneRepresentatives(items);
+        const representatives = project.sourceKind === 'images' ? imageRepresentatives(items) : sceneRepresentatives(items);
         const byId = new Map(items.map(item => [item.frameIdx, item]));
         for (const representative of representatives) {
           for (const id of representative.memberIds) Object.assign(byId.get(id), {
@@ -283,8 +328,10 @@
               const inputs = [];
               for (const id of sampleIds.slice(offset, offset + 8)) {
                 const image = await loadFrame(frames[id], signal, native);
-                const thumb = canvas(480, 480 * image.height / image.width);
-                thumb.getContext('2d').drawImage(image, 0, 0, thumb.width, thumb.height);
+                const scale = Math.min(1, 480 / Math.max(image.width, image.height));
+                const thumb = canvas(image.width * scale, image.height * scale);
+                const cx = thumb.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, thumb.width, thumb.height);
+                cx.drawImage(image, 0, 0, thumb.width, thumb.height);
                 inputs.push({ frameIdx: id, b64: thumb.toDataURL('image/jpeg', .7).split(',')[1] });
               }
               return scoreBatch(inputs, config.apiKey, config.model, config.hint, signal);
@@ -313,11 +360,12 @@
           merged: frames.length - representatives.length, scored: config.apiKey ? representatives.length : 0 };
         return { frames, batches: assets, selected: order, aiScores: items.map(({ pixels, colors, ...x }) => x), selectionSummary,
           batchIdCnt: assets.at(-1).id, finalCoverId: assets[0].id, finalDetailId: assets.find(x => x.assetKind === 'detail').id,
-          salesPlan: null, localFrameCache: !!project.desktopPath, lastPick: { engine: config.apiKey ? 'vision' : 'local', model: config.model, ok: true, count: order.length },
-          generationNote: '提取 ' + frames.length + ' 张候选 · 合并 ' + selectionSummary.merged + ' 张相邻相似画面 · ' + representatives.length + ' 张代表画面' +
+          salesPlan: null, localFrameCache: !!(project.desktopPath || project.imageCacheId), lastPick: { engine: config.apiKey ? 'vision' : 'local', model: config.model, ok: true, count: order.length },
+          generationNote: (project.sourceKind === 'images' ? '读取 ' : '提取 ') + frames.length + ' 张候选 · 合并 ' + selectionSummary.merged + (project.sourceKind === 'images' ? ' 张相似图片 · ' : ' 张相邻相似画面 · ') + representatives.length + ' 张代表画面' +
+            (project.imageWarnings?.length ? '（跳过 ' + project.imageWarnings.length + ' 张无法读取的图片，可在素材页查看）' : '') +
             (config.apiKey ? '均已 AI 评分。' : '用于本地选图。') + (representatives.length < 9 ? '代表画面较少，部分格子复用；全部候选仍可手动替换。' : '全部候选仍可手动替换。') };
       }
     };
   }
-  root.FrameStudio = { create, renderAsset, loadFrame, diverse, makeAssets, sceneRepresentatives, similarFrames };
+  root.FrameStudio = { create, renderAsset, loadFrame, diverse, makeAssets, sceneRepresentatives, imageRepresentatives, similarFrames };
 })(globalThis);

@@ -97,3 +97,13 @@ test('project serialization excludes API keys and retired document/copy data',()
   const value=context.serializeProjectDraft({id:1,runConfig:{apiKey:'secret'},manualStoryDoc:'old',storyDoc:'old',salesPlan:{keywords:['old']},batches:[],generationStatus:'paused'});
   assert.equal(JSON.stringify(value).includes('secret'),false);assert.equal(value.storyDoc,undefined);assert.equal(value.generationStatus,'stopped');assert.equal(value.salesPlan,null);
 });
+
+test('folder pictures merge nonadjacent duplicates but retain distinct proportions and all unique pictures',()=>{
+  const images=[{...candidate(0,0,100,.4),aspect:1.5},{...candidate(1,0,220,.8),aspect:1.5},{...candidate(2,0,102,.9),aspect:1.5},{...candidate(3,0,102,.9),aspect:.667}];
+  const reps=FrameStudio.imageRepresentatives(images);
+  assert.equal(reps.length,3);
+  assert.deepEqual(reps.find(g=>g.frameIdx===2).memberIds,[2,0]);
+  assert.equal(images[0].memberIds,undefined);
+  const many=Array.from({length:70},(_,i)=>({...candidate(i,0),aspect:1+i*.1}));
+  assert.equal(FrameStudio.imageRepresentatives(many).length,70);
+});

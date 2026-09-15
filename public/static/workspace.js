@@ -51,7 +51,7 @@ function updateResultNavigationState() {
   const button = document.getElementById('railBtn1');
   if (button) {
     button.disabled = !ready; button.setAttribute('aria-disabled', String(!ready));
-    button.title = ready ? '查看已生成结果，后台任务继续运行' : '完成一个视频后即可查看';
+    button.title = ready ? '查看已生成结果，后台任务继续运行' : '完成一个任务后即可查看';
     button.querySelector('.rail-lbl').textContent = '结果' + (count ? ' ' + count : '');
   }
   return ready;
@@ -66,14 +66,14 @@ function updateTaskFlowState() {
   const pending = list.filter(p => !isProjectGenerationComplete(p)).length;
   document.getElementById('taskStepSource')?.classList.toggle('is-active', !list.length);
   document.getElementById('taskStepGenerate')?.classList.toggle('is-done', !!list.length && !pending && !running);
-  if (label) label.textContent = running ? (taskQueue.state === 'paused' ? '队列已暂停' : taskQueue.state === 'stopping' ? '正在停止…' : '正在生成…') : !list.length ? '添加视频后开始' : pending ? '开始生成' + (pending > 1 ? ' · ' + pending + ' 个视频' : '') : '重新生成当前视频';
+  if (label) label.textContent = running ? (taskQueue.state === 'paused' ? '队列已暂停' : taskQueue.state === 'stopping' ? '正在停止…' : '正在生成…') : !list.length ? '添加素材后开始' : pending ? '开始生成' + (pending > 1 ? ' · ' + pending + ' 个任务' : '') : '重新生成当前任务';
   updateResultNavigationState();
 }
 function updateSalesPrimaryState() {
   const list = globalThis.__vfpProjects?.list || [];
   const button = document.getElementById('salesKitBtn');
   const busy = !!taskQueue?.active || generationStarting;
-  if (button) { button.disabled = !list.length || busy; button.title = list.length ? '生成封面与详情图片' : '先添加视频'; }
+  if (button) { button.disabled = !list.length || busy; button.title = list.length ? '生成封面与详情图片' : '先添加素材'; }
   const current = document.getElementById('salesCurrentBtn');
   if (current) { current.hidden = list.length < 2; current.disabled = busy; }
   const cap = document.getElementById('capBtn');
@@ -88,9 +88,9 @@ function updateQueueControls() {
   const current = taskQueue.current;
   document.getElementById('taskControlBar').hidden = !PROJECTS.list.length;
   document.getElementById('taskControlBar').classList.toggle('is-idle', !active);
-  document.getElementById('taskQueueTitle').textContent = stopping ? '正在停止任务' : paused ? '队列已暂停' : active ? '正在生成图片' : done ? '结果已就绪' : '视频已就绪';
+  document.getElementById('taskQueueTitle').textContent = stopping ? '正在停止任务' : paused ? '队列已暂停' : active ? '正在生成图片' : done ? '结果已就绪' : '素材已就绪';
   document.getElementById('taskQueueSummary').textContent = done + ' / ' + PROJECTS.list.length + ' 个完成' + (failed ? ' · ' + failed + ' 个失败，可重试' : '') + (current && !current.deleted ? ' · ' + current.name + '：' + (current.generationStage || '准备中') : '');
-  document.getElementById('taskQueueHint').textContent = paused ? '进度已保留。继续后会重试被中断的步骤。' : stopping ? '正在结束当前处理，已完成图片会保留。' : active ? '可以查看已完成结果，也可以移除不需要的视频。' : '每完成一个视频，结果立即可用。';
+  document.getElementById('taskQueueHint').textContent = paused ? '进度已保留。继续后会重试被中断的步骤。' : stopping ? '正在结束当前处理，已完成图片会保留。' : active ? '可以查看已完成结果，也可以移除不需要的任务。' : '每完成一个任务，结果立即可用。';
   const pause = document.getElementById('taskPauseBtn'); pause.hidden = !active; pause.disabled = stopping; pause.textContent = paused ? '继续生成' : '暂停';
   const stop = document.getElementById('taskStopBtn'); stop.hidden = !active; stop.disabled = stopping;
   document.getElementById('taskResultsBtn').disabled = !hasProjectOutcome();
@@ -151,7 +151,7 @@ function openCompletedResults() {
 async function deleteProject(id) {
   const p = PROJECTS.list.find(x => x.id === id); if (!p) return;
   if (p.batches?.some(b => b.canvas || b.wasGenerated)) {
-    if (!await appConfirm({ title: '移除视频和结果', message: '移除「' + p.name + '」及其图片结果？不会删除原始视频文件。', okText: '移除', cancelText: '保留' })) return;
+    if (!await appConfirm({ title: '移除任务和结果', message: '移除「' + p.name + '」及其图片结果？不会删除原始素材文件。', okText: '移除', cancelText: '保留' })) return;
   }
   deleteProjectNoConfirm(id);
   toast('已移除「' + p.name + '」');
@@ -172,7 +172,7 @@ function deleteProjectNoConfirm(id) {
       Object.assign(S, { frames: [], selected: [], batches: [], aiScores: [], imgCache: new Map(), finalCoverId: null, finalDetailId: null, lastPick: null });
       SALES.plan = null; batchIdCnt = 0;
       vPrev.removeAttribute('src'); vPrev.load(); document.getElementById('vCon').style.display = 'none';
-      renderAllFrames(); renderAllBatches(); updateSelBadge(); updateDlBtns();
+      renderImageSource(null); renderAllFrames(); renderAllBatches(); updateSelBadge(); updateDlBtns();
       document.getElementById('totalN').textContent = '0'; switchTab(0);
     }
   }
@@ -180,6 +180,7 @@ function deleteProjectNoConfirm(id) {
   done.finally(async () => {
     frameEngine?.discard(id);
     if (p.videoUrl && !p.desktopPath) URL.revokeObjectURL(p.videoUrl);
+    // Imported source copies are retained because saved history can still reference them.
     // History may still refer to an older cache. Remove only this job's new cache.
     if (p.runConfig?.cacheId && p.desktopPath) await DESKTOP_NATIVE.invoke('clear_project_cache', { projectId: p.runConfig.cacheId }).catch(console.warn);
   });
@@ -187,7 +188,7 @@ function deleteProjectNoConfirm(id) {
 }
 async function renameProject(id) {
   const p = PROJECTS.list.find(x => x.id === id); if (!p) return;
-  const name = await appPrompt({ title: '重命名视频任务', value: p.name, maxLength: 80 });
+  const name = await appPrompt({ title: '重命名素材任务', value: p.name, maxLength: 80 });
   if (name?.trim()) { p.name = name.trim(); renderProjectTabs(); scheduleWorkspaceSave(); }
 }
 function renderProjectTabs() {
@@ -199,7 +200,7 @@ function renderProjectTabs() {
   tabs.innerHTML = list.map((p, i) => '<div class="proj-tab' + (p.id === PROJECTS.activeId ? ' active' : '') + (p.generationStatus === 'complete' ? ' is-complete' : '') + (p.generationStatus === 'failed' ? ' is-failed' : '') + '">' +
     '<button type="button" class="project-select" onclick="switchProject(' + p.id + ')" aria-current="' + (p.id === PROJECTS.activeId) + '">' +
     '<span class="proj-index">' + String(i + 1).padStart(2, '0') + '</span><span class="proj-tab-main"><strong class="proj-tab-name" title="' + escapeHtml(p.fileName || p.name) + '">' + escapeHtml(p.name) + '</strong>' +
-    '<span class="proj-tab-meta"><span class="proj-state">' + (taskStatusLabels[p.generationStatus] || '待生成') + '</span><span>' + escapeHtml(projectGenerationError(p)?.message || p.fileSize || '') + '</span></span></span></button>' +
+    '<span class="proj-tab-meta"><span class="proj-state">' + (taskStatusLabels[p.generationStatus] || '待生成') + '</span><span>' + escapeHtml(projectGenerationError(p)?.message || (p.sourceKind === 'images' ? '图片文件夹 · ' : '视频 · ') + (p.fileSize || '')) + '</span></span></span></button>' +
     (p.batches?.length ? '<button class="btn-sm project-result" onclick="switchProject(' + p.id + ');switchTab(1)">查看结果</button>' : '') +
     (p.generationStatus === 'failed' ? '<button class="btn-sm" onclick="retryProject(' + p.id + ')">重试</button>' : '') +
     '<button class="project-rename" onclick="renameProject(' + p.id + ')" aria-label="重命名 ' + escapeHtml(p.name) + '">···</button>' +
@@ -209,7 +210,7 @@ function renderProjectTabs() {
 function renderResultProjectSwitcher() {
   const wrap = document.getElementById('resultProjectSwitcher'), tabs = document.getElementById('resultProjectTabs'); if (!wrap || !tabs) return;
   wrap.style.display = PROJECTS.list.length ? '' : 'none';
-  document.getElementById('resultProjectSummary').textContent = PROJECTS.list.filter(p => p.batches?.length).length + ' 个视频已有图片';
+  document.getElementById('resultProjectSummary').textContent = PROJECTS.list.filter(p => p.batches?.length).length + ' 个任务已有图片';
   tabs.innerHTML = PROJECTS.list.map(p => '<button class="result-project-tab' + (p.id === PROJECTS.activeId ? ' is-active' : '') + '" onclick="switchResultProject(' + p.id + ')"><span class="result-project-copy"><strong>' + escapeHtml(p.name) + '</strong><small>' + (taskStatusLabels[p.generationStatus] || '待生成') + '</small></span></button>').join('');
   const p = PROJECTS.list.find(x => x.id === PROJECTS.activeId);
   document.getElementById('resultVideoName').textContent = p?.name || '图片结果';
@@ -217,7 +218,7 @@ function renderResultProjectSwitcher() {
   box.style.display = error ? '' : 'none';
   if (error) { document.getElementById('resultProjectFailureTitle').textContent = '生成失败'; document.getElementById('resultProjectFailureReason').textContent = error.stage + '：' + error.message; document.getElementById('resultProjectFailureMeta').textContent = '可修正设置后重试，已有图片会保留。'; }
   const empty = document.getElementById('resultEmptyState');
-  if (empty) { empty.hidden = !!S.batches.length; empty.querySelector('strong').textContent = p?.generationStatus === 'running' ? '这个视频正在生成' : p?.generationStatus === 'paused' ? '这个视频已暂停' : '这个视频还没有图片结果'; }
+  if (empty) { empty.hidden = !!S.batches.length; empty.querySelector('strong').textContent = p?.generationStatus === 'running' ? '这个任务正在生成' : p?.generationStatus === 'paused' ? '这个任务已暂停' : '这个任务还没有图片结果'; }
   const replacing = !!p?.batches?.length && ['queued','running','paused'].includes(p.generationStatus);
   document.getElementById('batchList').inert = replacing;
   document.getElementById('batchList').classList.toggle('is-rebuilding', replacing);
@@ -249,14 +250,73 @@ async function importVideoFiles(fileList) {
   if (!created.length) { toast('这些视频已在列表中', 'warn'); return; }
   if (!PROJECTS.activeId) { PROJECTS.activeId = created[0].id; restoreProject(created[0]); }
   renderProjectTabs(); updateQueueControls(); scheduleWorkspaceSave();
-  toast('已添加 ' + created.length + ' 个视频' + (taskQueue?.active ? '，将在下次开始时生成' : ''));
+  toast('已添加 ' + created.length + ' 个任务' + (taskQueue?.active ? '，将在下次开始时生成' : ''));
+}
+let importingImageFolder = false;
+async function chooseImageFolder() {
+  if (importingImageFolder || (typeof appUpdateInstalling !== 'undefined' && appUpdateInstalling)) return;
+  if (!DESKTOP_NATIVE.enabled) { document.getElementById('imageFolderInput').click(); return; }
+  importingImageFolder = true;
+  const button = document.getElementById('imageFolderBtn');
+  button.disabled = true; button.textContent = '正在读取图片文件夹…';
+  try {
+    const path = await DESKTOP_NATIVE.invoke('plugin:dialog|open', { options: { directory: true, multiple: false, title: '选择图片所在文件夹（包含子文件夹）' } });
+    if (!path) return;
+    const cacheId = 'images-' + crypto.randomUUID();
+    const folder = await DESKTOP_NATIVE.invoke('import_image_folder', { path, cacheId });
+    await importImageFolder(folder.images, { name: folder.name, folderPath: folder.folderPath, cacheId, warnings: folder.skipped });
+  } catch (error) { toast('导入图片失败：' + (error.message || error), 'err'); }
+  finally { importingImageFolder = false; button.disabled = false; button.textContent = '选择图片文件夹'; }
+}
+async function importImageFolder(files, options = {}) {
+  if (typeof appUpdateInstalling !== 'undefined' && appUpdateInstalling) return;
+  const supported = /\.(jpe?g|png|webp)$/i;
+  const warnings = [...(options.warnings || [])];
+  const images = Array.from(files).filter(file => supported.test(file.name)).filter(file => {
+    if (file.size > 0 && file.size <= 24 * 1024 * 1024) return true;
+    warnings.push(file.name + '：空文件或超过 24 MB'); return false;
+  }).map(file => file.filePath ? file : { name: file.webkitRelativePath || file.name, size: file.size, blob: file });
+  images.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN', { numeric: true }));
+  if (!images.length) { toast('文件夹中没有可读取的 JPG、PNG 或 WebP 图片（单张不超过 24 MB）', 'warn'); return; }
+  const name = options.name || images[0].name.split('/')[0] || '图片文件夹';
+  const key = 'images|' + (options.folderPath || name) + '|' + images.map(f => [f.name, f.size, f.blob?.lastModified || 0].join(':')).join('|');
+  if (PROJECTS.list.some(p => p.fileKey === key)) {
+    if (options.cacheId) await DESKTOP_NATIVE.invoke('clear_project_cache', { projectId: options.cacheId });
+    toast('这个图片文件夹已在列表中', 'warn'); return;
+  }
+  saveActiveProject();
+  const defaults = projectDefaultsSnapshot();
+  const p = { id: ++PROJECTS.idCnt, name, fileName: name, fileKey: key, sourceKind: 'images',
+    imageSources: images, imageCacheId: options.cacheId || null, importWarnings: warnings,
+    fileSize: images.length + ' 张图片', fileFmt: '图片文件夹', videoUrl: '', videoBlob: null, desktopPath: '',
+    sourceMeta: { kind: 'images', count: images.length, fileName: name, width: 0, height: 0, duration: 0 },
+    frames: [], selected: [], batches: [], aiScores: [], imgCache: new Map(), captureMode: defaults.captureMode,
+    formState: defaults.formState, batchIdCnt: 0, finalCoverId: null, finalDetailId: null, generationStatus: 'pending' };
+  PROJECTS.list.push(p);
+  if (!PROJECTS.activeId) { PROJECTS.activeId = p.id; restoreProject(p); }
+  renderProjectTabs(); scheduleWorkspaceSave();
+  toast('已添加「' + name + '」· ' + images.length + ' 张图片' + (warnings.length ? '，跳过 ' + warnings.length + ' 张' : '') + (taskQueue?.active ? '，下次开始时处理' : ''));
+}
+function renderImageSource(p) {
+  const images = p?.sourceKind === 'images';
+  const preview = document.getElementById('imageFolderPreview'); preview.hidden = !images;
+  document.getElementById('videoCaptureSettings').hidden = images;
+  document.getElementById('coverBadge').disabled = images;
+  if (!images) return;
+  document.getElementById('imageFolderName').textContent = p.name;
+  document.getElementById('imageFolderSummary').textContent = p.imageSources.length + ' 张图片 · 包含子文件夹 · 不使用视频截帧设置';
+  const warnings = p.imageWarnings || p.importWarnings || [];
+  const warningBox = document.getElementById('imageFolderWarnings'); warningBox.hidden = !warnings.length;
+  warningBox.querySelector('summary').textContent = '有 ' + warnings.length + ' 张图片未参与分析';
+  warningBox.querySelector('p').textContent = warnings.join('\n');
+  document.getElementById('imageFolderFiles').textContent = p.imageSources.slice(0, 8).map(f => f.name).join('\n') + (p.imageSources.length > 8 ? '\n…其余 ' + (p.imageSources.length - 8) + ' 张' : '');
 }
 function taskConfig(project, extra = {}) {
   const value = id => document.getElementById(id)?.value;
   return {
     apiKey: value('selectionMode') === 'ai' ? value('aiApiKey')?.trim() : '', mode: value('selectionMode'),
     model: value('aiModel'), hint: value('aiPromptHint') || '', variants: Number(value('variantCount')) || 3,
-    badge: !!document.getElementById('coverBadge')?.checked && getResolutionInfo(project.sourceMeta || project.nativeMeta || {}).is4K,
+    badge: project.sourceKind !== 'images' && !!document.getElementById('coverBadge')?.checked && getResolutionInfo(project.sourceMeta || project.nativeMeta || {}).is4K,
     captureMode: S.captureMode, interval: Math.max(.1, Number(value('itvl')) || 1), start: Math.max(0, Number(value('stt')) || 0),
     end: value('edt') ? Number(value('edt')) : null, maxFrames: Math.max(1, Math.min(600, Number(value('mxf')) || 120)),
     sceneThreshold: Math.max(.03, .18 - (Number(value('sceneSens')) - 10) / 50 * .15),
@@ -307,8 +367,8 @@ function updateListingChecklist() {
   setListingCheck('checkCover', !!covers.length, covers.length + ' 版封面');
   setListingCheck('checkDetail', !!details.length, details.length + ' 版详情');
   setListingCheck('checkFinal', final, final ? '主版本已选，可随时更换' : '可下载单图或导出已有图片');
-  const summary = document.getElementById('listingSummary'); if (summary) summary.textContent = ready ? '默认选择 A 版，点击其他版本可更换。导出包含全部图片。' : '完成一个视频后即可查看、编辑和导出。';
-  const button = document.getElementById('unifiedDownloadBtn'); if (button) { button.disabled = !ready; button.title = ready ? '打包当前视频的全部图片' : '等待图片生成'; }
+  const summary = document.getElementById('listingSummary'); if (summary) summary.textContent = ready ? '默认选择 A 版，点击其他版本可更换。导出包含全部图片。' : '完成一个任务后即可查看、编辑和导出。';
+  const button = document.getElementById('unifiedDownloadBtn'); if (button) { button.disabled = !ready; button.title = ready ? '打包当前任务的全部图片' : '等待图片生成'; }
   updateResultNavigationState();
 }
 function showAssetPreview(b) {
@@ -401,3 +461,5 @@ function serializeProjectDraft(p) {
     generationStatus: ['running', 'queued', 'paused'].includes(p.generationStatus) ? 'stopped' : p.generationStatus,
     batches: (p.batches || []).map(serializeBatchDraft), salesPlan: null };
 }
+
+function frameLabel(frame) { return frame?.sourceName || ((frame?.time || 0).toFixed(1) + 's'); }

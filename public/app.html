@@ -90,9 +90,9 @@
     <div class="rail-sep"></div>
 
     <!-- 主视图切换 -->
-    <button class="rail-btn active" id="railBtn0" onclick="switchTab(0)" title="视频与任务队列">
+    <button class="rail-btn active" id="railBtn0" onclick="switchTab(0)" title="素材与任务队列">
       <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M2 9h20M8 4v5M16 4v5"></path></svg>
-      <span class="rail-lbl">视频</span>
+      <span class="rail-lbl">素材</span>
     </button>
     <button class="rail-btn" id="railBtn1" onclick="openCompletedResults()" title="生成完成后可查看结果" disabled="" aria-disabled="true">
       <svg viewBox="0 0 24 24"><path d="M12 2l2.4 5.2L20 8l-4 4 1 6-5-3-5 3 1-6-4-4 5.6-.8z"></path></svg>
@@ -143,7 +143,7 @@
   </aside>
 
   <!-- ===== 主工作区（三个全屏视图） ===== -->
-  <div class="stage"><section id="taskControlBar" class="task-control-bar" hidden=""><div class="task-control-copy"><div class="task-control-heading"><span class="queue-pulse"></span><strong id="taskQueueTitle">视频已就绪</strong><span id="taskQueueSummary" aria-live="polite"></span></div><p id="taskQueueHint"></p><div id="taskQueueTrack" class="task-queue-track" role="progressbar" aria-label="视频队列进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="taskQueueFill"></div></div></div><div class="task-control-actions"><button id="taskPauseBtn" hidden="">暂停</button><button id="taskStopBtn" class="stop-action" hidden="">停止</button><button id="taskResultsBtn" class="results-action" disabled="">查看结果</button></div></section>
+  <div class="stage"><section id="taskControlBar" class="task-control-bar" hidden=""><div class="task-control-copy"><div class="task-control-heading"><span class="queue-pulse"></span><strong id="taskQueueTitle">素材已就绪</strong><span id="taskQueueSummary" aria-live="polite"></span></div><p id="taskQueueHint"></p><div id="taskQueueTrack" class="task-queue-track" role="progressbar" aria-label="任务队列进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="taskQueueFill"></div></div></div><div class="task-control-actions"><button id="taskPauseBtn" hidden="">暂停</button><button id="taskStopBtn" class="stop-action" hidden="">停止</button><button id="taskResultsBtn" class="results-action" disabled="">查看结果</button></div></section>
 
     <!-- ════════ 视图 0：导入 & 截帧 ════════ -->
     <section class="view active" id="view0">
@@ -151,15 +151,15 @@
         <div class="vh-l">
           <span class="view-eyebrow">FRAME STUDIO / WORKSPACE</span>
           <h2 class="view-title">把好画面，留给封面。</h2>
-          <p class="view-sub">添加视频，生成封面与详情图。每完成一个，即可查看、调整和导出。</p>
+          <p class="view-sub">添加视频或图片文件夹，生成封面与详情图。每完成一个，即可查看、调整和导出。</p>
         </div>
         <div class="vh-r">
           <button type="button" class="privacy-pill" onclick="openPrivacyNotice()" title="查看数据处理说明">
-            <span class="privacy-dot"></span><span>原始视频留在本机</span><small>AI 选图仅发送压缩画面</small>
+            <span class="privacy-dot"></span><span>原始素材留在本机</span><small>AI 选图仅发送压缩画面</small>
           </button>
         </div>
       </div>
-      <ol class="task-steps" aria-label="视频处理进度"><li class="is-active" id="taskStepSource"><b>1</b><span>添加视频</span></li><li id="taskStepGenerate"><b>2</b><span>生成图片</span></li><li id="taskStepResult"><b>3</b><span>查看与导出</span></li></ol>
+      <ol class="task-steps" aria-label="素材处理进度"><li class="is-active" id="taskStepSource"><b>1</b><span>添加素材</span></li><li id="taskStepGenerate"><b>2</b><span>生成图片</span></li><li id="taskStepResult"><b>3</b><span>查看与导出</span></li></ol>
       <div class="view-body split-capture">
 
         <!-- 左：导入 + 参数控制面板 -->
@@ -174,17 +174,17 @@
  <div class="studio-settings-row"><label class="sales-field"><span>候选版本</span><select id="variantCount"><option value="1">1 组 · 快速生成</option><option value="3" selected="">3 组 · 对比挑选</option></select></label><label class="sales-field"><span>选图方式</span><select id="selectionMode"><option value="local" selected="">本地选图</option><option value="ai">AI 选图</option></select></label></div>
  <label class="studio-checkbox"><input type="checkbox" id="coverBadge"><span>封面添加 4K 角标 <small>仅用于 4K 源视频</small></span></label>
  <div class="ai-connection-bar" id="aiConnectionBar"><div class="ai-connection-state"><span class="ai-connection-dot"></span><div><strong id="aiConnectionTitle">本地选图</strong><small id="aiConnectionMeta">无需配置即可开始</small></div></div><button class="text-action" onclick="openSettingsDrawer()">设置</button></div>
- <div class="sales-actions"><button class="btn-p sales-primary" id="salesKitBtn" disabled=""><span id="salesKitBtnLabel">开始生成</span><span aria-hidden="true">↗</span></button><button class="batch-current-btn" id="salesCurrentBtn" hidden="">仅生成当前视频</button></div>
+ <div class="sales-actions"><button class="btn-p sales-primary" id="salesKitBtn" disabled=""><span id="salesKitBtnLabel">开始生成</span><span aria-hidden="true">↗</span></button><button class="batch-current-btn" id="salesCurrentBtn" hidden="">仅生成当前任务</button></div>
  <div class="project-failure-banner" id="currentProjectFailure" style="display:none" role="alert"><div><strong id="currentProjectFailureTitle"></strong><span id="currentProjectFailureReason"></span><small id="currentProjectFailureMeta"></small></div><button onclick="retryCurrentFailedProject()">重试</button></div></div></div>
 
         <!-- 项目（多视频）切换栏 -->
         <div class="card" id="projectsCard" style="display:none;">
           <div class="project-queue-head">
             <div>
-              <div class="ct"><div class="ctd"></div>视频任务
+              <div class="ct"><div class="ctd"></div>素材任务
                 <span class="proj-count" id="projCount"></span>
               </div>
-              <div class="proj-hint">点击视频查看预览；运行中也可以移除。</div>
+              <div class="proj-hint">点击任务查看素材；运行中也可以移除。</div>
             </div>
             <div class="project-queue-actions">
               <button type="button" class="project-new-batch-btn" id="projectNewBatchBtn" onclick="startNewBatch()">新建批次</button>
@@ -199,7 +199,7 @@
 
         <!-- Upload -->
         <div class="card upload-compact-card">
-          <div class="ct"><div class="ctd"></div>视频素材</div>
+          <div class="ct"><div class="ctd"></div>导入素材</div>
           <div class="upzone" id="upzone" role="button" tabindex="0" aria-label="选择或拖拽一个或多个视频文件">
             <div class="up-icon">
               <svg viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
@@ -209,6 +209,16 @@
             <div class="fmts"><span class="fmt">MP4</span><span class="fmt">MOV</span><span class="fmt">WEBM</span><span class="format-note">更多格式可用桌面版处理</span></div>
             <input type="file" id="vInput" accept="video/*" multiple="" style="display:none">
           </div>
+          <div class="image-folder-import">
+            <button type="button" id="imageFolderBtn" onclick="chooseImageFolder()">选择图片文件夹</button>
+            <p>已有图片？直接分析，无需视频截帧。<br>JPG / PNG / WebP · 包含子文件夹 · 单张 ≤ 24 MB</p>
+            <input type="file" id="imageFolderInput" webkitdirectory multiple hidden>
+          </div>
+          <section id="imageFolderPreview" class="image-folder-preview" hidden aria-label="当前图片文件夹">
+            <div><strong id="imageFolderName"></strong><button type="button" class="btn-sm" onclick="deleteProject(PROJECTS.activeId)">移除任务</button></div>
+            <p id="imageFolderSummary"></p><pre id="imageFolderFiles"></pre>
+            <details id="imageFolderWarnings" hidden><summary></summary><p></p></details>
+          </section>
           <div id="vCon">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
               <span style="font-size:var(--fs-sm);color:var(--tm);">当前视频预览</span>
@@ -227,7 +237,7 @@
         </div>
 
         <!-- Capture Settings -->
-        <details class="card advanced-settings-card">
+        <details id="videoCaptureSettings" class="card advanced-settings-card">
           <summary><span><span class="ctd"></span>高级视频分析设置</span><small>需要控制截帧间隔、场景检测时再展开</small></summary>
           <div class="advanced-settings-body">
 
@@ -342,7 +352,7 @@
               <div>
                 <div class="sales-eyebrow">完成度</div>
                 <h3>图片已准备好了吗</h3>
-                <p id="listingSummary">完成一个视频后，即可查看与导出。</p>
+                <p id="listingSummary">完成一个任务后，即可查看与导出。</p>
               </div>
             </div>
             <div class="listing-checklist" id="listingChecklist">
@@ -362,7 +372,7 @@
           </section>
           <section class="result-section asset-result-section" id="resultAssetSection">
             <div class="section-heading"><div><div class="sales-eyebrow">YOUR IMAGES</div><h3>封面与详情</h3><p>默认主版本为 A；点击画面可替换，拖拽可交换。</p><p id="generationNote" class="generation-note"></p></div><div class="result-inline-actions"><button class="btn-sm" onclick="switchTab(0)">生成设置</button><button class="btn-sm" id="swapModeBtn" onclick="toggleSwapMode()">点选交换</button></div></div>
-            <div id="resultEmptyState" class="result-empty-state"><span>▦</span><strong>这个视频还没有图片结果</strong><p>可以切换到已完成的视频查看，或返回队列开始生成。</p><button class="btn-sm" onclick="switchTab(0)">返回视频列表</button></div><div id="unifiedAssetSlot" class="asset-slot"></div>
+            <div id="resultEmptyState" class="result-empty-state"><span>▦</span><strong>这个任务还没有图片结果</strong><p>可以切换到已完成的任务查看，或返回队列开始生成。</p><button class="btn-sm" onclick="switchTab(0)">返回素材列表</button></div><div id="unifiedAssetSlot" class="asset-slot"></div>
           </section>
         </div>
       </div>
@@ -1011,6 +1021,7 @@ const AI_CONSENT_STORAGE = 'vfp_ai_data_consent_v1';
 
 function getSourceMeta(){
   const p=PROJECTS.list.find(x=>x.id===PROJECTS.activeId);
+  if(p?.sourceKind==='images') return {kind:'images',count:p.imageSources.length,fileName:p.fileName,width:0,height:0,duration:0};
   const width=Number((typeof vPrev!=='undefined' && vPrev.videoWidth)||p?.sourceMeta?.width||p?.nativeMeta?.width||0);
   const height=Number((typeof vPrev!=='undefined' && vPrev.videoHeight)||p?.sourceMeta?.height||p?.nativeMeta?.height||0);
   const duration=Number((typeof vPrev!=='undefined' && vPrev.duration)||p?.sourceMeta?.duration||p?.nativeMeta?.duration||0);
@@ -1046,7 +1057,7 @@ function openPrivacyNotice(){
   mask.innerHTML='<div class="app-confirm-box privacy-notice" role="dialog" aria-modal="true" aria-labelledby="privacyNoticeTitle">'+
     '<div class="app-confirm-title" id="privacyNoticeTitle">数据处理说明</div>'+
     '<div class="privacy-list">'+
-      '<div><strong>留在本机</strong><span>网页版在浏览器中处理视频；Windows 桌面版通过本机 FFmpeg 与磁盘帧缓存处理。原始视频不会上传。</span></div>'+
+      '<div><strong>留在本机</strong><span>网页版在浏览器中处理视频；Windows 桌面版通过本机 FFmpeg 与磁盘帧缓存处理。原始素材不会上传。</span></div>'+
       '<div><strong>启用 AI 时上传</strong><span>压缩后的抽样画面和选图偏好会发送到当前配置的 AI 接口，仅用于画面评分。</span></div>'+
       '<div><strong>API Key</strong><span>默认仅在当前会话使用；勾选长期保存后才写入此浏览器的本地存储。</span></div>'+
     '</div><div class="app-confirm-actions"><button type="button" class="app-confirm-ok" id="privacyNoticeClose">我知道了</button></div></div>';
@@ -1060,7 +1071,7 @@ async function ensureAiDataConsent(){
   if(localStorage.getItem(AI_CONSENT_STORAGE)==='1') return true;
   const ok=await appConfirm({
     title:'启用 AI 前请确认',
-    message:'为完成智能选图，系统会把压缩后的抽样画面及选图偏好发送到配置的 AI 接口。原始视频不会上传。',
+    message:'为完成智能选图，系统会把压缩后的抽样画面及选图偏好发送到配置的 AI 接口。原始素材不会上传。',
     okText:'同意并继续', cancelText:'暂不启用 AI'
   });
   if(ok) localStorage.setItem(AI_CONSENT_STORAGE,'1');
@@ -1150,7 +1161,11 @@ function restoreProject(p){
   // 历史栈按项目隔离 → 切换即清空
   if(typeof HISTORY!=='undefined'){ HISTORY.stack.length=0; HISTORY.future.length=0; if(typeof updateUndoRedoUI==='function') updateUndoRedoUI(); }
 
-  // 视频预览
+  // Stop the previous video's preview before changing source kinds.
+  vPrev.pause(); vPrev.onloadedmetadata = null;
+  vPrev.removeAttribute('src'); vPrev.load();
+  document.getElementById('vCon').style.display='none';
+  renderImageSource(p);
   updateSalesPrimaryState(false);
   if(DESKTOP_NATIVE.enabled&&p.desktopPath&&!p.videoUrl) p.videoUrl=DESKTOP_NATIVE.fileUrl(p.desktopPath);
   if(p.videoUrl){
@@ -1303,7 +1318,7 @@ async function startNewBatch(){
   if(!PROJECTS.list.length){ chooseVideoFiles(); return; }
   const ok=await appConfirm({
     title:'开始新批次',
-    message:'当前视频与图片结果会保存在历史记录中，然后清空工作台。',
+    message:'当前素材与图片结果会保存在历史记录中，然后清空工作台。',
     okText:'保存并新建',
     cancelText:'继续当前任务'
   });
@@ -1313,6 +1328,7 @@ async function startNewBatch(){
   await saveWorkspaceNow();
   PROJECTS.list.forEach(project=>{ if(project.videoUrl&&!project.desktopPath) try{URL.revokeObjectURL(project.videoUrl);}catch(_){} });
   PROJECTS.list=[]; PROJECTS.activeId=null; PROJECTS.idCnt=0;
+  renderImageSource(null);
   WORKSPACE_SESSION_ID='session-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
   WORKSPACE_HISTORY_NAME='';
   clearDesktopCanvasSourceCache();
@@ -1491,6 +1507,9 @@ upzone.addEventListener('drop', async e=>{
   upzone.classList.remove('drag');
   await importVideoFiles(e.dataTransfer.files);
 });
+document.getElementById('imageFolderInput').addEventListener('change', async e=>{
+  try { await importImageFolder(e.target.files); } finally { e.target.value=''; }
+});
 vInput.addEventListener('change', async e=>{
   await importVideoFiles(e.target.files);
   e.target.value='';
@@ -1544,7 +1563,7 @@ function updateSceneSensLabel(){
 // ===================================================================
 function switchTab(idx){
   if(idx===1 && !updateResultNavigationState()){
-    toast('完成一个视频后即可查看图片结果','warn');
+    toast('完成一个任务后即可查看图片结果','warn');
     document.getElementById('upzone')?.focus();
     return;
   }
@@ -2416,7 +2435,7 @@ function addThumb(i, parent){
     '<div class="fov"><div class="fcheck"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>'+
     '<div class="fdl" title="下载此帧" data-dl="'+i+'"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></div>'+
     '<div class="fzoom" title="放大查看"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/></svg></div>'+
-    '<div class="ftime">'+f.time.toFixed(1)+'s</div>'+
+    '<div class="ftime" title="'+escapeHtml(frameLabel(f))+'">'+escapeHtml(frameLabel(f))+'</div>'+
     '<div class="fnum">'+(i+1)+'</div>'+
     '<div class="fused-tag" id="fused-'+i+'"></div>'+
     '<div class="fscore" id="fscore-'+i+'"></div>';
@@ -2582,7 +2601,7 @@ function refreshUsageTags(){
 function downloadFrame(i, opts={}){
   const f=S.frames[i]; if(!f) return;
   const a=document.createElement('a');
-  a.href=f.dataUrl; a.download='frame_'+(i+1)+'_'+f.time.toFixed(2)+'s.jpg'; a.click();
+  a.href=f.dataUrl; a.download=(f.downloadName||f.sourceName)?.split('/').pop()||('frame_'+(i+1)+'_'+f.time.toFixed(2)+'s.jpg'); a.click();
   if(!opts.silent) toast('已下载 第'+(i+1)+'帧');
 }
 function downloadSelected(){
@@ -2988,16 +3007,16 @@ async function visionScoreBatch(frames, apiKey, model, hintText, goodRefImages=[
   }
 
   const systemText =
-    '你是专业视频画面质量评审 AI。\n'+
+    '你是专业图片与视频画面质量评审 AI。\n'+
     (goalText ? '【本次目标】'+goalText+'\n\n' : '')+
     (refBlock ? refBlock+'\n' : '')+
     (hint ? '【用户额外要求】'+hint+'\n' : '')+
-    '下面将提供'+validFrames.length+'张候选视频截图（每张前有【候选图N】标记）。\n'+
+    '下面将提供'+validFrames.length+'张候选图片（每张前有【候选图N】标记）。\n'+
     '请对每张候选图从以下7个维度打分（0-10整数）：\n'+
     '1. clarity（清晰度/对焦/画面锐利程度）\n'+
     '2. composition（构图：主体位置、三分法/黄金分割、留白与平衡、视觉引导线、画面层次，构图越讲究越高）\n'+
     '3. appeal（画面美观度与吸引力：色彩是否和谐、光影质感、整体美感与情绪感染力，越赏心悦目越想点击越高）\n'+
-    '4. theme（主题代表性：该画面在多大程度上能代表/概括视频主题，越能一眼看出视频讲什么越高）\n'+
+    '4. theme（主题代表性：该画面在多大程度上能表达这组素材的主题，主体与内容越清晰越高）\n'+
     '5. subject（主体突出度：画面主体是否清晰明确、占据视觉重心，杂乱/空镜得分低）\n'+
     '6. detail（信息与细节量：画面包含的有效信息/细节是否丰富，纯色/模糊/过场画面得分低）\n'+
     '7. overall（综合推荐分，结合上面目标给出整体推荐程度'+(goodRefImages.length?'，参考用户偏好风格':'')+'）\n\n'+
@@ -4728,7 +4747,7 @@ async function saveWorkspaceNow(){
   saveActiveProject();
   const payload={
     historyId:WORKSPACE_SESSION_ID,
-    historyName:WORKSPACE_HISTORY_NAME||((PROJECTS.list[0]?.name||'批量任务')+(PROJECTS.list.length>1?' 等 '+PROJECTS.list.length+' 个视频':'')),
+    historyName:WORKSPACE_HISTORY_NAME||((PROJECTS.list[0]?.name||'批量任务')+(PROJECTS.list.length>1?' 等 '+PROJECTS.list.length+' 个任务':'')),
     savedAt:Date.now(), activeId:PROJECTS.activeId, idCnt:PROJECTS.idCnt,
     projects:PROJECTS.list.map(serializeProjectDraft)
   };
@@ -4862,9 +4881,9 @@ async function restoreHistoryRecord(historyId){
   try{
     updateRailSaveState('正在打开历史','saving');
     const [payload,meta]=await Promise.all([readHistoryPayload(id),readHistoryMetaRecord(id)]);
-    if(!payload?.projects?.length){ toast('这条历史记录没有可恢复的视频','err'); updateRailSaveState('历史记录','error'); return false; }
+    if(!payload?.projects?.length){ toast('这条历史记录没有可恢复的素材','err'); updateRailSaveState('历史记录','error'); return false; }
     if(DESKTOP_NATIVE.enabled){
-      const paths=payload.projects.map(project=>project.desktopPath).filter(Boolean);
+      const paths=payload.projects.flatMap(project=>[project.desktopPath,...(project.imageSources||[]).map(f=>f.filePath),...(project.frames||[]).map(f=>f.filePath)]).filter(Boolean);
       if(paths.length) await DESKTOP_NATIVE.invoke('authorize_file_paths',{paths});
     }
     PROJECTS.list.forEach(project=>{ if(project.videoUrl&&!project.desktopPath) try{URL.revokeObjectURL(project.videoUrl);}catch(_){} });
@@ -4888,7 +4907,7 @@ async function restoreHistoryRecord(historyId){
 
     closeDraftManager();
     switchTab(0);
-    toast('已从历史记录恢复 '+PROJECTS.list.length+' 个视频任务');
+    toast('已从历史记录恢复 '+PROJECTS.list.length+' 个素材任务');
     S.dirty=false;
     updateRailSaveState('历史记录');
     return true;
@@ -4944,12 +4963,12 @@ async function openDraftManager(){
       const time=record.savedAt?new Date(record.savedAt).toLocaleString():'未知时间';
       const names=(record.projectNames||[]).join('、');
       return '<article class="draft-row'+(id===WORKSPACE_SESSION_ID?' is-active':'')+'">'+
-        '<div class="draft-main"><strong>'+escapeHtmlSafe(record.historyName||'批量任务')+'</strong><span>'+record.projectCount+' 个视频 · '+record.assetCount+' 个销售资产 · '+escapeHtmlSafe(time)+'</span>'+(names?'<small>'+escapeHtmlSafe(names)+'</small>':'')+'</div>'+
+        '<div class="draft-main"><strong>'+escapeHtmlSafe(record.historyName||'批量任务')+'</strong><span>'+record.projectCount+' 个任务 · '+record.assetCount+' 个销售资产 · '+escapeHtmlSafe(time)+'</span>'+(names?'<small>'+escapeHtmlSafe(names)+'</small>':'')+'</div>'+
         '<button type="button" class="draft-icon is-primary" data-history-action="restore" data-history-id="'+escapeHtmlSafe(id)+'">打开编辑</button>'+
         '<button type="button" class="draft-icon" data-history-action="rename" data-history-id="'+escapeHtmlSafe(id)+'">重命名</button>'+
         '<button type="button" class="draft-icon is-danger" data-history-action="delete" data-history-id="'+escapeHtmlSafe(id)+'">删除</button>'+
       '</article>';
-    }).join(''):'<div class="draft-empty">还没有历史记录。创建视频任务后，修改内容会自动保存在这里。</div>';
+    }).join(''):'<div class="draft-empty">还没有历史记录。创建素材任务后，修改内容会自动保存在这里。</div>';
   }catch(e){
     console.warn('读取历史记录失败',e);
     if(mask.isConnected) mask.querySelector('#draftHistoryList').innerHTML='<div class="draft-list-error"><strong>历史记录读取失败</strong><span>'+escapeHtmlSafe(e?.message||'请关闭其他旧页面后重试')+'</span><button type="button" data-history-action="retry">重新读取</button></div>';
@@ -5353,7 +5372,7 @@ function createFramePickerItem(i,cur,onPick){
   item.type='button';
   item.className='frame-picker-item'+(cur===i?' is-current':'');
   item.dataset.frameIndex=String(i);
-  item.setAttribute('aria-label','选择第 '+(i+1)+' 帧，时间 '+fmtT(f?.time||0));
+  item.setAttribute('aria-label','选择第 '+(i+1)+' 张，'+frameLabel(f));
   const img=document.createElement('img');
   img.alt='第 '+(i+1)+' 帧';
   img.decoding='async';
@@ -5361,7 +5380,7 @@ function createFramePickerItem(i,cur,onPick){
   img.src=f?.dataUrl||'';
   item.appendChild(img);
   const meta=document.createElement('span');
-  meta.innerHTML='<b>第 '+(i+1)+' 帧</b><small>'+fmtT(f?.time||0)+'</small>';
+  meta.innerHTML='<b>第 '+(i+1)+' 帧</b><small>'+escapeHtml(frameLabel(f))+'</small>';
   item.appendChild(meta);
   item.onclick=()=>onPick(i);
   return item;
@@ -5657,7 +5676,7 @@ function showFrame(i,resetZoom){
   const f=S.frames[LB.idx];
   lbImg.src=f.dataUrl;
   document.getElementById('lbTitle').textContent='帧 #'+(LB.idx+1);
-  document.getElementById('lbSub').textContent=f.time.toFixed(2)+'s · '+(LB.idx+1)+' / '+S.frames.length;
+  document.getElementById('lbSub').textContent=frameLabel(f)+' · '+(LB.idx+1)+' / '+S.frames.length;
   const prevActive = lbStrip.querySelector('.lb-strip-item.active');
   if(prevActive) prevActive.classList.remove('active');
   if(LB.idx<LB.stripStart+8||LB.idx>=LB.stripEnd-8) buildStrip(LB.idx);
@@ -5926,7 +5945,7 @@ document.querySelectorAll('img:not([alt])').forEach(img=>img.alt='');
 const toastRegion=document.getElementById('toast');
 if(toastRegion){ toastRegion.setAttribute('role','status'); toastRegion.setAttribute('aria-live','polite'); }
 window.addEventListener('beforeunload',e=>{
-  if(taskQueue?.active || S.dirty){ e.preventDefault(); e.returnValue=''; }
+  if(taskQueue?.active || importingImageFolder || S.dirty){ e.preventDefault(); e.returnValue=''; }
 });
 migrateLegacyWorkspaceToHistory();
 setTimeout(()=>{ updateAiConnectionUI(); updateTaskFlowState(); },0);

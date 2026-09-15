@@ -25,7 +25,7 @@
     }
     async install(){
       if(!this.update||this.installing||this.state==='checking')return;
-      if(this.isBusy()){this.error='请先停止视频处理并等待图片编辑完成，再安装更新。';this.emit();return;}
+      if(this.isBusy()){this.error='请先停止任务，并等待素材导入和图片编辑完成，再安装更新。';this.emit();return;}
       this.state='installing';this.error='';this.progress='正在保存当前任务…';
       this.setLocked(true);this.emit();
       try{
@@ -74,7 +74,7 @@ function initializeAppUpdater(){
     document.getElementById('desktopUpdateLater').disabled=u.installing;
   };
   desktopUpdater=new AppUpdater({native:DESKTOP_NATIVE,
-    isBusy:()=>!!taskQueue?.active||generationStarting||S.batches.some(b=>b.rendering),
+    isBusy:()=>!!taskQueue?.active||generationStarting||importingImageFolder||S.batches.some(b=>b.rendering),
     persist:async()=>{flushUserDefaultsAutoSave();await saveWorkspaceNow();if(S.dirty)throw new Error('任务保存失败，已取消更新。请先保存后重试。');},
     setLocked:locked=>{
       appUpdateInstalling=locked;

@@ -18,6 +18,7 @@ use std::{
     time::{Duration, Instant, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Manager};
+mod image_folders;
 mod updates;
 
 #[derive(Serialize)]
@@ -912,6 +913,7 @@ pub fn run() {
             updates::check_desktop_update,
             updates::install_desktop_update,
             inspect_video_files,
+            image_folders::import_image_folder,
             authorize_file_paths,
             read_cached_frame,
             extract_video_frames,
