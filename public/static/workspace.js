@@ -105,7 +105,7 @@ function updateAiConnectionUI() {
   const key = document.getElementById('aiApiKey')?.value?.trim();
   const title = document.getElementById('aiConnectionTitle'), meta = document.getElementById('aiConnectionMeta');
   if (title) title.textContent = mode === 'ai' ? key ? 'AI 选图 · 已配置密钥' : 'AI 选图 · 需要配置' : '本地选图 · 无需联网';
-  if (meta) meta.textContent = mode === 'ai' ? '仅发送压缩候选画面，连接状态以实际请求为准' : '按清晰度、曝光与画面差异挑选';
+  if (meta) meta.textContent = mode === 'ai' ? '相邻相似画面只留较清楚的一张，全部代表画面参与 AI 评分' : '先合并相邻相似画面，再按清晰度、曝光与画面差异挑选';
   document.getElementById('aiConnectionBar')?.classList.toggle('is-connected', mode === 'local' || !!key);
   updateTaskFlowState();
 }

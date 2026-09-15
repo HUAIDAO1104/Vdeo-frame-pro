@@ -5,6 +5,52 @@ import vm from 'node:vm';
 import '../public/static/frame-engine.js';
 const {makeAssets,diverse}=globalThis.FrameStudio;
 const frames=n=>Array.from({length:n},(_,i)=>({idx:i,w:1920,h:1080,time:i,dataUrl:'frame:'+i}));
+const candidate=(frameIdx,time,gray=100,overall=.7)=>({frameIdx,time,overall,pixels:Array(576).fill(gray)});
+const {sceneRepresentatives,similarFrames}=globalThis.FrameStudio;
+
+test('adjacent similar frames keep the better representative and every candidate belongs to one group',()=>{
+  const items=[candidate(0,0,100,.4),candidate(1,1,103,.9),candidate(2,2,101,.6),candidate(3,3,220,.8)];
+  const result=sceneRepresentatives(items);
+  assert.deepEqual(result.map(x=>x.frameIdx),[1,3]);
+  assert.deepEqual(result.map(x=>x.memberIds),[[0,1,2],[3]]);
+  assert.deepEqual(result.map(x=>[x.startTime,x.endTime]),[[0,2],[3,3]]);
+  assert.equal(items[0].sceneId,undefined);
+});
+test('scene changes close in time are all retained beyond the old 32 and 60 caps',()=>{
+  const items=Array.from({length:90},(_,i)=>candidate(i,i*.1,i%2?220:20));
+  assert.equal(sceneRepresentatives(items).length,90);
+});
+test('a long static shot needs one representative, with no artificial minimum or time-slice quota',()=>{
+  assert.equal(sceneRepresentatives(Array.from({length:120},(_,i)=>candidate(i,i*5))).length,1);
+  assert.deepEqual(sceneRepresentatives([]),[]);
+});
+test('returning to an earlier scene and gaps in time start new groups',()=>{
+  assert.equal(sceneRepresentatives([candidate(0,0,20),candidate(1,1,220),candidate(2,2,20)]).length,3);
+  const separated=[candidate(0,0),candidate(1,1),candidate(2,2),candidate(3,30),candidate(4,31)];
+  assert.deepEqual(sceneRepresentatives(separated).map(x=>x.memberIds),[[0,1,2],[3,4]]);
+  assert.equal(sceneRepresentatives([candidate(0,0),candidate(1,100)]).length,2);
+});
+test('gradual motion cannot chain frames far from the original composition into one group',()=>{
+  const result=sceneRepresentatives(Array.from({length:12},(_,i)=>candidate(i,i,40+i*5)));
+  assert.ok(result.length>=4);
+  assert.ok(result.every(group=>group.memberIds.length<=3));
+});
+test('similarity retains different colors with equal luminance and localized visual changes',()=>{
+  const a={...candidate(0,0),colors:Uint8Array.from({length:1728},(_,i)=>i%3===0?180:0)};
+  const b={...candidate(1,1),colors:Uint8Array.from({length:1728},(_,i)=>i%3===1?92:0)};
+  assert.equal(similarFrames(a,b),false);
+  const changed=candidate(1,1);changed.pixels.fill(220,200,260);
+  assert.equal(similarFrames(candidate(0,0),changed),false);
+});
+test('automatic layouts use only representatives and stay compact after duplicate reduction',()=>{
+  const source=frames(120),order=[2,48,92];
+  const assets=makeAssets(order,source,{variants:3,badge:false},0);
+  for(const asset of assets){
+    const indices=asset.isDetailLong?[...asset.detailLayout.gridFrames,...asset.detailLayout.rows.flatMap(r=>r.frames)]:asset.cells;
+    assert.ok(indices.every(i=>order.includes(i)));
+    if(asset.isDetailLong) assert.equal(asset.detailLayout.rows.length,0);
+  }
+});
 
 test('short videos have compact image-only layouts with valid fallback frames',()=>{
   for(const n of [1,2,4,8]){

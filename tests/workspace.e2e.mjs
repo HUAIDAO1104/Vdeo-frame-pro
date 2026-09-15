@@ -139,6 +139,54 @@ try {
   const error=await page.evaluate(async()=>{try{await visionScoreBatch([{frameIdx:11,b64:'fake'},{frameIdx:22,b64:'fake'}],'fake','fake','',[],[],null,1000,null);return '';}catch(e){return e.message;}});
   assert.match(error,/重复/);
   passed('AI scores match candidate IDs, preserve zero, and reject ambiguous responses (mock provider)');
+  const adaptive=await page.evaluate(async()=>{
+    // Real JPEG decoding and Canvas rendering, with only native I/O and the
+    // paid provider replaced. Seventy adjacent scene groups, three frames each.
+    const bytes=new Map(),descriptors=[],calls=[],encoded=new Map();
+    const canvas=document.createElement('canvas');canvas.width=320;canvas.height=180;
+    const cx=canvas.getContext('2d');
+    for(let i=0;i<210;i++){
+      const gray=(Math.floor(i/3)%2?210:40)+(i%3===1?2:0);
+      if(!encoded.has(gray)){
+        cx.fillStyle=`rgb(${gray},${gray},${gray})`;cx.fillRect(0,0,320,180);
+        encoded.set(gray,Uint8Array.from(atob(canvas.toDataURL('image/jpeg',.9).split(',')[1]),c=>c.charCodeAt(0)));
+      }
+      const path='fixture:'+i;bytes.set(path,encoded.get(gray));
+      descriptors.push({path,time:i+.5,width:320,height:180});
+    }
+    const engine=FrameStudio.create({
+      native:{enabled:true,fileUrl:path=>path,invoke:async(command,args)=>{
+        if(command==='extract_video_frames')return descriptors;
+        if(command==='read_cached_frame')return bytes.get(args.path);
+        throw Error('Unexpected command: '+command);
+      }},badge:()=>null,
+      scoreBatch:async frames=>{
+        calls.push(frames.map(f=>f.frameIdx));
+        return frames.map(f=>({frameIdx:f.frameIdx,clarity:.8,composition:.7,appeal:.8,theme:.7,subject:.9,detail:.6,overall:.8}));
+      }
+    });
+    const project={id:999,desktopPath:'fixture.mp4',runConfig:{apiKey:'test-only',model:'mock',variants:1,maxFrames:210,interval:1,cacheId:'fixture'}};
+    const queue=new VideoTaskQueue({process:(p,ctx)=>engine.generate(p,ctx)});
+    await queue.start([project]);
+    if(project.generationStatus!=='complete')throw Error(JSON.stringify(project.generationError));
+    const used=project.batches.flatMap(b=>b.isDetailLong?[...b.detailLayout.gridFrames,...b.detailLayout.rows.flatMap(r=>r.frames)]:b.cells);
+    const result={summary:project.selectionSummary,calls:calls.map(x=>x.length),scored:calls.flat(),selected:project.selected,used,
+      allFrames:project.frames.length,visionCount:project.aiScores.filter(s=>s.scoreSource==='vision'&&s.vision?.composition===.7).length,
+      note:project.generationNote,savedSummary:serializeProjectDraft(project).selectionSummary,
+      rendered:project.batches.every(b=>b.canvas.width>0&&b.canvas.height>0)};
+    project.runConfig.captureOnly=true;
+    await queue.start([project]);
+    result.captureOnlyCleared=project.generationStatus==='complete'&&project.selectionSummary===null&&project.lastPick===null&&project.batches.length===0;
+    return result;
+  });
+  assert.deepEqual(adaptive.summary,{candidates:210,representatives:70,merged:140,scored:70});
+  assert.deepEqual(adaptive.calls,[8,8,8,8,8,8,8,8,6]);
+  assert.equal(new Set(adaptive.scored).size,70);assert.equal(adaptive.selected.length,70);
+  assert.ok(adaptive.used.every(id=>adaptive.scored.includes(id)));
+  assert.equal(adaptive.allFrames,210);assert.equal(adaptive.visionCount,70);assert.ok(adaptive.rendered);
+  assert.ok(adaptive.captureOnlyCleared);
+  assert.deepEqual(adaptive.savedSummary,adaptive.summary);assert.match(adaptive.note,/70 张代表画面均已 AI 评分/);
+  passed('210 real candidate images become 70 scene representatives; all are scored, only representatives are auto-used, history retains counts');
   await page.evaluate(()=>switchResultProject(PROJECTS.list[0].id));
   await page.waitForFunction(()=>S.batches.every(b=>b.canvas&&!b.rendering));
   await page.evaluate(()=>{

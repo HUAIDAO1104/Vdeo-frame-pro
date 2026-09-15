@@ -378,8 +378,8 @@
           <div class="ai-planner-head">
             <div>
               <div class="sales-eyebrow">Vision AI</div>
-              <h3>让 AI 先判断哪些画面更好卖</h3>
-              <p>按构图、清晰度和画面代表性，为候选帧评分。</p>
+              <h3>按画面变化选出代表帧，再交给 AI</h3>
+              <p>相邻相似画面先归并，评分数量随视频内容变化。</p>
             </div>
             <span class="ai-status-chip">失败会明确提示</span>
           </div>
@@ -394,7 +394,7 @@
               <span>覆盖丰富度、商用场景、细节和风格变化</span>
             </div>
           </div>
-          <div id="aiIntentHint" class="ai-intent-line">自动按资产类型分别挑图：封面重点击，详情重证明。</div>
+          <div id="aiIntentHint" class="ai-intent-line">相邻相似画面保留较清楚的一张，每张代表画面都参与评分。</div>
 
           <div class="model-preset-control">
             <div class="model-preset-label"><span>模型档位</span><small>可在“全部模型”中精细选择</small></div>
@@ -1115,12 +1115,11 @@ function resolveIntent(){
   return { key:it, preset: INTENT_PRESETS[it] || INTENT_PRESETS.auto };
 }
 
-// 系统固定为 auto 模式：四宫格按封面标准、九宫格按细节标准逐批次自动套用。
-// 保留此函数仅用于初始化提示文案（不再有手动切换按钮）。
+// 保留旧意图状态供编辑器兼容；主工作流使用相邻画面归并。
 function setAiIntent(intent){
   S.aiIntent = 'auto';
   const hintEl = document.getElementById('aiIntentHint');
-  if(hintEl) hintEl.textContent = INTENT_PRESETS.auto.hint;
+  if(hintEl) hintEl.textContent = '相邻相似画面保留较清楚的一张，每张代表画面都参与评分。';
 }
 
 // ===================================================================

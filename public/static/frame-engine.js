@@ -119,30 +119,78 @@
         cx.drawImage(image, 0, 0, 32, 18);
         const rgba = cx.getImageData(0, 0, 32, 18).data;
         const pixels = Array.from({ length: 576 }, (_, j) => .299 * rgba[j * 4] + .587 * rgba[j * 4 + 1] + .114 * rgba[j * 4 + 2]);
+        // Keep spatial RGB too: equal-luminance scenes can have different colors.
+        const colors = Uint8Array.from({ length: 576 * 3 }, (_, j) => rgba[Math.floor(j / 3) * 4 + j % 3]);
         const mean = pixels.reduce((a, b) => a + b, 0) / pixels.length;
         let edge = 0;
-        for (let j = 33; j < pixels.length; j++) edge += Math.abs(pixels[j] - pixels[j - 1]) + Math.abs(pixels[j] - pixels[j - 32]);
+        for (let j = 0; j < pixels.length; j++) {
+          if (j % 32) edge += Math.abs(pixels[j] - pixels[j - 1]);
+          if (j >= 32) edge += Math.abs(pixels[j] - pixels[j - 32]);
+        }
         const clarity = Math.min(1, edge / pixels.length / 45);
         const exposure = 1 - Math.abs(mean - 128) / 128;
-        return { frameIdx: i, pixels, clarity, overall: .7 * clarity + .3 * exposure, time: frames[i].time };
+        return { frameIdx: i, pixels, colors, clarity, overall: .7 * clarity + .3 * exposure, time: frames[i].time };
       }));
       if (i % 12 === 0) { ctx.progress(45 + Math.round(10 * i / frames.length)); await new Promise(r => setTimeout(r, 0)); }
     }
     return items;
   }
+  function similarFrames(a, b) {
+    const left = a.colors || a.pixels, right = b.colors || b.pixels;
+    if (!left?.length || left.length !== right?.length) return false;
+    const channels = a.colors && b.colors ? 3 : 1;
+    let total = 0, changed = 0;
+    for (let i = 0; i < left.length; i += channels) {
+      let delta = 0;
+      for (let c = 0; c < channels; c++) delta += Math.abs(left[i + c] - right[i + c]) / 255;
+      delta /= channels;
+      total += delta;
+      if (delta > .14) changed++;
+    }
+    const cells = left.length / channels;
+    // Conservative spatial comparison, not a semantic scene classifier.
+    return total / cells <= .045 && changed / cells <= .08;
+  }
+  function sceneRepresentatives(items) {
+    const ordered = [...items].sort((a, b) => a.time - b.time || a.frameIdx - b.frameIdx);
+    const gaps = ordered.slice(1).map((item, i) => item.time - ordered[i].time).filter(gap => gap > 0).sort((a, b) => a - b);
+    // Adapt to the actual sampling interval. A missing stretch starts a new group.
+    const nearby = Math.min(10, Math.max(3, (gaps[Math.floor(gaps.length / 2)] || 1) * 2.5));
+    const groups = [];
+    let group;
+    for (const item of ordered) {
+      // Compare to a fixed anchor as well as the previous frame: gradual motion
+      // must not chain an entire changing shot into a single representative.
+      if (!group || item.time - group.last.time > nearby || !similarFrames(item, group.anchor) || !similarFrames(item, group.last)) {
+        group = { anchor: item, last: item, best: item, memberIds: [] };
+        groups.push(group);
+      }
+      group.memberIds.push(item.frameIdx);
+      group.last = item;
+      if (item.overall > group.best.overall) group.best = item;
+    }
+    return groups.map((group, sceneId) => ({ ...group.best, sceneId, memberIds: group.memberIds,
+      startTime: group.anchor.time, endTime: group.last.time }));
+  }
   function diverse(items, count) {
     const pool = [...items].sort((a, b) => b.overall - a.overall);
     const picked = [];
-    const span = Math.max(1, ...items.map(x => x.time || 0));
+    const span = Math.max(1, Math.max(...items.map(x => x.time || 0)) - Math.min(...items.map(x => x.time || 0)));
+    const distances = new Map(pool.map(item => [item, { pixels: 1, time: 1 }]));
     while (pool.length && picked.length < count) {
       let best = 0, score = -Infinity;
       pool.forEach((item, i) => {
-        const distance = picked.length ? Math.min(...picked.map(other => item.pixels.reduce((sum, x, j) => sum + Math.abs(x - other.pixels[j]), 0) / 576 / 255)) : 1;
-        const time = picked.length ? Math.min(...picked.map(other => Math.abs(item.time - other.time) / span)) : 1;
-        const value = item.overall * .5 + Math.min(1, distance * 4) * .35 + time * .15;
+        const distance = distances.get(item);
+        const value = item.overall * .5 + Math.min(1, distance.pixels * 4) * .35 + distance.time * .15;
         if (value > score) { score = value; best = i; }
       });
-      picked.push(pool.splice(best, 1)[0]);
+      const selected = pool.splice(best, 1)[0];
+      picked.push(selected);
+      for (const item of pool) {
+        const distance = distances.get(item);
+        distance.pixels = Math.min(distance.pixels, item.pixels.reduce((sum, x, j) => sum + Math.abs(x - selected.pixels[j]), 0) / item.pixels.length / 255);
+        distance.time = Math.min(distance.time, Math.abs(item.time - selected.time) / span);
+      }
     }
     return picked.map(x => x.frameIdx);
   }
@@ -158,7 +206,7 @@
     const used = new Set(covers.flatMap(x => x.cells));
     const detailOrder = [...order.filter(x => !used.has(x)), ...order.filter(x => used.has(x))];
     // Short/static clips get a compact 3x3; longer clips add intentional 1/3/2 rows.
-    const rowPlan = frames.length >= 15 ? [1, 3, 2] : frames.length >= 10 ? [1] : [];
+    const rowPlan = order.length >= 15 ? [1, 3, 2] : order.length >= 10 ? [1] : [];
     for (let i = 0; i < count; i++) {
       const rotated = detailOrder.slice(i * 3).concat(detailOrder.slice(0, i * 3));
       const filled = fill(rotated.length ? rotated : order, 9 + rowPlan.reduce((a, b) => a + b, 0));
@@ -214,14 +262,24 @@
         if (!work.frames) work.frames = await capture(project, config, ctx, native);
         const frames = work.frames;
         if (!frames.length) throw new Error('没有提取到画面，请调整截取范围或改用均匀采样');
-        if (config.captureOnly) return { frames, batches: [], selected: [], aiScores: [], batchIdCnt: 0, finalCoverId: null, finalDetailId: null, salesPlan: null };
+        if (config.captureOnly) return { frames, batches: [], selected: [], aiScores: [], batchIdCnt: 0, finalCoverId: null, finalDetailId: null, salesPlan: null,
+          selectionSummary: null, lastPick: null, generationNote: '已提取 ' + frames.length + ' 张候选，开始生成后将归并相邻相似画面。' };
         if (!work.items) work.items = await inspect(frames, ctx, native);
         const items = work.items.map(x => ({ ...x }));
+        const representatives = sceneRepresentatives(items);
+        const byId = new Map(items.map(item => [item.frameIdx, item]));
+        for (const representative of representatives) {
+          for (const id of representative.memberIds) Object.assign(byId.get(id), {
+            representativeId: representative.frameIdx, sceneId: representative.sceneId,
+            scoreSource: id === representative.frameIdx ? 'local' : 'merged'
+          });
+        }
+        ctx.progress(55, '已归并为 ' + representatives.length + ' 张代表画面（原 ' + frames.length + ' 张）');
         if (config.apiKey) {
-          const sampleIds = diverse(items, Math.min(32, items.length));
+          const sampleIds = representatives.map(item => item.frameIdx);
           const allScores = [];
           for (let offset = 0; offset < sampleIds.length; offset += 8) {
-            const scores = await ctx.step('AI 选图 ' + (Math.floor(offset / 8) + 1) + ' / ' + Math.ceil(sampleIds.length / 8), async signal => {
+            const scores = await ctx.step('AI 评分 ' + (offset + 1) + '–' + Math.min(offset + 8, sampleIds.length) + ' / ' + sampleIds.length + ' 张代表画面', async signal => {
               const inputs = [];
               for (const id of sampleIds.slice(offset, offset + 8)) {
                 const image = await loadFrame(frames[id], signal, native);
@@ -235,23 +293,31 @@
             allScores.push(...scores);
             ctx.progress(55 + Math.round(20 * allScores.length / sampleIds.length));
           }
-          for (const item of items) {
-            const ai = allScores.find(x => x.frameIdx === item.frameIdx);
-            item.overall = ai ? ai.overall * .8 + item.overall * .2 : item.overall * .5;
+          const scoresById = new Map(allScores.map(score => [score.frameIdx, score]));
+          if (scoresById.size !== representatives.length || representatives.some(item => !scoresById.has(item.frameIdx))) throw new Error('代表画面评分不完整，请重试');
+          for (const item of representatives) {
+            const ai = scoresById.get(item.frameIdx), localScore = item.overall;
+            Object.assign(item, ai, { localScore, vision: { ...ai }, overall: ai.overall * .8 + localScore * .2, scoreSource: 'vision' });
+            Object.assign(byId.get(item.frameIdx), { ...ai, localScore, vision: { ...ai }, overall: item.overall, scoreSource: 'vision' });
           }
         }
-        const order = diverse(items, Math.min(60, items.length));
+        // Only representatives enter automatic layouts. All source candidates
+        // remain available for manual replacement; no hidden 32/60-frame cap.
+        const order = diverse(representatives, representatives.length);
         const assets = makeAssets(order, frames, config, project.batchIdCnt || 0);
         for (let i = 0; i < assets.length; i++) {
           assets[i].canvas = await ctx.step('合成' + assets[i].title, signal => renderAsset(assets[i], frames, signal, native, badge()));
           ctx.progress(78 + Math.round(22 * (i + 1) / assets.length));
         }
-        return { frames, batches: assets, selected: order, aiScores: items.map(({ pixels, ...x }) => x),
+        const selectionSummary = { candidates: frames.length, representatives: representatives.length,
+          merged: frames.length - representatives.length, scored: config.apiKey ? representatives.length : 0 };
+        return { frames, batches: assets, selected: order, aiScores: items.map(({ pixels, colors, ...x }) => x), selectionSummary,
           batchIdCnt: assets.at(-1).id, finalCoverId: assets[0].id, finalDetailId: assets.find(x => x.assetKind === 'detail').id,
           salesPlan: null, localFrameCache: !!project.desktopPath, lastPick: { engine: config.apiKey ? 'vision' : 'local', model: config.model, ok: true, count: order.length },
-          generationNote: frames.length < 9 ? '视频画面较少，部分格子复用了画面，可在编辑中替换。' : '' };
+          generationNote: '提取 ' + frames.length + ' 张候选 · 合并 ' + selectionSummary.merged + ' 张相邻相似画面 · ' + representatives.length + ' 张代表画面' +
+            (config.apiKey ? '均已 AI 评分。' : '用于本地选图。') + (representatives.length < 9 ? '代表画面较少，部分格子复用；全部候选仍可手动替换。' : '全部候选仍可手动替换。') };
       }
     };
   }
-  root.FrameStudio = { create, renderAsset, loadFrame, diverse, makeAssets };
+  root.FrameStudio = { create, renderAsset, loadFrame, diverse, makeAssets, sceneRepresentatives, similarFrames };
 })(globalThis);
