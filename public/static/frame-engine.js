@@ -257,13 +257,13 @@
       const filled = fill(rotated.length ? rotated : order, 9 + rowPlan.reduce((a, b) => a + b, 0));
       const gridFrames = filled.splice(0, 9);
       details.push({ id: ++baseId, cols: 3, rows: 0, cells: [], crops: {}, hasBadge: false, assetKind: 'detail',
-        isDetail: true, isDetailLong: true, heroShowText: false, detailLayout: { gridFrames, rows: rowPlan.map(cols => ({ cols, frames: filled.splice(0, cols) })) },
-        title: '详情 ' + String.fromCharCode(65 + i), note: '九宫格' + (rowPlan.length ? ' + ' + rowPlan.length + ' 行' : '') + ' · 纯画面', canvas: null });
+        isDetail: true, isDetailLong: true, heroShowText: true, heroTitle: '', detailLayout: { gridFrames, rows: rowPlan.map(cols => ({ cols, frames: filled.splice(0, cols) })) },
+        title: '详情 ' + String.fromCharCode(65 + i), note: '九宫格' + (rowPlan.length ? ' + ' + rowPlan.length + ' 行' : '') + ' · 可手动添加标题', canvas: null });
     }
     return [...covers, ...details];
   }
-  async function renderAsset(asset, frames, signal, native, badgeImage) {
-    check(signal);
+  // Rendering and pointer hit areas share these exact rounded pixel rectangles.
+  function assetGeometry(asset, frames) {
     const isLong = asset.isDetailLong;
     const rows = isLong ? [0, 1, 2].map(i => ({ cols: 3, frames: asset.detailLayout.gridFrames.slice(i * 3, i * 3 + 3) })).concat(asset.detailLayout.rows) :
       Array.from({ length: asset.rows }, (_, i) => ({ cols: asset.cols, frames: asset.cells.slice(i * asset.cols, (i + 1) * asset.cols) }));
@@ -272,27 +272,65 @@
     if (!isLong) width *= Math.min(1, 3840 / Math.max(width, 540 * asset.rows));
     width = Math.round(width);
     const heights = rows.map(row => Math.round(width / row.cols / ar));
-    // Tall vertical videos must remain within a safe canvas and memory budget.
     const total = heights.reduce((a, b) => a + b, 0), ratio = Math.min(1, 14000 / total, Math.sqrt(22000000 / (width * total)));
-    const out = canvas(width * ratio, total * ratio), cx = out.getContext('2d');
-    cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high'; cx.fillStyle = frames[0]?.sourceName ? '#fff' : '#161a23'; cx.fillRect(0, 0, out.width, out.height);
-    let y = 0, index = 0;
-    for (let r = 0; r < rows.length; r++) {
-      const row = rows[r], nextY = r === rows.length - 1 ? out.height : Math.round((heights.slice(0, r + 1).reduce((a, b) => a + b, 0)) * ratio);
+    const w = Math.max(1, Math.round(width * ratio)), h = Math.max(1, Math.round(total * ratio));
+    const slots = [];
+    let y = 0, index = 0, accumulated = 0;
+    rows.forEach((row, r) => {
+      accumulated += heights[r];
+      const nextY = r === rows.length - 1 ? h : Math.round(accumulated * ratio);
       for (let c = 0; c < row.cols; c++, index++) {
-        check(signal);
-        const frame = frames[row.frames[c]];
-        if (!frame) continue;
-        const image = await loadFrame(frame, signal, native);
-        const x = Math.round(out.width * c / row.cols), w = Math.round(out.width * (c + 1) / row.cols) - x, h = nextY - y;
-        const crop = !isLong && asset.crops?.[index], zoom = crop?.scale || 1;
-        const scale = Math.max(w / image.width, h / image.height) * zoom, sw = image.width * scale, sh = image.height * scale;
-        const dx = x + (w - sw) / 2 + (crop?.ox || 0) * .5 * sw, dy = y + (h - sh) / 2 + (crop?.oy || 0) * .5 * sh;
-        cx.save(); cx.beginPath(); cx.rect(x, y, w, h); cx.clip(); cx.drawImage(image, dx, dy, sw, sh); cx.restore();
+        const x = Math.round(w * c / row.cols);
+        slots.push({ key: !isLong ? 'cell:' + index : r < 3 ? 'grid:' + index : 'row:' + (r - 3) + ':' + c,
+          fi: row.frames[c], index, x, y, w: Math.round(w * (c + 1) / row.cols) - x, h: nextY - y });
       }
       y = nextY;
+    });
+    return { width: w, height: h, slots };
+  }
+  function drawManualTitle(cx, asset, width, height) {
+    const title = String(asset.heroTitle || '').trim();
+    if (!title || asset.heroShowText === false) return;
+    const padding = width * .045, maxWidth = width - padding * 2;
+    let fontSize = width * .047, lines;
+    do {
+      cx.font = '700 ' + fontSize + 'px "Microsoft YaHei", "PingFang SC", sans-serif';
+      lines = [''];
+      for (const char of Array.from(title)) {
+        const last = lines.length - 1;
+        if (cx.measureText(lines[last] + char).width > maxWidth && lines[last]) lines.push(char);
+        else lines[last] += char;
+      }
+      if (lines.length <= 2) break;
+      fontSize *= .9;
+    } while (fontSize > width * .012);
+    const bandHeight = Math.min(height, fontSize * 1.4 * lines.length + width * .045);
+    const gradient = cx.createLinearGradient(0, 0, width, bandHeight);
+    gradient.addColorStop(0, '#a91e36'); gradient.addColorStop(1, '#ee6252');
+    cx.fillStyle = gradient; cx.fillRect(0, 0, width, bandHeight);
+    cx.fillStyle = '#fff'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    lines.forEach((line, i) => cx.fillText(line, width / 2, bandHeight / 2 + (i - (lines.length - 1) / 2) * fontSize * 1.4, maxWidth));
+  }
+  async function renderAsset(asset, frames, signal, native, badgeImage) {
+    check(signal);
+    const geometry = assetGeometry(asset, frames);
+    const out = canvas(geometry.width, geometry.height), cx = out.getContext('2d');
+    cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high'; cx.fillStyle = frames[0]?.sourceName ? '#fff' : '#161a23'; cx.fillRect(0, 0, out.width, out.height);
+    for (const slot of geometry.slots) {
+      check(signal);
+      const frame = frames[slot.fi]; if (!frame) continue;
+      const image = await loadFrame(frame, signal, native);
+      const { x, y, w, h } = slot;
+      const crop = asset.crops?.[asset.isDetailLong ? slot.key : slot.index], zoom = crop?.scale || 1;
+      const scale = Math.max(w / image.width, h / image.height) * zoom, sw = image.width * scale, sh = image.height * scale;
+      const dx = x + (w - sw) / 2 + (crop?.ox || 0) * .5 * sw, dy = y + (h - sh) / 2 + (crop?.oy || 0) * .5 * sh;
+      cx.save(); cx.beginPath(); cx.rect(x, y, w, h); cx.clip(); cx.drawImage(image, dx, dy, sw, sh); cx.restore();
     }
-    if (asset.hasBadge && badgeImage) cx.drawImage(badgeImage, 0, 0, badgeImage.naturalWidth, badgeImage.naturalHeight);
+    if (asset.isDetailLong) drawManualTitle(cx, asset, out.width, out.height);
+    if (asset.hasBadge && badgeImage) {
+      const width = Math.min(badgeImage.naturalWidth, out.width * .22);
+      cx.drawImage(badgeImage, 0, 0, width, width * badgeImage.naturalHeight / badgeImage.naturalWidth);
+    }
     return out;
   }
   function create({ native, scoreBatch, badge }) {
@@ -367,5 +405,5 @@
       }
     };
   }
-  root.FrameStudio = { create, renderAsset, loadFrame, diverse, makeAssets, sceneRepresentatives, imageRepresentatives, similarFrames };
+  root.FrameStudio = { create, renderAsset, assetGeometry, loadFrame, diverse, makeAssets, sceneRepresentatives, imageRepresentatives, similarFrames };
 })(globalThis);

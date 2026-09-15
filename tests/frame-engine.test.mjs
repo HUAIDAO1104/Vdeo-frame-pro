@@ -59,7 +59,7 @@ test('short videos have compact image-only layouts with valid fallback frames',(
     for(const b of assets){
       const indices=b.isDetailLong?b.detailLayout.gridFrames:b.cells;
       assert.ok(indices.every(i=>Number.isInteger(i)&&i>=0&&i<n));
-      if(b.isDetailLong){assert.equal(b.detailLayout.rows.length,0);assert.equal(b.heroShowText,false);}
+      if(b.isDetailLong){assert.equal(b.detailLayout.rows.length,0);assert.equal(b.heroShowText,true);}
       assert.equal(b.hasBadge,false);assert.ok(!b.heroTitle);
     }
   }
@@ -106,4 +106,18 @@ test('folder pictures merge nonadjacent duplicates but retain distinct proportio
   assert.equal(images[0].memberIds,undefined);
   const many=Array.from({length:70},(_,i)=>({...candidate(i,0),aspect:1+i*.1}));
   assert.equal(FrameStudio.imageRepresentatives(many).length,70);
+});
+
+
+test('detail render geometry covers every pixel and slot for mixed dimensions and tall layouts',()=>{
+  for(const size of [[1920,1080],[1080,1920],[100,4000]]){
+    const source=frames(25).map((f,i)=>({...f,w:i?900:size[0],h:i?600:size[1]}));
+    const detail=makeAssets(source.map(f=>f.idx),source,{variants:1,badge:false},0).find(b=>b.isDetailLong);
+    const g=FrameStudio.assetGeometry(detail,source);
+    assert.equal(g.slots.length,15);assert.equal(new Set(g.slots.map(s=>s.key)).size,15);
+    assert.equal(g.slots.reduce((n,s)=>n+s.w*s.h,0),g.width*g.height);
+    for(const s of g.slots){assert.ok(s.x>=0&&s.y>=0&&s.x+s.w<=g.width&&s.y+s.h<=g.height);}
+    assert.equal(g.slots[9].key,'row:0:0');assert.equal(g.slots.at(-1).key,'row:2:1');
+    assert.ok(g.height<=14000);
+  }
 });

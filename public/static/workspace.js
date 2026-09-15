@@ -301,7 +301,7 @@ function renderImageSource(p) {
   const images = p?.sourceKind === 'images';
   const preview = document.getElementById('imageFolderPreview'); preview.hidden = !images;
   document.getElementById('videoCaptureSettings').hidden = images;
-  document.getElementById('coverBadge').disabled = images;
+  document.getElementById('coverBadge').disabled = false;
   if (!images) return;
   document.getElementById('imageFolderName').textContent = p.name;
   document.getElementById('imageFolderSummary').textContent = p.imageSources.length + ' 张图片 · 包含子文件夹 · 不使用视频截帧设置';
@@ -316,7 +316,7 @@ function taskConfig(project, extra = {}) {
   return {
     apiKey: value('selectionMode') === 'ai' ? value('aiApiKey')?.trim() : '', mode: value('selectionMode'),
     model: value('aiModel'), hint: value('aiPromptHint') || '', variants: Number(value('variantCount')) || 3,
-    badge: project.sourceKind !== 'images' && !!document.getElementById('coverBadge')?.checked && getResolutionInfo(project.sourceMeta || project.nativeMeta || {}).is4K,
+    badge: !!document.getElementById('coverBadge')?.checked,
     captureMode: S.captureMode, interval: Math.max(.1, Number(value('itvl')) || 1), start: Math.max(0, Number(value('stt')) || 0),
     end: value('edt') ? Number(value('edt')) : null, maxFrames: Math.max(1, Math.min(600, Number(value('mxf')) || 120)),
     sceneThreshold: Math.max(.03, .18 - (Number(value('sceneSens')) - 10) / 50 * .15),
@@ -335,6 +335,7 @@ async function startImageTasks(projects, extra = {}) {
     }
     projects = projects.filter(p => PROJECTS.list.includes(p) && !p.deleted);
     projects.forEach(p => { p.runConfig = taskConfig(p, extra); p.generationProgress = 0; });
+    if(projects.some(p=>p.runConfig.badge)) await S.badgeReady;
     await taskQueue.start(projects);
     // Credentials are kept in memory only for the running batch, never in history.
     projects.forEach(p => { if (p.runConfig) delete p.runConfig.apiKey; });
@@ -388,7 +389,8 @@ function renderAllBatches() {
   S.batches.forEach(b => {
     if (b.isDetailLong) renderDetailBatchCard(b);
     else { renderBatch(b); b.cells.forEach((_, ci) => renderCell(b, ci)); }
-    if (b.canvas) showAssetPreview(b);
+    if (b.needsRender) generateBatch(b.id, true).catch(console.warn);
+    else if (b.canvas) showAssetPreview(b);
     else if (b.wasGenerated) generateBatch(b.id, true).catch(console.warn);
   });
   updateListingChecklist();
@@ -402,10 +404,14 @@ async function generateBatch(id, silent = false) {
   updateListingChecklist();
   const button = document.getElementById('gen-' + id); if (button) { button.disabled = true; button.textContent = '更新中…'; }
   try {
+    if(b.hasBadge) await S.badgeReady;
     const image = await FrameStudio.renderAsset(b, frames, null, DESKTOP_NATIVE, S.badgeImg);
     if (project?.deleted || b.renderRevision !== revision) return;
-    b.canvas = image; b.wasGenerated = true;
-    if (S.batches.includes(b)) { showAssetPreview(b); updateFinalAssetUI(); }
+    b.canvas = image; b.wasGenerated = true; b.needsRender = false;
+    if (S.batches.includes(b)) {
+      showAssetPreview(b); updateFinalAssetUI();
+      if(pmCurrentBatch===b&&document.getElementById('previewModal').classList.contains('open')) openPreviewModal(b);
+    }
     scheduleWorkspaceSave();
     if (!silent) toast('图片已更新');
   } catch (error) { toast('图片更新失败：' + error.message, 'err'); throw error; }
@@ -416,7 +422,7 @@ async function generateBatch(id, silent = false) {
   }
 }
 async function regenDetailLong(b) { if (b) return generateBatch(b.id, true); }
-async function renderDetailLongCanvas(b) { return FrameStudio.renderAsset(b, S.frames, null, DESKTOP_NATIVE, null); }
+async function renderDetailLongCanvas(b) { return FrameStudio.renderAsset(b, S.frames, null, DESKTOP_NATIVE, S.badgeImg); }
 function renderBatchTitle(b) {
   const el = document.getElementById('batch-' + b.id); if (!el) return;
   el.querySelector('.batch-tag').textContent = b.title || '自定义拼图';
@@ -428,6 +434,7 @@ function listingPayload() {
     assets: S.batches.filter(b => b.canvas).map(b => ({ id: b.id, kind: b.assetKind, width: b.canvas.width, height: b.canvas.height })) };
 }
 async function exportListingPackage() {
+  if(S.batches.some(b=>b.needsRender)) { toast('标题正在更新，请稍后导出'); return; }
   if (S.batches.some(b => b.rendering)) { toast('图片正在更新，请稍后导出'); return; }
   const ready = S.batches.filter(b => b.canvas).map(b => ({ id: b.id, assetKind: b.assetKind, canvas: b.canvas })); if (!ready.length) return;
   const snapshot = listingPayload();
@@ -463,3 +470,39 @@ function serializeProjectDraft(p) {
 }
 
 function frameLabel(frame) { return frame?.sourceName || ((frame?.time || 0).toFixed(1) + 's'); }
+
+const manualTitleTimers = new Map();
+function manualTitleControlsHTML(b) {
+  return '<div class="manual-title-controls"><label class="manual-title-field" for="herotitle-'+b.id+'">手动标题<input id="herotitle-'+b.id+'" maxlength="80" value="'+escapeHtmlSafe(b.heroTitle||'')+'" placeholder="填写这张长图的标题；留空不显示" oninput="setManualTitle('+b.id+',this.value)" onblur="this.dataset.editing=\'\'"></label>'+
+    '<div class="manual-title-options"><label><input type="checkbox" id="hero-visible-'+b.id+'" '+(b.heroShowText!==false?'checked':'')+' onchange="setManualTitleVisible('+b.id+',this.checked)">显示标题</label>'+
+    '<label><input type="checkbox" id="badge-'+b.id+'" '+(b.hasBadge?'checked':'')+' onchange="setBatchBadge('+b.id+',this.checked)">4K 角标</label><small>仅手动填写，自动保存到图片</small></div></div>';
+}
+function syncManualTitleControls(b) {
+  const input=document.getElementById('herotitle-'+b.id); if(input) { input.value=b.heroTitle||''; input.dataset.editing=''; }
+  const visible=document.getElementById('hero-visible-'+b.id); if(visible) visible.checked=b.heroShowText!==false;
+}
+function setManualTitle(id, value) {
+  const b=S.batches.find(x=>x.id===id); if(!b) return;
+  const input=document.getElementById('herotitle-'+id);
+  if(!input?.dataset.editing) { pushHistory(); if(input) input.dataset.editing='1'; }
+  if(!b.heroTitle?.trim()&&String(value).trim()) { b.heroShowText=true; const show=document.getElementById('hero-visible-'+id); if(show) show.checked=true; }
+  b.heroTitle=String(value).slice(0,80);
+  scheduleManualTitleRender(b);
+}
+function setManualTitleVisible(id, value) {
+  const b=S.batches.find(x=>x.id===id); if(!b) return;
+  pushHistory(); b.heroShowText=!!value; scheduleManualTitleRender(b);
+}
+function scheduleManualTitleRender(b) {
+  clearTimeout(manualTitleTimers.get(b));
+  b.needsRender=true; b.renderRevision=(b.renderRevision||0)+1; b.rendering=true;
+  ['dl-','dl2-'].forEach(prefix=>{const el=document.getElementById(prefix+b.id);if(el) el.disabled=true;});
+  updateListingChecklist(); scheduleWorkspaceSave();
+  manualTitleTimers.set(b,setTimeout(async()=>{
+    manualTitleTimers.delete(b);
+    if(S.batches.includes(b)) {
+      try { await generateBatch(b.id,true); if(S.batches.includes(b)) document.getElementById('prev-'+b.id)?.scrollTo({top:0}); }
+      catch(error) { console.warn(error); }
+    } else b.rendering=false;
+  },300));
+}

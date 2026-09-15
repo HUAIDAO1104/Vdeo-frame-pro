@@ -21,8 +21,8 @@ test('inline application scripts parse',()=>{
 });
 
 test('detail thumbnail editor covers the complete scaled long canvas',()=>{
-  assert.match(html,/const overlayHeight=pcanvas\?\.height/);
-  assert.match(html,/height:'\+overlayHeight\+'px/);
+  assert.match(html,/aspect-ratio:'\+pcanvas.width\+'\/'\+pcanvas.height/);
+  assert.match(html,/FrameStudio.assetGeometry\(b,S.frames\)/);
   assert.match(html,/点击画面替换 · 拖到另一格交换/);
 });
 
@@ -79,7 +79,7 @@ test('internal image dragging cannot fall through to desktop file upload',()=>{
   assert.match(html,/if\(INTERNAL_MEDIA_DRAG\.blocksFileImport\(\)\)\{[\s\S]*?return;/);
   assert.match(html,/INTERNAL_MEDIA_DRAG\.begin\('candidate-frame'\)/);
   assert.match(html,/INTERNAL_MEDIA_DRAG\.begin\('asset-cell'\)/);
-  assert.match(html,/INTERNAL_MEDIA_DRAG\.begin\('detail-cell'\)/);
+  assert.match(html,/bindCrossCellDrag\(cell,b.id,detailSlotKey\(s.slot\)\)/);
   assert.ok(workspace.includes("startsWith(cacheRoot + '/')"));
   assert.match(html,/!isExternalFileDrag\(e\.dataTransfer\)/);
 });

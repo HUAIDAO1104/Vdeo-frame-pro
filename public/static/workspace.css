@@ -182,3 +182,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
   #view0 .upload-compact-card.has-projects .upzone { min-height:100px!important; padding:18px!important; gap:8px; }
   .ai-connection-bar .text-action { white-space:nowrap; flex-shrink:0; }
 }
+
+.manual-title-controls { margin:14px 0; padding:14px; background:#f8f6fc; border:1px solid #e7e1f2; border-radius:10px; }
+.manual-title-field { display:flex; flex-direction:column; gap:7px; font-size:12px; font-weight:600; color:var(--ts); }
+.manual-title-field input { width:100%; min-width:0; padding:10px 12px; border:1px solid #d9d2e6; border-radius:7px; background:white; color:var(--tp); font-size:14px; }
+.manual-title-options { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:10px; font-size:12px; color:var(--tm); }
+.manual-title-options label { display:flex; align-items:center; gap:6px; cursor:pointer; }
+.manual-title-options input { accent-color:var(--accent); }
+.manual-title-options small { font-size:11px; }
+[data-xbid][data-xkey] { touch-action:none; user-select:none; }
+#pmCellOverlay .pm-cell-long[data-xbid] { cursor:grab; }
+#pmCellOverlay .pm-cell-long.xdragover { background:#6651cc55; box-shadow:inset 0 0 0 3px #6651cc; }

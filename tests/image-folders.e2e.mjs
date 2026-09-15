@@ -53,10 +53,69 @@ try{
  await page.screenshot({path:join(folder,'01-folder-complete.png'),fullPage:true});
  await page.locator('#taskResultsBtn').click();
  assert.equal(await page.locator('#unifiedDownloadBtn').isEnabled(),true);
+ // Exercise real pointer targets, including the bottom of a scrollable long image.
+ const detailId=await page.evaluate(()=>S.batches.find(b=>b.isDetailLong).id);
+ const detailCard=page.locator('#batch-'+detailId);
+ assert.equal(await detailCard.locator('.dt-slot').count(),15);
+ const lastSlot=detailCard.locator('[data-xkey="row:2:1"]');
+ await lastSlot.scrollIntoViewIfNeeded();await lastSlot.click();
+ assert.equal(await page.locator('#framePicker').isVisible(),true);
+ const priorFrame=await page.evaluate(id=>S.batches.find(b=>b.id===id).detailLayout.rows[2].frames[1],detailId);
+ const replaceWith=priorFrame===0?1:0;
+ await page.locator('#framePicker [data-frame-index="'+replaceWith+'"]').click();
+ await page.waitForFunction(id=>!S.batches.find(b=>b.id===id).rendering,detailId);
+ assert.equal(await page.evaluate(id=>S.batches.find(b=>b.id===id).detailLayout.rows[2].frames[1],detailId),replaceWith);
+ await detailCard.locator('.detail-edit-btn').click();
+ assert.equal(await page.locator('#pmCellOverlay [data-xkey]').count(),15);
+ const beforeSwap=await page.evaluate(id=>S.batches.find(b=>b.id===id).detailLayout.gridFrames.slice(0,2),detailId);
+ const first=page.locator('#pmCellOverlay [data-xkey="grid:0"]'),second=page.locator('#pmCellOverlay [data-xkey="grid:1"]');
+ await first.scrollIntoViewIfNeeded();
+ const from=await first.boundingBox(),to=await second.boundingBox();
+ await page.mouse.move(from.x+from.width*.2,from.y+from.height*.25);await page.mouse.down();
+ await page.mouse.move(to.x+to.width*.2,to.y+to.height*.25,{steps:12});await page.mouse.up();
+ await page.waitForFunction(id=>!S.batches.find(b=>b.id===id).rendering,detailId);
+ assert.deepEqual(await page.evaluate(id=>S.batches.find(b=>b.id===id).detailLayout.gridFrames.slice(0,2),detailId),[beforeSwap[1],beforeSwap[0]]);
+ const dockTarget=page.locator('#pmCellOverlay [data-xkey="grid:2"]');
+ await page.waitForTimeout(750);await dockTarget.click({position:{x:10,y:10}});
+ await page.locator('#pmFrameDockGrid').evaluate(grid=>{grid.scrollTop=0;});
+ await page.locator('#pmFrameDockGrid [data-frame-index="3"]').click();
+ await page.waitForFunction(id=>!S.batches.find(b=>b.id===id).rendering,detailId);
+ assert.equal(await page.evaluate(id=>S.batches.find(b=>b.id===id).detailLayout.gridFrames[2],detailId),3);
+ console.log('PASS long image bottom replacement, pointer swap, full-screen replacement');
+ await page.locator('#pmClose').click();
+ await page.evaluate(id=>{const b=S.batches.find(b=>b.id===id);globalThis.untitledCanvas=b.canvas.toDataURL();b.heroShowText=false;syncManualTitleControls(b);},detailId);
+ await page.locator('#herotitle-'+detailId).fill('城市夜景｜光影交织');
+ await page.waitForFunction(id=>{const b=S.batches.find(b=>b.id===id);return !b.rendering&&!b.needsRender;},detailId);
+ assert.equal(await page.evaluate(id=>S.batches.find(b=>b.id===id).canvas.toDataURL()!==untitledCanvas,detailId),true);
+ await page.evaluate(()=>undo());await page.waitForFunction(()=>S.batches.every(b=>!b.rendering));
+ assert.equal(await page.locator('#herotitle-'+detailId).inputValue(),'');
+ await page.evaluate(()=>redo());await page.waitForFunction(()=>S.batches.every(b=>!b.rendering));
+ assert.equal(await page.locator('#herotitle-'+detailId).inputValue(),'城市夜景｜光影交织');
+ await page.locator('#hero-visible-'+detailId).uncheck();
+ await page.waitForFunction(id=>{const b=S.batches.find(b=>b.id===id);return !b.rendering&&!b.needsRender;},detailId);
+ assert.equal(await page.evaluate(id=>S.batches.find(b=>b.id===id).canvas.toDataURL()===untitledCanvas,detailId),true);
+ await page.locator('#hero-visible-'+detailId).check();
+ await page.waitForFunction(id=>{const b=S.batches.find(b=>b.id===id);return !b.rendering&&!b.needsRender;},detailId);
+ const coverId=await page.evaluate(()=>S.batches.find(b=>b.assetKind==='cover').id);
+ await page.evaluate(id=>{globalThis.noBadgeCanvas=S.batches.find(b=>b.id===id).canvas.toDataURL();},coverId);
+ await page.locator('#batch-'+coverId+' label.tog').click();await page.waitForFunction(id=>!S.batches.find(b=>b.id===id).rendering,coverId);
+ assert.equal(await page.evaluate(id=>S.batches.find(b=>b.id===id).hasBadge&&S.batches.find(b=>b.id===id).canvas.toDataURL()!==noBadgeCanvas,coverId),true);
+ await page.locator('#batch-'+coverId+' label.tog').click();await page.waitForFunction(id=>!S.batches.find(b=>b.id===id).rendering,coverId);
+ assert.equal(await page.evaluate(id=>S.batches.find(b=>b.id===id).canvas.toDataURL()===noBadgeCanvas,coverId),true);
+ await detailCard.scrollIntoViewIfNeeded();await page.screenshot({path:join(folder,'03-long-image-manual-editor.png'),fullPage:true});
+ await page.evaluate(()=>{EXPORT.format='png';});
+
  const downloadPromise=page.waitForEvent('download');await page.locator('#unifiedDownloadBtn').click();
  const zip=await readFile(await (await downloadPromise).path());
  const manifest=await page.evaluate(bytes=>JSON.parse(fflate.strFromU8(fflate.unzipSync(new Uint8Array(bytes))['图片清单.json'])),[...zip]);
  assert.equal(manifest.source.kind,'images');assert.equal(manifest.source.count,72);
+ const exportedTitlePixel=await page.evaluate(async bytes=>{
+   const files=fflate.unzipSync(new Uint8Array(bytes));const name=Object.keys(files).find(n=>n.startsWith('详情')&&n.endsWith('.png'));
+   const bitmap=await createImageBitmap(new Blob([files[name]],{type:'image/png'}));
+   const c=document.createElement('canvas');c.width=bitmap.width;c.height=bitmap.height;const ctx=c.getContext('2d');ctx.drawImage(bitmap,0,0);bitmap.close();
+   return [...ctx.getImageData(0,0,1,1).data];
+ },[...zip]);
+ assert.ok(exportedTitlePixel[0]>150&&exportedTitlePixel[1]<60&&exportedTitlePixel[2]<90,'export includes the manual title band');
  const scored=await page.evaluate(async()=>{
    const ids=[];
    const engine=FrameStudio.create({native:{enabled:false},badge:()=>null,scoreBatch:async frames=>{ids.push(...frames.map(f=>f.frameIdx));return frames.map(f=>({frameIdx:f.frameIdx,overall:.8}));}});
@@ -75,6 +134,9 @@ try{
  await page.evaluate(id=>restoreHistoryRecord(id),history);
  await page.waitForFunction(()=>PROJECTS.list.length===1&&S.frames.length===71);
  assert.equal(await page.evaluate(()=>PROJECTS.list[0].imageSources[0].blob instanceof Blob),true);
+ await page.waitForFunction(()=>S.batches.every(b=>b.canvas&&!b.rendering));
+ assert.equal(await page.evaluate(id=>S.batches.find(b=>b.id===id).heroTitle,detailId),'城市夜景｜光影交织');
+ assert.equal(await page.evaluate(id=>S.batches.find(b=>b.id===id).heroShowText,detailId),true);
  await page.evaluate(()=>switchTab(0));
  await page.setViewportSize({width:390,height:844});
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
@@ -85,6 +147,7 @@ try{
  await page.locator('#vInput').setInputFiles(videoPath);
  await page.evaluate(()=>{switchProject(PROJECTS.list.at(-1).id);document.getElementById('stt').value='0';document.getElementById('mxf').value='3';});
  assert.equal(await page.locator('#vCon').isVisible(),true);
+ await page.locator('#coverBadge').check();
  assert.equal(await page.locator('#videoCaptureSettings').isHidden(),false);
  await page.locator('#salesKitBtn').click();
  await page.evaluate(()=>switchProject(PROJECTS.list[0].id));
@@ -92,6 +155,8 @@ try{
  assert.equal(await page.evaluate(()=>PROJECTS.list.every(p=>p.generationStatus==='complete')),true);
  assert.equal(await page.locator('#vCon').isVisible(),false);
  assert.equal(await page.evaluate(()=>getSourceMeta().kind),'images');
+ assert.equal(await page.locator('#coverBadge').isEnabled(),true);
+ assert.equal(await page.evaluate(()=>PROJECTS.list.at(-1).batches.filter(b=>b.assetKind==='cover').every(b=>b.hasBadge)),true);
  // Native command integration with real image bytes: no FFmpeg/video path involved.
  await page.evaluate(async bytes=>{
   const original=DESKTOP_NATIVE.invoke;globalThis.savedNativeInvoke=original;
@@ -111,6 +176,7 @@ try{
  assert.equal(await page.evaluate(()=>PROJECTS.list.at(-1).localFrameCache),true);
  await page.evaluate(()=>{DESKTOP_NATIVE.enabled=false;DESKTOP_NATIVE.invoke=savedNativeInvoke;});
  assert.deepEqual(errors,[]);
+ console.log('PASS manual title pixels in exported PNG, legacy visibility, undo/redo, history restore, unrestricted image/video badges');
  console.log('PASS image folders: nested import, duplicate guard, 71 candidates despite maxFrames=1, 70 representatives, pause/stop/restart, corrupt-image warning, ZIP, Blob history, mobile, native IPC');
  console.log('Screenshots:',folder);
-}finally{await browser.close();await new Promise(r=>server.close(r));}
+}catch(error){await page.screenshot({path:join(folder,'failure.png'),fullPage:true});console.log('Failure screenshot:',folder);throw error;}finally{await browser.close();await new Promise(r=>server.close(r));}

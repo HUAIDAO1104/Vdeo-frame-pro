@@ -172,7 +172,7 @@
         <div class="card sales-kit-card"><div class="sales-kit-head"><div><div class="sales-eyebrow">OUTPUT</div><div class="sales-title">生成什么样的图片</div><div class="sales-sub">封面与详情图一起生成，之后仍可逐格调整。</div></div></div>
  <div class="sales-form"><div class="output-summary"><div><span class="output-grid-icon">▦</span><strong>四宫格封面</strong><small>突出主题，一眼看到重点</small></div><div><span class="output-grid-icon">▤</span><strong>详情展示图</strong><small>九宫格与长图，展示更多画面</small></div></div>
  <div class="studio-settings-row"><label class="sales-field"><span>候选版本</span><select id="variantCount"><option value="1">1 组 · 快速生成</option><option value="3" selected="">3 组 · 对比挑选</option></select></label><label class="sales-field"><span>选图方式</span><select id="selectionMode"><option value="local" selected="">本地选图</option><option value="ai">AI 选图</option></select></label></div>
- <label class="studio-checkbox"><input type="checkbox" id="coverBadge"><span>封面添加 4K 角标 <small>仅用于 4K 源视频</small></span></label>
+ <label class="studio-checkbox"><input type="checkbox" id="coverBadge"><span>封面添加 4K 角标 <small>自由开关，视频和图片均可使用</small></span></label>
  <div class="ai-connection-bar" id="aiConnectionBar"><div class="ai-connection-state"><span class="ai-connection-dot"></span><div><strong id="aiConnectionTitle">本地选图</strong><small id="aiConnectionMeta">无需配置即可开始</small></div></div><button class="text-action" onclick="openSettingsDrawer()">设置</button></div>
  <div class="sales-actions"><button class="btn-p sales-primary" id="salesKitBtn" disabled=""><span id="salesKitBtnLabel">开始生成</span><span aria-hidden="true">↗</span></button><button class="batch-current-btn" id="salesCurrentBtn" hidden="">仅生成当前任务</button></div>
  <div class="project-failure-banner" id="currentProjectFailure" style="display:none" role="alert"><div><strong id="currentProjectFailureTitle"></strong><span id="currentProjectFailureReason"></span><small id="currentProjectFailureMeta"></small></div><button onclick="retryCurrentFailedProject()">重试</button></div></div></div>
@@ -2653,6 +2653,7 @@ function snapshotCells(){
       cells:(b.cells||[]).slice(),
       crops:JSON.parse(JSON.stringify(b.crops||{})),
       detailLayout:b.detailLayout?JSON.parse(JSON.stringify(b.detailLayout)):null,
+      heroTitle:b.heroTitle||'', heroShowText:b.heroShowText, hasBadge:b.hasBadge,
     })),
     finalCoverId:S.finalCoverId,
     finalDetailId:S.finalDetailId
@@ -2677,6 +2678,9 @@ function applySnapshot(snap){
       b.cells = s.cells.slice();
       b.crops = s.crops ? JSON.parse(JSON.stringify(s.crops)) : {};
       if(s.detailLayout) b.detailLayout=JSON.parse(JSON.stringify(s.detailLayout));
+      for(const key of ['heroTitle','heroShowText','hasBadge']) if(key in s) b[key]=s[key];
+      syncManualTitleControls(b);
+      const badge=document.getElementById('badge-'+b.id); if(badge) badge.checked=!!b.hasBadge;
       if(b.isDetailLong){ regenDetailLong(b).catch(console.warn); }
       else { b.cells.forEach((_,i)=>renderCell(b,i)); generateBatch(b.id,true).catch(console.warn); }
     }
@@ -3791,7 +3795,7 @@ function addBatch(cols,rows,silent=false,assetKind='custom'){
 function setBatchBadge(id, checked){
   const b=S.batches.find(x=>x.id===id);
   if(!b) return;
-  if(checked&&!getResolutionInfo().is4K){ document.getElementById('badge-'+id).checked=false; toast('当前源视频不是 4K，未添加角标','warn'); return; }
+  pushHistory();
   b.hasBadge=!!checked; b.badgeTouched=true;
   generateBatch(id,true).catch(console.warn);
 }
@@ -3844,7 +3848,7 @@ function batchHTML(b){
     '  <div class="side-section" style="display:'+(b.assetKind==='cover'?'flex':'none')+';">'+
     '    <span style="font-size:12px;color:var(--tp);white-space:nowrap;">4K角标</span>'+
     '    <label class="tog" style="margin:0;">'+
-    '      <input type="checkbox" id="badge-'+b.id+'" onchange="setBatchBadge('+b.id+',this.checked)" '+(b.hasBadge?'checked':'')+' title="仅适用于 4K 源视频" />'+
+    '      <input type="checkbox" id="badge-'+b.id+'" onchange="setBatchBadge('+b.id+',this.checked)" '+(b.hasBadge?'checked':'')+' title="自由开启或关闭角标" />'+
     '      <div class="tog-track"></div>'+
     '      <div class="tog-thumb"></div>'+
     '    </label>'+
@@ -3949,6 +3953,7 @@ function setSlotFrameByKey(b, key, fi){
   if(s.kind==='cell'){ b.cells[s.ci]=fi; if(fi===null&&b.crops) delete b.crops[s.ci]; }
   else if(s.kind==='grid'){ b.detailLayout.gridFrames[s.idx]=fi; }
   else if(s.kind==='row'){ b.detailLayout.rows[s.ri].frames[s.c]=fi; }
+  if(b.crops) delete b.crops[s.kind==='cell'?s.ci:key];
 }
 // 重绘某批次（封面 → 重生成画布；长图 → regenDetailLong）
 async function refreshBatchAfterSwap(b){
@@ -4894,7 +4899,7 @@ async function restoreHistoryRecord(historyId){
       imgCache:new Map(),
       generationStatus:['running','paused','queued'].includes(p.generationStatus)?'stopped':p.generationStatus,
       salesPlan:null,
-      batches:(p.batches||[]).map(b=>({...b,heroShowText:false,canvas:null}))
+      batches:(p.batches||[]).map(b=>({...b,canvas:null}))
     }));
     PROJECTS.idCnt=payload.idCnt||Math.max(...PROJECTS.list.map(p=>p.id));
     PROJECTS.activeId=PROJECTS.list.some(p=>p.id===payload.activeId)?payload.activeId:PROJECTS.list[0].id;
@@ -5090,6 +5095,7 @@ function renderDetailBatchCard(b){
     '    <button class="btn-del" onclick="removeBatch('+b.id+')">删除</button>'+
     '  </div>'+
     '</div>'+
+    manualTitleControlsHTML(b)+
     '<div class="detail-edit-hint"><strong>直接编辑长图</strong><span>点击画面替换 · 拖到另一格交换 · 可跨封面和详情版本</span></div>'+
     '<div class="prev-thumb" id="prev-'+b.id+'" title="点击任一画面可替换，拖拽到另一画面可交换"><canvas id="pcanvas-'+b.id+'"></canvas></div>';
   document.getElementById('batchList').appendChild(el);
@@ -5107,8 +5113,7 @@ function buildDetailThumbDragOverlay(b, prevWrap){
   ov=document.createElement('div');
   ov.className='detail-thumb-overlay';
   const pcanvas=prevWrap.querySelector('canvas');
-  const overlayHeight=pcanvas?.height||prevWrap.scrollHeight||prevWrap.clientHeight;
-  ov.style.cssText='position:absolute;left:0;top:0;width:100%;height:'+overlayHeight+'px;z-index:3;';
+  ov.style.cssText='position:absolute;left:0;top:0;width:100%;aspect-ratio:'+pcanvas.width+'/'+pcanvas.height+';z-index:3;';
   const slots=computeDetailLongSlots(b);
   slots.forEach(s=>{
     const cell=document.createElement('div');
@@ -5191,6 +5196,7 @@ function openPreviewModal(b){
 function buildPreviewCellOverlay(b){
   const ov=document.getElementById('pmCellOverlay');
   if(!ov) return;
+  ov.style.display='grid';
   ov.style.gridTemplateColumns='repeat('+b.cols+',1fr)';
   ov.style.gridTemplateRows='repeat('+b.rows+',1fr)';
   ov.innerHTML='';
@@ -5225,41 +5231,9 @@ function buildPreviewCellOverlay(b){
 // 返回 [{slot, x,y,w,h, fi}]，slot 为 {kind:'grid',idx} 或 {kind:'row',ri,c}
 function computeDetailLongSlots(b){
   if(!b.detailLayout) return [];
-  let layout;
-  try{ layout=repairDetailLongLayout(b.detailLayout); b.detailLayout=layout; }
-  catch(_){ return []; }
-  const W=1620;
-  const arOf=(fi)=>{ const f=S.frames[fi]; return (f&&f.w&&f.h)? f.w/f.h : 16/9; };
-  const cellW3=W/3;
-  const gridARs=layout.gridFrames.map(arOf).sort((a,b)=>a-b);
-  const gridAR=gridARs.length? gridARs[Math.floor(gridARs.length/2)] : 16/9;
-  const gridCellH=Math.round(cellW3/gridAR);
-  const gridH=gridCellH*3;
-  const rowHeights=layout.rows.map(r=>{
-    const cw=W/r.cols;
-    const ars=r.frames.map(arOf).sort((a,b)=>a-b);
-    const ar=ars.length? ars[Math.floor(ars.length/2)] : 16/9;
-    return Math.round(cw/ar);
-  });
-  const totalH=gridH + rowHeights.reduce((a,b)=>a+b,0);
-  const slots=[];
-  // 九宫格
-  for(let r=0;r<3;r++) for(let c=0;c<3;c++){
-    const i=r*3+c;
-    const x0=Math.round(W*c/3), y0=r*gridCellH, x1=Math.round(W*(c+1)/3), y1=(r+1)*gridCellH;
-    slots.push({ slot:{kind:'grid',idx:i}, x:x0/W, y:y0/totalH, w:(x1-x0)/W, h:(y1-y0)/totalH, fi:layout.gridFrames[i] });
-  }
-  // 下方各行
-  let curY=gridH;
-  for(let ri=0;ri<layout.rows.length;ri++){
-    const row=layout.rows[ri]; const rh=rowHeights[ri];
-    for(let c=0;c<row.cols;c++){
-      const x0=Math.round(W*c/row.cols), x1=Math.round(W*(c+1)/row.cols);
-      slots.push({ slot:{kind:'row',ri,c}, x:x0/W, y:curY/totalH, w:(x1-x0)/W, h:rh/totalH, fi:row.frames[c] });
-    }
-    curY+=rh;
-  }
-  return slots;
+  const geometry=FrameStudio.assetGeometry(b,S.frames);
+  return geometry.slots.map(s=>({slot:parseSlotKey(b,s.key),fi:s.fi,
+    x:s.x/geometry.width,y:s.y/geometry.height,w:s.w/geometry.width,h:s.h/geometry.height}));
 }
 // 取/设某 slot 的帧索引
 function getDetailSlotFrame(b, slot){
@@ -5269,6 +5243,7 @@ function getDetailSlotFrame(b, slot){
 function setDetailSlotFrame(b, slot, fi){
   if(slot.kind==='grid') b.detailLayout.gridFrames[slot.idx]=fi;
   else b.detailLayout.rows[slot.ri].frames[slot.c]=fi;
+  if(b.crops) delete b.crops[detailSlotKey(slot)];
 }
 function detailSlotKey(slot){
   return slot?.kind==='grid'?'grid:'+slot.idx:'row:'+slot?.ri+':'+slot?.c;
@@ -5283,7 +5258,6 @@ function highlightDetailTarget(slot){
   document.querySelectorAll('#pmCellOverlay .pm-cell-long').forEach(el=>el.classList.toggle('is-target',el.dataset.slotKey===key));
 }
 // 构建详情长图预览的可编辑热区（点击替换 + 拖拽交换）
-let _detailDragSlot=null; // 拖拽源 slot
 function buildDetailLongOverlay(b){
   const ov=document.getElementById('pmCellOverlay'); if(!ov) return;
   ov.style.display='block'; ov.style.gridTemplateColumns=''; ov.style.gridTemplateRows='';
@@ -5292,7 +5266,7 @@ function buildDetailLongOverlay(b){
   slots.forEach(s=>{
     const cell=document.createElement('div');
     cell.className='pm-cell pm-cell-long';
-    cell.draggable=true;
+    cell.draggable=false;
     cell.tabIndex=0;
     cell.setAttribute('role','button');
     cell.setAttribute('aria-label','替换或拖拽交换详情画面');
@@ -5305,7 +5279,8 @@ function buildDetailLongOverlay(b){
       '</div>'+
       '<div class="pm-drag-hint">拖拽可交换</div>';
     // 点击替换
-    cell.onclick=(e)=>{
+    cell.onclick=async(e)=>{
+      if(await handleSwapTap(b.id,detailSlotKey(s.slot),cell)) return;
       if(e.target.closest('[data-act="replace"]') || !e.target.closest('button')){
         openDetailSlotPicker(b, s.slot);
       }
@@ -5313,41 +5288,7 @@ function buildDetailLongOverlay(b){
     cell.addEventListener('keydown',e=>{
       if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openDetailSlotPicker(b,s.slot); }
     });
-    // 拖拽交换
-    cell.addEventListener('dragstart', (e)=>{
-      e.stopPropagation();
-      INTERNAL_MEDIA_DRAG.begin('detail-cell');
-      _detailDragSlot=s.slot;
-      cell.classList.add('pm-dragging');
-      if(e.dataTransfer){
-        e.dataTransfer.effectAllowed='move';
-        try{ e.dataTransfer.setData('text/plain','detail|'+detailSlotKey(s.slot)); }catch(_){}
-      }
-    });
-    cell.addEventListener('dragend', ()=>{
-      _detailDragSlot=null;
-      INTERNAL_MEDIA_DRAG.end();
-      cell.classList.remove('pm-dragging');
-      document.querySelectorAll('.pm-dragover').forEach(el=>el.classList.remove('pm-dragover'));
-    });
-    cell.addEventListener('dragover', (e)=>{
-      if(!_detailDragSlot) return;
-      e.preventDefault();
-      e.stopPropagation();
-      if(e.dataTransfer)e.dataTransfer.dropEffect='move';
-      cell.classList.add('pm-dragover');
-    });
-    cell.addEventListener('dragleave', ()=>{ cell.classList.remove('pm-dragover'); });
-    cell.addEventListener('drop', async (e)=>{
-      if(!_detailDragSlot) return;
-      e.preventDefault(); e.stopPropagation(); cell.classList.remove('pm-dragover');
-      const a=_detailDragSlot, bb=s.slot; _detailDragSlot=null;
-      const fa=getDetailSlotFrame(b,a), fb=getDetailSlotFrame(b,bb);
-      setDetailSlotFrame(b,a,fb); setDetailSlotFrame(b,bb,fa);
-      await regenDetailLong(b);
-      openPreviewModal(b); // 重开以刷新热区与预览
-      toast('已交换两格画面');
-    });
+    bindCrossCellDrag(cell,b.id,detailSlotKey(s.slot));
     ov.appendChild(cell);
   });
 }
@@ -5540,33 +5481,15 @@ function showDetailFramePicker(b, slot, cur){
   mountVirtualFrameGrid(grid,cur,detailSlotPickDone);
   picker.querySelector('.frame-picker-close')?.focus();
 }
-let _detailRegenTimer=null;
-let _detailRegenSeq=0;
-function detailSlotPickDone(fi){
+async function detailSlotPickDone(fi){
   closeFramePicker();
   if(!_detailPickTarget) return;
   const { b, slot }=_detailPickTarget;
   pushHistory();
   setDetailSlotFrame(b, slot, fi);
   syncDetailDockSelection(fi);
-  const target=document.getElementById('pmFrameDockTarget');
-  if(target){ target.classList.add('is-busy'); target.textContent='已替换为第 '+(fi+1)+' 帧，正在刷新详情长图…'; }
-  scheduleWorkspaceSave();
-  toast('已替换为第 '+(fi+1)+' 帧，正在刷新');
-  if(_detailRegenTimer) clearTimeout(_detailRegenTimer);
-  const seq=++_detailRegenSeq;
-  _detailRegenTimer=setTimeout(async()=>{
-    _detailRegenTimer=null;
-    try{
-      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-      await regenDetailLong(b);
-      if(seq!==_detailRegenSeq) return;
-      if(document.getElementById('previewModal')?.classList.contains('open')&&pmCurrentBatch===b) openPreviewModal(b);
-      if(target){ target.classList.remove('is-busy'); target.textContent='正在替换：'+detailSlotLabel(slot)+' · 点击下方画面立即替换'; }
-    }catch(error){
-      if(target){ target.classList.remove('is-busy'); target.textContent='刷新失败：'+(error?.message||'未知错误'); }
-    }
-  },120);
+  try { await regenDetailLong(b); refreshUsageTags(); }
+  catch(error) { console.warn(error); }
 }
 // 预览中替换某格的帧选择器（复用 framePicker，但回调后自动重新生成）
 function openPreviewCellPicker(b, ci){
