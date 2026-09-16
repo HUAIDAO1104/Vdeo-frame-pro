@@ -374,6 +374,7 @@ function updateListingChecklist() {
 }
 function showAssetPreview(b) {
   if (!S.batches.includes(b) || !b.canvas) return;
+  const badgeOverlay=document.getElementById('cover-overlay-'+b.id); if(badgeOverlay) badgeOverlay.hidden=!b.hasBadge;
   const wrap = document.getElementById('prev-' + b.id), target = document.getElementById('pcanvas-' + b.id);
   if (!wrap || !target) return;
   wrap.style.display = 'block';

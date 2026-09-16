@@ -267,9 +267,11 @@
     const isLong = asset.isDetailLong;
     const rows = isLong ? [0, 1, 2].map(i => ({ cols: 3, frames: asset.detailLayout.gridFrames.slice(i * 3, i * 3 + 3) })).concat(asset.detailLayout.rows) :
       Array.from({ length: asset.rows }, (_, i) => ({ cols: asset.cols, frames: asset.cells.slice(i * asset.cols, (i + 1) * asset.cols) }));
-    const first = frames.find(f => f?.w && f?.h), ar = first ? first.w / first.h : 16 / 9;
-    let width = isLong ? 1620 : Math.round(540 * ar * asset.cols);
-    if (!isLong) width *= Math.min(1, 3840 / Math.max(width, 540 * asset.rows));
+    const single = asset.assetKind === 'cover' && asset.cols === 1 && asset.rows === 1;
+    const first = (single && frames[asset.cells[0]]) || frames.find(f => f?.w && f?.h), ar = first ? first.w / first.h : 16 / 9;
+    let width = single && first ? first.w : isLong ? 1620 : Math.round(540 * ar * asset.cols);
+    if (single && first) width *= Math.min(1, 3840 / Math.max(first.w, first.h));
+    else if (!isLong) width *= Math.min(1, 3840 / Math.max(width, 540 * asset.rows));
     width = Math.round(width);
     const heights = rows.map(row => Math.round(width / row.cols / ar));
     const total = heights.reduce((a, b) => a + b, 0), ratio = Math.min(1, 14000 / total, Math.sqrt(22000000 / (width * total)));
@@ -334,7 +336,8 @@
       // This PNG is a full-width transparent overlay, with the ribbon at its
       // top right. Scale the overlay by output width, not by ribbon width;
       // preserve its aspect ratio so tall detail images never stretch it.
-      cx.drawImage(badgeImage, 0, 0, out.width, out.width * badgeImage.naturalHeight / badgeImage.naturalWidth);
+      const width = Math.min(out.width, out.height * badgeImage.naturalWidth / badgeImage.naturalHeight);
+      cx.drawImage(badgeImage, out.width - width, 0, width, width * badgeImage.naturalHeight / badgeImage.naturalWidth);
     }
     return out;
   }

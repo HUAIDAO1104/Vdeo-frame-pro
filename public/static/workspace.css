@@ -151,6 +151,16 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .view-sub,#view0 .view-sub,#view0 .sales-sub,.sales-field>span,.output-summary small,.ai-connection-state small,.studio-checkbox,.studio-checkbox small,.format-note,.task-control-copy p,.task-control-heading>span:last-child,.project-queue-head .proj-hint,#tabPane0.active.has-projects .project-queue-head .proj-hint,.proj-tab-meta,.proj-state,.section-heading p,.unified-head p,.result-project-copy small,.vi-l { color:#776b83; }
 .ai-connection-state small,.output-summary small,.task-control-copy p { font-size:11px; }
 .batch-side { gap:8px; flex-wrap:wrap; border-top:0; padding-top:9px; }.batch-side>.side-section:first-child,.batch-side>.btn-dl,.batch-side>.btn-gen { display:none; }.batch-side .side-section { font-size:11px; }
+.cover-layout-controls { display:flex; align-items:center; gap:5px; margin-top:10px; font-size:11px; color:#796388; }
+.cover-layout-controls>span { margin-right:auto; }
+.cover-layout-controls button { padding:5px 12px; border:1px solid #e4d7f1; border-radius:6px; background:#fff; color:#796388; cursor:pointer; }
+.cover-layout-controls button[aria-pressed="true"] { background:#eee6fa; border-color:#b9a1df; color:#69438d; }
+.cover-layout-controls button:focus-visible { outline:2px solid #a089c5; outline-offset:2px; }
+.asset-cover .collage-grid { position:relative; }
+.cover-badge-overlay { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; object-position:top right; pointer-events:none; z-index:1; }
+.cover-badge-overlay[hidden] { display:none; }
+.crop-box { max-height:calc(100dvh - 40px); overflow:auto; }
+.crop-stage { width:min(100%,calc(max(120px,100dvh - 300px) * var(--crop-aspect,1.7778))); margin-inline:auto; }
 .batch .prev-thumb { cursor:pointer; border-radius:7px; margin-top:10px; }.batch.asset-cover .prev-thumb { display:none!important; }.collage-grid { margin-top:10px; border:0; border-radius:7px; overflow:hidden; }
 .detail-edit-hint { display:none; }.asset-detail .prev-thumb.detail-thumb-on { max-height:360px; }.detail-edit-btn { color:#87649f!important; border-color:#e1d2eb!important; }
 .result-empty-state { display:flex; flex-direction:column; align-items:center; gap:12px; padding:60px 20px; color:#9c8aaa; }.result-empty-state>span { font-size:36px; }.result-empty-state strong { font-size:17px; color:#7e668d; }.result-empty-state p { font-size:13px; text-align:center; }

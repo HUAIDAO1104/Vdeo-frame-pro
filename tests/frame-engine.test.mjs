@@ -11,6 +11,15 @@ test('enabled badge fails explicitly when the overlay is missing or undecoded',a
 });
 const frames=n=>Array.from({length:n},(_,i)=>({idx:i,w:1920,h:1080,time:i,dataUrl:'frame:'+i}));
 const candidate=(frameIdx,time,gray=100,overall=.7)=>({frameIdx,time,overall,pixels:Array(576).fill(gray)});
+test('single cover follows the chosen image proportions without upscaling small images',()=>{
+  for(const [w,h] of [[640,360],[320,640],[400,400],[8000,6000],[6000,8000]]){
+    const source=[{w:1920,h:1080},{w,h}];
+    const g=FrameStudio.assetGeometry({assetKind:'cover',cols:1,rows:1,cells:[1]},source);
+    assert.equal(g.slots.length,1);assert.equal(g.slots[0].fi,1);
+    assert.equal(g.width/g.height,w/h);assert.ok(g.width<=w&&g.height<=h);
+    assert.ok(Math.max(g.width,g.height)<=3840);
+  }
+});
 const {sceneRepresentatives,similarFrames}=globalThis.FrameStudio;
 
 test('adjacent similar frames keep the better representative and every candidate belongs to one group',()=>{
