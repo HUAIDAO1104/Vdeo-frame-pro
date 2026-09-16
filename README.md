@@ -40,7 +40,7 @@ Windows 将图片复制到本地缓存，原文件移动后仍可恢复；网页
 
 ## Windows 下载与更新
 
-[下载 Windows 0.3.2 x64 安装包](https://github.com/HUAIDAO1104/Vdeo-frame-pro/releases/download/desktop-v0.3.2/SalesKitStudio_0.3.2_x64-setup.exe)（约 60 MB）。[发行说明](https://github.com/HUAIDAO1104/Vdeo-frame-pro/releases/tag/desktop-v0.3.2)、[构建与发布验证](docs/releases/0.3.2-verification.md)。已安装 0.2.0 及更新版本可在应用内更新；0.1.6 及更早版本没有更新模块，需要先关闭旧程序、运行一次新版安装包，无需预先卸载。
+[下载 Windows 0.3.3 x64 安装包](https://github.com/HUAIDAO1104/Vdeo-frame-pro/releases/download/desktop-v0.3.3/SalesKitStudio_0.3.3_x64-setup.exe)（约 60 MB）。[发行说明](https://github.com/HUAIDAO1104/Vdeo-frame-pro/releases/tag/desktop-v0.3.3)、[构建与发布验证](docs/releases/0.3.3-verification.md)。已安装 0.2.0 及更新版本可在应用内更新；0.1.6 及更早版本没有更新模块，需要先关闭旧程序、运行一次新版安装包，无需预先卸载。
 
 0.2.0 起，Windows 启动时和运行中每 6 小时自动检查更新；也可打开“设置 → 版本与更新”。收到新版提示后点击“保存并安装”，程序会保存当前任务、下载并验证签名，再启动安装。视频正在运行或暂停时需要先停止；更新失败可继续使用旧版并重试。
 
