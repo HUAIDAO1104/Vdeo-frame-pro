@@ -11,6 +11,21 @@ test('enabled badge fails explicitly when the overlay is missing or undecoded',a
 });
 const frames=n=>Array.from({length:n},(_,i)=>({idx:i,w:1920,h:1080,time:i,dataUrl:'frame:'+i}));
 const candidate=(frameIdx,time,gray=100,overall=.7)=>({frameIdx,time,overall,pixels:Array(576).fill(gray)});
+test('21:9 4K and portrait covers produce exact 16:9 output in either layout',()=>{
+  for(const [w,h] of [[4032,1728],[1080,1920],[333,500]])for(const n of [1,2]){
+    const g=FrameStudio.assetGeometry({assetKind:'cover',cols:n,rows:n,cells:Array(n*n).fill(0),coverAspect:'16:9'},[{w,h}]);
+    assert.equal(g.width*9,g.height*16);assert.equal(g.slots.length,n*n);
+    assert.ok(g.slots.every(s=>s.w*9===s.h*16));
+  }
+});
+test('crop at 100% can pan the clipped dimension, clamps edges and matches the output geometry',()=>{
+  const left=FrameStudio.cropPlacement(4032,1728,1920,1080,{scale:1,ox:1,oy:1});
+  assert.ok(Math.abs(left.x)<1e-9);assert.equal(left.y,0);assert.ok(left.ox>0);assert.equal(left.oy,0);
+  const right=FrameStudio.cropPlacement(4032,1728,1920,1080,{scale:1,ox:-1});
+  assert.ok(Math.abs(right.x+right.width-1920)<1e-9);
+  const portrait=FrameStudio.cropPlacement(1080,1920,1920,1080,{scale:1,oy:-1});
+  assert.ok(portrait.oy<0);assert.ok(Math.abs(portrait.y+portrait.height-1080)<1e-9);
+});
 test('single cover follows the chosen image proportions without upscaling small images',()=>{
   for(const [w,h] of [[640,360],[320,640],[400,400],[8000,6000],[6000,8000]]){
     const source=[{w:1920,h:1080},{w,h}];

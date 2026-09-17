@@ -144,6 +144,78 @@ try{
   await card.locator('[data-cover-layout="grid"]').click();await waitCover();
   assert.deepEqual(await page.evaluate(id=>S.batches.find(b=>b.id===id).cells,singleId),[0,1,2,3]);
   console.log('PASS single cover: layout toggle, portrait replacement, correct crop aspect, independent grid/single drafts, undo/redo, badge downloads, ZIP, history and mobile');
+  await page.setViewportSize({width:1440,height:1000});
+  const wideId=await page.evaluate(async()=>{
+    const c=document.createElement('canvas');c.width=4032;c.height=1728;const x=c.getContext('2d');
+    x.fillStyle='#194ea6';x.fillRect(0,0,c.width,c.height);x.fillStyle='#dc1e28';x.fillRect(0,0,576,c.height);
+    x.fillStyle='#208942';x.fillRect(3456,0,576,c.height);
+    await importImageFolder([new File([await new Promise(r=>c.toBlob(r))],'21比9_4032x1728.png',{type:'image/png'})]);
+    const p=PROJECTS.list.at(-1);switchProject(p.id);await startImageTasks([p]);switchTab(1);
+    return S.batches.find(b=>b.assetKind==='cover').id;
+  });
+  const wide=page.locator('#batch-'+wideId),waitWide=()=>page.waitForFunction(id=>{const b=S.batches.find(b=>b.id===id);return !b.rendering&&!b.needsRender;},wideId);
+  const initialWide=await inspect(await download(wideId));assert.ok(initialWide.width/initialWide.height>2.3);
+  await wide.locator('[data-cover-aspect="16:9"]').click();await waitWide();
+  pixels=await inspect(await download(wideId));assert.equal(pixels.width,1920);assert.equal(pixels.height,1080);
+  await wide.locator('[data-cover-crop]').click();
+  assert.equal(await page.evaluate(()=>_cropCtx.scale),1);
+  const cropBox=await page.locator('#cropStage').boundingBox();
+  await page.mouse.move(cropBox.x+cropBox.width*.4,cropBox.y+cropBox.height*.5);await page.mouse.down();
+  await page.mouse.move(cropBox.x+cropBox.width*.9,cropBox.y+cropBox.height*.5,{steps:10});await page.mouse.up();
+  assert.ok(await page.evaluate(()=>_cropCtx.ox>.2),'100% zoom must allow panning a clipped wide image');
+  await page.locator('#cropCellSelect').selectOption('1');
+  assert.equal(await page.evaluate(()=>_cropCtx.ci),1);
+  await page.locator('#cropEditor button',{hasText:'应用'}).click();await waitWide();
+  const croppedBytes=await download(wideId);
+  const sample=await page.evaluate(async bytes=>{
+    const img=await createImageBitmap(new Blob([new Uint8Array(bytes)])),c=document.createElement('canvas');c.width=img.width;c.height=img.height;
+    const x=c.getContext('2d');x.drawImage(img,0,0);img.close();
+    return {moved:[...x.getImageData(c.width*.05,c.height*.25,1,1).data],centered:[...x.getImageData(c.width*.55,c.height*.25,1,1).data]};
+  },[...croppedBytes]);
+  assert.ok(sample.moved[0]>190&&sample.moved[2]<70,'first cell exports the chosen left-edge subject');
+  assert.ok(sample.centered[2]>120&&sample.centered[0]<70,'other cells keep their own framing');
+  await wide.locator('[data-cover-layout="single"]').click();await waitWide();
+  pixels=await inspect(await download(wideId));assert.equal(pixels.width,3072);assert.equal(pixels.height,1728);
+  await wide.locator('[data-cover-aspect="source"]').click();await waitWide();
+  assert.ok((await inspect(await download(wideId))).width/(await inspect(await download(wideId))).height>2.3);
+  await page.evaluate(()=>undo());await page.waitForFunction(()=>S.batches.every(b=>!b.rendering));
+  assert.equal(await wide.locator('[data-cover-aspect="16:9"]').getAttribute('aria-pressed'),'true');
+  await wide.locator('[data-cover-layout="grid"]').click();await waitWide();
+  assert.ok(await page.evaluate(id=>S.batches.find(b=>b.id===id).crops[0].ox>.2,wideId));
+  await wide.locator('label.tog').click();await waitWide();
+  const wideHistory=await page.evaluate(async()=>{await saveWorkspaceNow();return WORKSPACE_SESSION_ID;});
+  await page.reload();await page.evaluate(id=>restoreHistoryRecord(id),wideHistory);
+  await page.waitForFunction(()=>S.batches.length>0&&S.batches.every(b=>b.canvas&&!b.rendering));
+  await page.evaluate(()=>{switchTab(1);EXPORT.format='png';EXPORT.scale=1;});
+  pixels=await inspect(await download(wideId));assert.equal(pixels.width*9,pixels.height*16);assert.ok(pixels.redRatio>.2);
+  await wide.screenshot({path:join(output,'wide-cover-16-9.png')});
+  const wideZipPending=page.waitForEvent('download');await page.locator('#unifiedDownloadBtn').click();
+  const wideZip=await readFile(await (await wideZipPending).path());
+  const wideExport=await page.evaluate(({bytes,id})=>{const files=fflate.unzipSync(new Uint8Array(bytes));const m=JSON.parse(fflate.strFromU8(files['图片清单.json']));return [...files[m.assets.find(a=>a.id===id).file]];},{bytes:[...wideZip],id:wideId});
+  pixels=await inspect(wideExport);assert.equal(pixels.width*9,pixels.height*16);assert.ok(pixels.redRatio>.2);
+  // Run the real scoring pipeline over the 4032x1728 source with a mocked native
+  // HTTP provider: recover a connection failure and inspect the transmitted thumbnails.
+  const network=await page.evaluate(async()=>{
+    const savedInvoke=DESKTOP_NATIVE.invoke;let fail=true,calls=0,maxEdge=0;
+    DESKTOP_NATIVE.enabled=true;
+    DESKTOP_NATIVE.invoke=async(command,args)=>{
+      if(command==='save_workspace')return;
+      if(command!=='ai_http_request')throw new Error('Unexpected command '+command);
+      calls++;if(fail)throw '无法连接 AI 服务，请检查网络';
+      const body=JSON.parse(args.request.body),images=body.messages[0].content.filter(p=>p.type==='image_url');
+      for(const {image_url} of images){const img=await createImageBitmap(await (await fetch(image_url.url)).blob());maxEdge=Math.max(maxEdge,img.width,img.height);img.close();}
+      return {status:200,body:JSON.stringify({choices:[{message:{content:JSON.stringify({scores:images.map((_,i)=>({idx:i+1,overall:8}))})}}]})};
+    };
+    try{
+      const project={...PROJECTS.list.at(-1),id:9999,runConfig:{apiKey:'mock-only',variants:1}},engine=FrameStudio.create({native:{enabled:false},badge:()=>null,scoreBatch:(frames,key,model,hint,signal)=>visionScoreBatch(frames,key,model,hint,[],[],null,75000,signal)});
+      const q=new VideoTaskQueue({process:(p,ctx)=>engine.generate(p,ctx)});
+      await q.start([project]);const failed={status:project.generationStatus,error:project.generationError};fail=false;
+      await q.start([project]);return {failed,status:project.generationStatus,calls,maxEdge};
+    }finally{DESKTOP_NATIVE.enabled=false;DESKTOP_NATIVE.invoke=savedInvoke;}
+  });
+  assert.equal(network.failed.status,'failed');assert.match(network.failed.error.stage,/AI 评分/);assert.match(network.failed.error.message,/无法连接/);
+  assert.equal(network.status,'complete');assert.equal(network.calls,2);assert.equal(network.maxEdge,480);
+  console.log('PASS 4032x1728 wide source: 16:9 grid/single exports, 100% pan pixels, per-cell crop, layout/ratio history, badge ZIP; native AI failure/retry with 480px payload');
   assert.deepEqual(errors,[]);
   console.log('PASS packaged frontend: actual PNG/JPEG/WebP downloads at 0.5x/1x/2x, cover/detail/ZIP top-right badge pixels, toggle off, load failure and retry');
   console.log('Exported images:',output);

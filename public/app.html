@@ -8,7 +8,7 @@
   <link href="/static/style.css" rel="stylesheet">
   <script src="/static/vendor/fflate.min.js"></script>
 
-<script src="/static/task-queue.js"></script><script src="/static/frame-engine.js"></script><script src="/static/workspace.js"></script><script src="/static/app-updater.js"></script><link rel="stylesheet" href="/static/workspace.css"></head>
+<script src="/static/ai-transport.js"></script><script src="/static/task-queue.js"></script><script src="/static/frame-engine.js"></script><script src="/static/workspace.js"></script><script src="/static/app-updater.js"></script><link rel="stylesheet" href="/static/workspace.css"></head>
 <body>
 
 <!-- Drag Ghost -->
@@ -989,32 +989,7 @@ function salesRunTimeoutError(){
 }
 
 async function fetchWithDeadline(url,options={},timeoutMs=120000,label='网络请求'){
-  const controller=new AbortController();
-  const parentSignal=options.signal;
-  let timedOut=false;
-  const abortFromParent=()=>controller.abort(parentSignal?.reason);
-  if(parentSignal?.aborted) abortFromParent();
-  else parentSignal?.addEventListener('abort',abortFromParent,{once:true});
-  const timer=setTimeout(()=>{
-    timedOut=true;
-    controller.abort(new DOMException(label+'超时','TimeoutError'));
-  },timeoutMs);
-  try{
-    const response=await fetch(url,{...options,signal:controller.signal});
-    const body=await response.arrayBuffer();
-    const headers=new Headers(response.headers);
-    headers.delete('content-encoding');
-    headers.delete('content-length');
-    return new Response(body,{status:response.status,statusText:response.statusText,headers});
-  }catch(error){
-    if(timedOut){
-      throw new Error(label+'超过 '+Math.ceil(timeoutMs/1000)+' 秒仍未响应，已停止等待。请检查网络、模型状态或更换模型后重试');
-    }
-    throw error;
-  }finally{
-    clearTimeout(timer);
-    parentSignal?.removeEventListener('abort',abortFromParent);
-  }
+  return AITransport.request(url,options,timeoutMs,label,DESKTOP_NATIVE);
 }
 
 const AI_CONSENT_STORAGE = 'vfp_ai_data_consent_v1';
@@ -2651,6 +2626,7 @@ function snapshotCells(){
     batches:S.batches.map(b => ({
       id:b.id,
       cols:b.cols, rows:b.rows, note:b.note,
+      coverAspect:b.coverAspect||'source', aspectCrops:JSON.parse(JSON.stringify(b.aspectCrops||{})),
       coverLayouts:b.coverLayouts?JSON.parse(JSON.stringify(b.coverLayouts)):null,
       cells:(b.cells||[]).slice(),
       crops:JSON.parse(JSON.stringify(b.crops||{})),
@@ -2677,8 +2653,10 @@ function applySnapshot(snap){
   items.forEach(s => {
     const b = S.batches.find(x => x.id === s.id);
     if(b && ((b.cells||[]).length === (s.cells||[]).length || (b.assetKind==='cover' && s.cols && s.rows))){
-      const layoutChanged=b.cols!==s.cols||b.rows!==s.rows;
+      const layoutChanged=b.cols!==s.cols||b.rows!==s.rows||(b.coverAspect||'source')!==(s.coverAspect||'source');
       if(s.cols&&s.rows){ b.cols=s.cols; b.rows=s.rows; }
+      if('coverAspect' in s) b.coverAspect=s.coverAspect;
+      if('aspectCrops' in s) b.aspectCrops=JSON.parse(JSON.stringify(s.aspectCrops));
       if('coverLayouts' in s) b.coverLayouts=s.coverLayouts?JSON.parse(JSON.stringify(s.coverLayouts)):null;
       if('note' in s) b.note=s.note;
       b.cells = s.cells.slice();
@@ -2808,10 +2786,10 @@ async function refreshModelList(silent=false){
   if(!key){ if(!silent) toast('请先填写并保存 API Key','err'); return; }
   setModelListStatus('正在拉取模型...');
   try{
-    const resp=await fetch('https://llm-api.mcisaas.com/v1/models',{
+    const resp=await fetchWithDeadline('https://llm-api.mcisaas.com/v1/models',{
       headers:{'Authorization':'Bearer '+key}
-    });
-    if(!resp.ok) throw new Error('模型列表接口失败 '+resp.status+': '+(await resp.text()).slice(0,120));
+    },25000,'模型列表');
+    if(!resp.ok) throw AITransport.httpError(resp.status,await resp.text(),key);
     const data=await resp.json();
     const raw=Array.isArray(data.data)?data.data:(Array.isArray(data.models)?data.models:[]);
     const models=[...new Set(raw.map(m=>m.id||m.model||m.name||m).map(String).filter(Boolean))].sort();
@@ -3076,7 +3054,7 @@ async function visionScoreBatch(frames, apiKey, model, hintText, goodRefImages=[
 
   if(!resp.ok){
     const errText = await resp.text();
-    throw new Error('API错误 '+resp.status+': '+errText.slice(0,300));
+    throw AITransport.httpError(resp.status,errText,apiKey);
   }
 
   const json = await resp.json();
@@ -3820,15 +3798,38 @@ async function setCoverLayout(id, mode){
   if(current===mode) return;
   pushHistory();
   b.coverLayouts=b.coverLayouts||{};
-  b.coverLayouts[current]={cells:b.cells.slice(),crops:JSON.parse(JSON.stringify(b.crops||{}))};
+  saveCoverAspectDraft(b);
+  b.coverLayouts[current]={cells:b.cells.slice(),crops:JSON.parse(JSON.stringify(b.crops||{})),aspectCrops:JSON.parse(JSON.stringify(b.aspectCrops))};
   const saved=b.coverLayouts[mode],first=b.cells.find(fi=>fi!=null)??null;
   b.cols=b.rows=mode==='single'?1:2;
   b.cells=saved?saved.cells.slice():Array(b.cols*b.rows).fill(first);
-  b.crops=saved?JSON.parse(JSON.stringify(saved.crops)):{};
+  b.aspectCrops=saved?JSON.parse(JSON.stringify(saved.aspectCrops||{source:saved.crops||{}})):{};
+  b.crops=JSON.parse(JSON.stringify(b.aspectCrops[b.coverAspect||'source']||{}));
   b.note=(mode==='single'?'单图':'四宫格')+' · 点击画面替换';
   refreshCoverCard(b); refreshUsageTags();
   document.querySelector('#batch-'+id+' [data-cover-layout="'+mode+'"]')?.focus();
   await generateBatch(id,true);
+}
+function saveCoverAspectDraft(b){
+  b.aspectCrops=b.aspectCrops||{};
+  b.aspectCrops[b.coverAspect||'source']=JSON.parse(JSON.stringify(b.crops||{}));
+}
+async function setCoverAspect(id, aspect){
+  const b=S.batches.find(x=>x.id===id);
+  if(!b||b.assetKind!=='cover'||!['source','16:9'].includes(aspect)||(b.coverAspect||'source')===aspect)return;
+  pushHistory();saveCoverAspectDraft(b);b.coverAspect=aspect;
+  b.crops=JSON.parse(JSON.stringify(b.aspectCrops[aspect]||{}));
+  refreshCoverCard(b);await generateBatch(id,true);
+}
+function openCoverCrop(id){
+  const b=S.batches.find(x=>x.id===id);if(!b)return;
+  const ci=b.cells.findIndex(fi=>fi!=null);
+  if(ci<0){toast('请先选择封面图片','err');return;}
+  openCropEditor(id,ci);
+}
+function clearCellCrop(b,ci){
+  if(b.crops)delete b.crops[ci];
+  Object.values(b.aspectCrops||{}).forEach(crops=>delete crops[ci]);
 }
 
 function renderBatch(b){
@@ -3862,6 +3863,7 @@ function batchHTML(b){
     '</div>'+
     (b.assetKind==='cover'?'<div class="cover-layout-controls" role="group" aria-label="封面版式">'+
       '<span>封面版式</span>'+['single','grid'].map(mode=>'<button type="button" data-cover-layout="'+mode+'" aria-pressed="'+((b.cols===1&&b.rows===1)===(mode==='single'))+'" onclick="setCoverLayout('+b.id+',\''+mode+'\').catch(console.warn)">'+(mode==='single'?'单图':'四宫格')+'</button>').join('')+'</div>':'')+
+    (b.assetKind==='cover'?'<div class="cover-layout-controls" role="group" aria-label="封面输出比例"><span>输出比例</span>'+['source','16:9'].map(aspect=>'<button type="button" data-cover-aspect="'+aspect+'" aria-pressed="'+((b.coverAspect||'source')===aspect)+'" onclick="setCoverAspect('+b.id+',\''+aspect+'\').catch(console.warn)">'+(aspect==='source'?'原比例':'16:9')+'</button>').join('')+'<button type="button" data-cover-crop onclick="openCoverCrop('+b.id+')">调整裁剪</button></div>':'')+
     // ── 拼图格子（全宽） ──
     '<div class="collage-grid" id="cgrid-'+b.id+'"'+
     '     style="grid-template-columns:repeat('+b.cols+',1fr);grid-template-rows:repeat('+b.rows+',1fr);">'+
@@ -3936,7 +3938,7 @@ function bindDropEvents(cell, b, ci){
     if(S.dragFrameIdx!==null){
       pushHistory();
       b.cells[ci]=S.dragFrameIdx;
-      if(b.crops) delete b.crops[ci];
+      clearCellCrop(b,ci);
       renderCell(b,ci); generateBatch(b.id,true).catch(console.warn);
       refreshUsageTags();
     }
@@ -3984,7 +3986,7 @@ function getSlotFrameByKey(b, key){
 // 写某批次某格子的帧索引
 function setSlotFrameByKey(b, key, fi){
   const s=parseSlotKey(b,key); if(!s) return;
-  if(s.kind==='cell'){ b.cells[s.ci]=fi; if(fi===null&&b.crops) delete b.crops[s.ci]; }
+  if(s.kind==='cell'){ b.cells[s.ci]=fi; clearCellCrop(b,s.ci); }
   else if(s.kind==='grid'){ b.detailLayout.gridFrames[s.idx]=fi; }
   else if(s.kind==='row'){ b.detailLayout.rows[s.ri].frames[s.c]=fi; }
   if(b.crops) delete b.crops[s.kind==='cell'?s.ci:key];
@@ -4158,7 +4160,7 @@ function pickDone(bid, ci, fi){
   const b=S.batches.find(x=>x.id===bid); if(!b) return;
   pushHistory();
   b.cells[ci]=fi;
-  if(b.crops) delete b.crops[ci];
+  clearCellCrop(b,ci);
   renderCell(b,ci);
   refreshUsageTags();
   _pmReplaceMode=false;
@@ -4171,7 +4173,7 @@ function removeCell(bid, ci){
   if(b.cells[ci]===null) return;
   pushHistory();
   b.cells[ci]=null;
-  if(b.crops) delete b.crops[ci];   // 清除该格裁剪
+  clearCellCrop(b,ci);   // 清除该格裁剪
   renderCell(b,ci);
   generateBatch(b.id,true).catch(console.warn);
   refreshUsageTags();
@@ -4190,16 +4192,14 @@ function applyCellCropStyle(img, b, ci){
   if(!img) return;
   const crop=getCellCrop(b, ci);
   const f=S.frames[b.cells[ci]];
-  if(!crop || !f){
-    img.style.transform='';
-    img.style.objectPosition='center';
-    return;
-  }
-  // cover 基础下，scale 放大，ox/oy 平移（百分比）
-  const panX = crop.ox * 50; // -50%~50%
-  const panY = crop.oy * 50;
-  img.style.transformOrigin='center';
-  img.style.transform='scale('+crop.scale+') translate('+panX+'%,'+panY+'%)';
+  if(!f)return;
+  const slot=FrameStudio.assetGeometry(b,S.frames).slots[ci];
+  applyCropImageStyle(img,f.w,f.h,slot.w/slot.h,crop);
+}
+function applyCropImageStyle(img,w,h,ar,crop){
+  const placed=FrameStudio.cropPlacement(w,h,1,1/ar,crop);
+  Object.assign(img.style,{position:'absolute',objectFit:'fill',transform:'none',right:'auto',bottom:'auto',
+    width:placed.width*100+'%',height:placed.height*ar*100+'%',left:placed.x*100+'%',top:placed.y*ar*100+'%'});
 }
 
 let _cropCtx=null; // {bid,ci,scale,ox,oy,imgW,imgH,cellAR}
@@ -4211,13 +4211,14 @@ function openCropEditor(bid, ci){
   const geometry=FrameStudio.assetGeometry(b,S.frames),slot=geometry.slots[ci];
   const cellAR=slot?slot.w/slot.h:16/9;
 
-  document.getElementById('cropEditor')?.remove();
+  closeCropEditor();
   const modal=document.createElement('div');
   modal.id='cropEditor'; modal.className='crop-modal';
   modal.innerHTML=
     '<div class="crop-box">'+
       '<div class="crop-head">'+
         '<div class="crop-title">调整裁剪 · 格 #'+(ci+1)+'</div>'+
+        (b.assetKind==='cover'&&b.cells.length>1?'<select id="cropCellSelect" aria-label="选择要裁剪的格子" title="切换前自动应用当前裁剪" onchange="saveCrop();openCropEditor('+bid+',Number(this.value))">'+b.cells.map((fi,i)=>'<option value="'+i+'" '+(fi==null?'disabled ':'')+(i===ci?'selected':'')+'>第 '+(i+1)+' 格</option>').join('')+'</select>':'')+
         '<button class="crop-close" onclick="closeCropEditor()">×</button>'+
       '</div>'+
       '<div class="crop-stage-wrap">'+
@@ -4242,11 +4243,11 @@ function openCropEditor(bid, ci){
     '</div>';
   document.body.appendChild(modal);
 
-  _cropCtx={ bid, ci, scale:(existing?existing.scale:1), ox:(existing?existing.ox:0), oy:(existing?existing.oy:0), cellAR };
+  _cropCtx={ bid, ci, imgW:f.w, imgH:f.h, scale:(existing?existing.scale:1), ox:(existing?existing.ox:0), oy:(existing?existing.oy:0), cellAR };
   const zoom=document.getElementById('cropZoom');
   zoom.value=Math.round(_cropCtx.scale*100);
   document.getElementById('cropZoomVal').textContent=Math.round(_cropCtx.scale*100)+'%';
-  updateCropPreview();
+  clampCropOffset();updateCropPreview();
 
   // 缩放滑块
   zoom.addEventListener('input', ()=>{
@@ -4277,8 +4278,9 @@ function openCropEditor(bid, ci){
     const dx=(x-lastX)/rect.width;   // 归一化（占舞台宽度）
     const dy=(y-lastY)/rect.height;
     lastX=x; lastY=y;
-    // 偏移范围与可平移量相关：scale>1 时才有空间
-    _cropCtx.ox += dx*2; _cropCtx.oy += dy*2;
+    // 使用缩放后的图片尺寸换算拖动距离；原比例溢出也可平移
+    const placed=FrameStudio.cropPlacement(_cropCtx.imgW,_cropCtx.imgH,1,1/_cropCtx.cellAR,_cropCtx);
+    _cropCtx.ox += dx*2/placed.width; _cropCtx.oy += dy*2/(placed.height*_cropCtx.cellAR);
     clampCropOffset();
     updateCropPreview();
   };
@@ -4294,16 +4296,13 @@ let _cropMove=null, _cropUp=null;
 // 限制偏移使图片不脱离格子边界
 function clampCropOffset(){
   if(!_cropCtx) return;
-  const room=(_cropCtx.scale-1)/_cropCtx.scale; // 可平移的归一化半径（基于 transform translate %）
-  const max=room; // ox/oy 对应 translate 50% * ox，translate 与 scale 联动
-  _cropCtx.ox=Math.max(-max,Math.min(max,_cropCtx.ox));
-  _cropCtx.oy=Math.max(-max,Math.min(max,_cropCtx.oy));
+  const placed=FrameStudio.cropPlacement(_cropCtx.imgW,_cropCtx.imgH,1,1/_cropCtx.cellAR,_cropCtx);
+  _cropCtx.ox=placed.ox;_cropCtx.oy=placed.oy;
 }
 function updateCropPreview(){
   if(!_cropCtx) return;
   const img=document.getElementById('cropImg'); if(!img) return;
-  const panX=_cropCtx.ox*50, panY=_cropCtx.oy*50;
-  img.style.transform='scale('+_cropCtx.scale+') translate('+panX+'%,'+panY+'%)';
+  applyCropImageStyle(img,_cropCtx.imgW,_cropCtx.imgH,_cropCtx.cellAR,_cropCtx);
 }
 function resetCrop(){
   if(!_cropCtx) return;
@@ -5539,7 +5538,7 @@ function openPreviewCellPicker(b, ci){
 async function replaceCellAndRegen(b, ci, fi){
   pushHistory();
   b.cells[ci]=fi;
-  if(fi===null && b.crops) delete b.crops[ci];
+  clearCellCrop(b,ci);
   renderCell(b, ci);
   refreshUsageTags();
   await generateBatch(b.id);  // 重新生成并刷新预览（会自动重开 modal）

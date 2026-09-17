@@ -2759,10 +2759,13 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
 name = "sales-kit-studio"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "chrono",
+ "futures-util",
+ "reqwest",
  "rusqlite",
+ "rustls",
  "serde",
  "serde_json",
  "tauri",

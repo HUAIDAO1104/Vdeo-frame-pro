@@ -1,6 +1,6 @@
 [package]
 name = "sales-kit-studio"
-version = "0.3.3"
+version = "0.3.4"
 description = "Local desktop runtime for Sales Kit Studio"
 authors = ["HUAIDAO1104"]
 edition = "2021"
@@ -13,6 +13,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+futures-util = "0.3"
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "json", "system-proxy"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 chrono = { version = "0.4", features = ["serde"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }

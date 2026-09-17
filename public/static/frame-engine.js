@@ -268,11 +268,13 @@
     const rows = isLong ? [0, 1, 2].map(i => ({ cols: 3, frames: asset.detailLayout.gridFrames.slice(i * 3, i * 3 + 3) })).concat(asset.detailLayout.rows) :
       Array.from({ length: asset.rows }, (_, i) => ({ cols: asset.cols, frames: asset.cells.slice(i * asset.cols, (i + 1) * asset.cols) }));
     const single = asset.assetKind === 'cover' && asset.cols === 1 && asset.rows === 1;
-    const first = (single && frames[asset.cells[0]]) || frames.find(f => f?.w && f?.h), ar = first ? first.w / first.h : 16 / 9;
-    let width = single && first ? first.w : isLong ? 1620 : Math.round(540 * ar * asset.cols);
-    if (single && first) width *= Math.min(1, 3840 / Math.max(first.w, first.h));
+    const first = (single && frames[asset.cells[0]]) || frames.find(f => f?.w && f?.h);
+    const fixed = asset.assetKind === 'cover' && asset.coverAspect === '16:9';
+    const ar = fixed ? 16 / 9 : first ? first.w / first.h : 16 / 9;
+    let width = single && first ? Math.min(first.w, first.h * ar) : isLong ? 1620 : Math.round(540 * ar * asset.cols);
+    if (single && first) width *= Math.min(1, 3840 / Math.max(width, width / ar));
     else if (!isLong) width *= Math.min(1, 3840 / Math.max(width, 540 * asset.rows));
-    width = Math.round(width);
+    width = fixed ? Math.max(16, Math.floor(width / 16) * 16) : Math.round(width);
     const heights = rows.map(row => Math.round(width / row.cols / ar));
     const total = heights.reduce((a, b) => a + b, 0), ratio = Math.min(1, 14000 / total, Math.sqrt(22000000 / (width * total)));
     const w = Math.max(1, Math.round(width * ratio)), h = Math.max(1, Math.round(total * ratio));
@@ -289,6 +291,16 @@
       y = nextY;
     });
     return { width: w, height: h, slots };
+  }
+  function cropPlacement(imageW, imageH, width, height, crop) {
+    const zoom = Math.max(1, Math.min(3, Number(crop?.scale) || 1));
+    const scale = Math.max(width / imageW, height / imageH) * zoom;
+    const sw = imageW * scale, sh = imageH * scale;
+    const limitX = Math.max(0, 1 - width / sw), limitY = Math.max(0, 1 - height / sh);
+    const ox = Math.max(-limitX, Math.min(limitX, Number(crop?.ox) || 0));
+    const oy = Math.max(-limitY, Math.min(limitY, Number(crop?.oy) || 0));
+    return { width: sw, height: sh, x: (width - sw) / 2 + ox * sw / 2,
+      y: (height - sh) / 2 + oy * sh / 2, ox, oy, scale: zoom };
   }
   function drawManualTitle(cx, asset, width, height) {
     const title = String(asset.heroTitle || '').trim();
@@ -326,10 +338,9 @@
       const frame = frames[slot.fi]; if (!frame) continue;
       const image = await loadFrame(frame, signal, native);
       const { x, y, w, h } = slot;
-      const crop = asset.crops?.[asset.isDetailLong ? slot.key : slot.index], zoom = crop?.scale || 1;
-      const scale = Math.max(w / image.width, h / image.height) * zoom, sw = image.width * scale, sh = image.height * scale;
-      const dx = x + (w - sw) / 2 + (crop?.ox || 0) * .5 * sw, dy = y + (h - sh) / 2 + (crop?.oy || 0) * .5 * sh;
-      cx.save(); cx.beginPath(); cx.rect(x, y, w, h); cx.clip(); cx.drawImage(image, dx, dy, sw, sh); cx.restore();
+      const crop = asset.crops?.[asset.isDetailLong ? slot.key : slot.index];
+      const placed = cropPlacement(image.width, image.height, w, h, crop);
+      cx.save(); cx.beginPath(); cx.rect(x, y, w, h); cx.clip(); cx.drawImage(image, x + placed.x, y + placed.y, placed.width, placed.height); cx.restore();
     }
     if (asset.isDetailLong) drawManualTitle(cx, asset, out.width, out.height);
     if (asset.hasBadge) {
@@ -413,5 +424,5 @@
       }
     };
   }
-  root.FrameStudio = { create, renderAsset, assetGeometry, loadFrame, diverse, makeAssets, sceneRepresentatives, imageRepresentatives, similarFrames };
+  root.FrameStudio = { create, renderAsset, assetGeometry, cropPlacement, loadFrame, diverse, makeAssets, sceneRepresentatives, imageRepresentatives, similarFrames };
 })(globalThis);

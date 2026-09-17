@@ -18,6 +18,7 @@ use std::{
     time::{Duration, Instant, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Manager};
+mod ai_http;
 mod image_folders;
 mod updates;
 
@@ -909,6 +910,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_desktop_environment,
+            ai_http::ai_http_request,
+            ai_http::cancel_ai_http_request,
             updates::desktop_update_status,
             updates::check_desktop_update,
             updates::install_desktop_update,
