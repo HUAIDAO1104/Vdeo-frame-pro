@@ -254,10 +254,30 @@
     const mode = ['single', 'collage'].includes(config.coverMode) ? config.coverMode : 'grid';
     const count = mode === 'single' ? 1 : mode === 'grid' ? 4 : Math.max(1, Math.min(12, Math.round(Number(config.coverCount) || 6)));
     const cols = mode === 'single' ? 1 : mode === 'grid' ? 2 : Math.max(1, Math.min(count, 6, Math.round(Number(config.coverCols) || 3)));
-    const aspect = parseCoverAspect(config.coverAspect)?.value || (config.coverAspect === 'source' ? 'source' : mode === 'collage' ? '27:32' : 'source');
+    const aspect = mode === 'collage' ? '8:9' : parseCoverAspect(config.coverAspect)?.value || (config.coverAspect === 'source' || mode === 'single' ? 'source' : '16:9');
     return { mode, count, cols, rows: Math.ceil(count / cols), aspect };
   }
+  function coverShadow(value = {}) {
+    const bounded = (input, fallback, max) => input == null || !Number.isFinite(Number(input)) ? fallback : Math.max(0, Math.min(max, Math.round(Number(input))));
+    return { size: bounded(value?.size, 24, 60), distance: bounded(value?.distance, 12, 40) };
+  }
+  function portraitGeometry(asset) {
+    const width = 1600, height = 1800, gap = 40, padding = 24;
+    const count = asset.cells.length, cols = Math.max(1, Math.min(asset.cols, count)), rows = Math.max(1, Math.ceil(count / cols));
+    const unit = Math.min((width - padding * 2 - gap * (cols - 1)) / (9 * cols), (height - padding * 2 - gap * (rows - 1)) / (16 * rows));
+    const cellW = 9 * unit, cellH = 16 * unit, top = (height - cellH * rows - gap * (rows - 1)) / 2, slots = [];
+    for (let row = 0, index = 0; row < rows; row++) {
+      const rowCols = Math.min(cols, count - index), left = (width - cellW * rowCols - gap * (rowCols - 1)) / 2;
+      for (let col = 0; col < rowCols; col++, index++) {
+        const x = Math.round(left + col * (cellW + gap)), y = Math.round(top + row * (cellH + gap));
+        slots.push({ key: 'cell:' + index, fi: asset.cells[index], index, x, y,
+          w: Math.round(left + col * (cellW + gap) + cellW) - x, h: Math.round(top + row * (cellH + gap) + cellH) - y });
+      }
+    }
+    return { width, height, slots, gap };
+  }
   function coverGeometry(asset, frames) {
+    if (coverMode(asset) === 'collage') return portraitGeometry(asset);
     const count = asset.cells.length, cols = Math.max(1, asset.cols), rows = Math.max(1, Math.ceil(count / cols));
     const single = count === 1, first = (single && frames[asset.cells[0]]) || frames.find(f => f?.w && f?.h);
     const sourceAspect = first ? first.w / first.h : 16 / 9;
@@ -286,7 +306,7 @@
       const picks = buckets[i].length ? buckets[i] : order;
       const pool = [...picks, ...order.filter(id => !picks.includes(id))];
       covers.push({ id: ++baseId, cols: spec.cols, rows: spec.rows, cells: fill(pool, spec.count), crops: {}, hasBadge: config.badge,
-        coverMode: spec.mode, coverAspect: spec.aspect,
+        coverMode: spec.mode, coverAspect: spec.aspect, coverShadow: coverShadow(config.coverShadow),
         assetKind: 'cover', title: '封面 ' + String.fromCharCode(65 + i), note: (spec.mode === 'single' ? '单图' : spec.mode === 'grid' ? '四宫格' : spec.count + ' 张 · ' + spec.cols + ' 列') + ' · 点击画面替换', canvas: null });
     }
     if (config.includeDetail === false || (config.includeDetail == null && spec.mode === 'collage')) return covers;
@@ -364,6 +384,24 @@
     cx.fillStyle = '#fff'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
     lines.forEach((line, i) => cx.fillText(line, width / 2, bandHeight / 2 + (i - (lines.length - 1) / 2) * fontSize * 1.4, maxWidth));
   }
+  // Quantized dominant colors from selected pictures only; sampling stays local.
+  function paletteFromPixels(samples) {
+    const bins = new Map();
+    for (const pixels of samples) for (let i = 0; i < pixels.length; i += 4) {
+      if (pixels[i + 3] < 128) continue;
+      const rgb = [pixels[i], pixels[i + 1], pixels[i + 2]];
+      const key = rgb.map(v => v >> 5).join(':');
+      const bin = bins.get(key) || { count: 0, sum: [0, 0, 0] };
+      bin.count++; rgb.forEach((v, j) => bin.sum[j] += v); bins.set(key, bin);
+    }
+    const all = [...bins.values()].map(b => ({ count: b.count, rgb: b.sum.map(v => Math.round(v / b.count)) })).sort((a, b) => b.count - a.count || a.rgb.join(',').localeCompare(b.rgb.join(',')));
+    const colorful = all.filter(b => Math.max(...b.rgb) > 24 && Math.min(...b.rgb) < 232);
+    const pool = colorful.length >= 2 ? colorful : all;
+    if (!pool.length) return [[40, 44, 52], [72, 77, 87]];
+    const first = pool[0].rgb, distance = rgb => Math.hypot(...rgb.map((v, i) => v - first[i]));
+    const second = pool.slice(1).find(b => distance(b.rgb) >= 55)?.rgb || pool[1]?.rgb || first;
+    return [first, second];
+  }
   async function renderAsset(asset, frames, signal, native, badgeImage) {
     check(signal);
     if (asset.hasBadge && !(badgeImage?.naturalWidth > 0 && badgeImage?.naturalHeight > 0)) {
@@ -372,10 +410,30 @@
     const geometry = assetGeometry(asset, frames);
     const out = canvas(geometry.width, geometry.height), cx = out.getContext('2d');
     cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high'; cx.fillStyle = frames[0]?.sourceName ? '#fff' : '#161a23'; cx.fillRect(0, 0, out.width, out.height);
+    const loaded = new Map();
+    if (asset.assetKind === 'cover' && coverMode(asset) === 'collage') {
+      const probe = canvas(32, 32), px = probe.getContext('2d', { willReadFrequently: true }), samples = [];
+      for (const fi of new Set(asset.cells.filter(fi => frames[fi]))) {
+        check(signal); const image = await loadFrame(frames[fi], signal, native); loaded.set(fi, image);
+        px.clearRect(0, 0, 32, 32); px.drawImage(image, 0, 0, 32, 32); samples.push(px.getImageData(0, 0, 32, 32).data);
+      }
+      const colors = paletteFromPixels(samples), gradient = cx.createLinearGradient(0, 0, out.width, out.height);
+      colors.forEach((rgb, i) => gradient.addColorStop(i, 'rgb(' + rgb.join(',') + ')'));
+      cx.fillStyle = gradient; cx.fillRect(0, 0, out.width, out.height);
+      out.coverBackground = colors;
+      const shadow = coverShadow(asset.coverShadow);
+      cx.save();cx.shadowColor = 'rgba(0,0,0,0.38)';cx.shadowBlur = shadow.size;
+      cx.shadowOffsetX = shadow.distance * .6;cx.shadowOffsetY = shadow.distance;cx.fillStyle = '#000';
+      // All shadows go beneath all pictures, including at large distances.
+      for (const slot of geometry.slots) if (loaded.has(slot.fi)) cx.fillRect(slot.x,slot.y,slot.w,slot.h);
+      cx.restore();
+      // The editor uses the exact rendered backdrop, including the shadows.
+      out.coverBackdrop = out.toDataURL('image/png');
+    }
     for (const slot of geometry.slots) {
       check(signal);
       const frame = frames[slot.fi]; if (!frame) continue;
-      const image = await loadFrame(frame, signal, native);
+      const image = loaded.get(slot.fi) || await loadFrame(frame, signal, native);
       const { x, y, w, h } = slot;
       const crop = asset.crops?.[asset.isDetailLong ? slot.key : slot.index];
       const placed = cropPlacement(image.width, image.height, w, h, crop);
@@ -463,5 +521,5 @@
       }
     };
   }
-  root.FrameStudio = { create, renderAsset, assetGeometry, coverMode, coverSpec, parseCoverAspect, cropPlacement, loadFrame, diverse, makeAssets, sceneRepresentatives, imageRepresentatives, similarFrames };
+  root.FrameStudio = { create, renderAsset, assetGeometry, coverMode, coverSpec, coverShadow, parseCoverAspect, paletteFromPixels, cropPlacement, loadFrame, diverse, makeAssets, sceneRepresentatives, imageRepresentatives, similarFrames };
 })(globalThis);

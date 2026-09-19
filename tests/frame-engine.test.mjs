@@ -151,28 +151,31 @@ test('detail render geometry covers every pixel and slot for mixed dimensions an
   }
 });
 
-test('six portrait covers are 3 by 2, keep six unique pictures per variant and omit detail by default',()=>{
+test('six portrait covers are fixed 8:9 with gutters and omit detail by default',()=>{
   const source=frames(6).map(f=>({...f,w:1080,h:1920}));
   const assets=makeAssets(source.map(f=>f.idx),source,{variants:3,coverMode:'collage'},0);
   assert.equal(assets.length,3);
   for(const asset of assets){
     assert.equal(asset.assetKind,'cover');assert.equal(asset.cols,3);assert.equal(asset.rows,2);assert.equal(asset.cells.length,6);assert.equal(new Set(asset.cells).size,6);
-    const g=FrameStudio.assetGeometry(asset,source);assert.equal(g.width,1620);assert.equal(g.height,1920);
-    assert.ok(g.slots.every(s=>s.w*16===s.h*9));
+    const g=FrameStudio.assetGeometry(asset,source);assert.equal(g.width,1600);assert.equal(g.height,1800);
+    assert.ok(g.slots.every(s=>Math.abs(s.w/s.h-9/16)<.002));
+    assert.ok(g.slots[0].x>0&&g.slots[0].y>0);assert.ok(g.slots[1].x-g.slots[0].x-g.slots[0].w>=39);
+    assert.ok(g.slots[3].y-g.slots[0].y-g.slots[0].h>=39);
   }
   assert.equal(makeAssets([0,1],source,{variants:1,coverMode:'collage',includeDetail:true},0).length,2);
   assert.equal(makeAssets([0,1],source,{variants:1,includeDetail:false},0).length,1);
 });
-test('all 1–12 picture layouts and 1–6 columns cover every pixel at the requested overall ratio',()=>{
+test('portrait layouts keep 8:9, separated portrait slots and margins at every supported count',()=>{
   const source=frames(12);
   for(let count=1;count<=12;count++)for(let cols=1;cols<=6;cols++)for(const aspect of ['3:4','27:32','16:9','2:3','source']){
     const b=makeAssets(source.map(f=>f.idx),source,{variants:1,coverMode:'collage',coverCount:count,coverCols:cols,coverAspect:aspect},0)[0];
     const g=FrameStudio.assetGeometry(b,source),ratio=FrameStudio.parseCoverAspect(aspect);
     assert.equal(g.slots.length,count);assert.equal(new Set(b.cells).size,count);
-    assert.equal(g.slots.reduce((sum,s)=>sum+s.w*s.h,0),g.width*g.height);
+    assert.ok(g.slots.reduce((sum,s)=>sum+s.w*s.h,0)<g.width*g.height);
+    for(const a of g.slots)for(const b of g.slots)if(a!==b)assert.ok(a.x+a.w<=b.x||b.x+b.w<=a.x||a.y+a.h<=b.y||b.y+b.h<=a.y);
     assert.ok(Math.max(g.width,g.height)<=3840);
     for(const slot of g.slots)assert.ok(slot.x>=0&&slot.y>=0&&slot.x+slot.w<=g.width&&slot.y+slot.h<=g.height);
-    if(ratio)assert.equal(g.width*ratio.h,g.height*ratio.w);
+    assert.equal(g.width*9,g.height*8);assert.ok(g.slots.every(s=>Math.abs(s.w-s.h*9/16)<=1.5625));
   }
 });
 test('cover settings normalize bounded counts and custom ratios while legacy assets remain supported',()=>{
@@ -182,4 +185,21 @@ test('cover settings normalize bounded counts and custom ratios while legacy ass
   assert.equal(FrameStudio.coverSpec({coverMode:'collage',coverCount:2,coverCols:6}).cols,2);
   assert.equal(FrameStudio.coverMode({cols:1,rows:1}),'single');assert.equal(FrameStudio.coverMode({cols:2,rows:2}),'grid');
   assert.equal(FrameStudio.coverMode({cols:3,rows:2}),'collage');
+});
+
+test('gradient palette selects two dominant distinct sampled colors and handles flat or transparent images',()=>{
+  const pixels=(rgb,n)=>Uint8ClampedArray.from(Array.from({length:n},()=>[...rgb,255]).flat());
+  const colors=FrameStudio.paletteFromPixels([pixels([25,55,95],100),pixels([190,120,45],80),pixels([255,255,255],400)]);
+  assert.deepEqual(colors,[[25,55,95],[190,120,45]]);
+  assert.deepEqual(FrameStudio.paletteFromPixels([pixels([40,40,40],50)]),[[40,40,40],[40,40,40]]);
+  assert.equal(FrameStudio.paletteFromPixels([new Uint8ClampedArray(16)]).length,2);
+  assert.equal(FrameStudio.coverSpec({}).aspect,'16:9');
+});
+test('portrait shadow defaults survive legacy assets and controls remain bounded',()=>{
+  assert.deepEqual(FrameStudio.coverShadow(),{size:24,distance:12});
+  assert.deepEqual(FrameStudio.coverShadow(null),{size:24,distance:12});
+  assert.deepEqual(FrameStudio.coverShadow({size:0,distance:0}),{size:0,distance:0});
+  assert.deepEqual(FrameStudio.coverShadow({size:Infinity,distance:'invalid'}),{size:24,distance:12});
+  assert.deepEqual(FrameStudio.coverShadow({size:100,distance:-5}),{size:60,distance:0});
+  assert.deepEqual(FrameStudio.coverShadow({size:'31.4',distance:'18.8'}),{size:31,distance:19});
 });

@@ -314,13 +314,17 @@ function renderImageSource(p) {
 function updateCoverOutputSettings(modeChanged=false) {
   const mode=document.getElementById('coverMode');if(!mode)return;
   const collage=mode.value==='collage',detail=document.getElementById('includeDetail'),aspect=document.getElementById('coverAspect');
-  if(modeChanged){detail.checked=!collage;aspect.value=collage?'27:32':'source';}
+  if(modeChanged){detail.checked=!collage;aspect.value=mode.value==='grid'?'16:9':'source';}
+  if(collage)aspect.value='8:9';aspect.disabled=collage;
   document.getElementById('coverGridSettings').hidden=!collage;
+  document.getElementById('coverShadowSettings').hidden=!collage;
+  document.getElementById('coverShadowSizeValue').value=document.getElementById('coverShadowSize').value;
+  document.getElementById('coverShadowDistanceValue').value=document.getElementById('coverShadowDistance').value;
   document.getElementById('coverCustomRatio').hidden=aspect.value!=='custom';
   const count=document.getElementById('coverCount'),cols=document.getElementById('coverCols');
   const spec=FrameStudio.coverSpec({coverMode:mode.value,coverCount:count.value,coverCols:cols.value});
   cols.max=String(Math.min(6,spec.count));if(Number(cols.value)>Number(cols.max))cols.value=cols.max;
-  document.getElementById('coverOutputHint').textContent=collage?spec.count+' 张 · '+spec.cols+' 列 × '+spec.rows+' 行。27:32 适合 3×2 的六张 9:16 竖图；末行不足时自动铺满。':'整体比例决定成图形状，每一格都可以独立调整裁剪。';
+  document.getElementById('coverOutputHint').textContent=collage?spec.count+' 张 · '+spec.cols+' 列 × '+spec.rows+' 行。固定 8:9，保留间隙；从选图提取两种颜色作为渐变背景。':'整体比例决定成图形状，每一格都可以独立调整裁剪。';
   document.getElementById('detailOutputSummary').textContent=detail.checked?'已开启 · 同时生成详情长图':'已关闭 · 本次只生成封面';
 }
 function coverOutputConfig() {
@@ -329,9 +333,9 @@ function coverOutputConfig() {
   for(const id of (collage?['coverCount','coverCols']:[]).concat(value('coverAspect')==='custom'?['coverRatioW','coverRatioH']:[])){
     const el=document.getElementById(id);if(!el.value||!el.checkValidity())throw new Error('请填写有效的拼图张数、列数或比例');
   }
-  const aspect=value('coverAspect')==='custom'?value('coverRatioW')+':'+value('coverRatioH'):value('coverAspect');
+  const aspect=collage?'8:9':value('coverAspect')==='custom'?value('coverRatioW')+':'+value('coverRatioH'):value('coverAspect');
   if(aspect!=='source'&&!FrameStudio.parseCoverAspect(aspect))throw new Error('自定义比例宽高须为 1–100 的整数，整体比例在 1:6 到 6:1 之间');
-  return {coverMode:value('coverMode'),coverCount:Number(value('coverCount')),coverCols:Number(value('coverCols')),coverAspect:aspect,includeDetail:document.getElementById('includeDetail').checked};
+  return {coverShadow:FrameStudio.coverShadow({size:value('coverShadowSize'),distance:value('coverShadowDistance')}),coverMode:value('coverMode'),coverCount:Number(value('coverCount')),coverCols:Number(value('coverCols')),coverAspect:aspect,includeDetail:document.getElementById('includeDetail').checked};
 }
 function taskConfig(project, extra = {}) {
   const value = id => document.getElementById(id)?.value;
@@ -400,6 +404,10 @@ function updateListingChecklist() {
 function showAssetPreview(b) {
   if (!S.batches.includes(b) || !b.canvas) return;
   const badgeOverlay=document.getElementById('cover-overlay-'+b.id); if(badgeOverlay) badgeOverlay.hidden=!b.hasBadge;
+  const grid=document.getElementById('cgrid-'+b.id);
+  if(grid && b.canvas.coverBackdrop){
+    grid.style.backgroundImage='url("'+b.canvas.coverBackdrop+'")';grid.style.backgroundSize='100% 100%';
+  }
   const wrap = document.getElementById('prev-' + b.id), target = document.getElementById('pcanvas-' + b.id);
   if (!wrap || !target) return;
   wrap.style.display = 'block';

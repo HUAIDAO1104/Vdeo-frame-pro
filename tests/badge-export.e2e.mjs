@@ -100,7 +100,7 @@ try{
       c.getContext('2d').fillStyle=color;c.getContext('2d').fillRect(0,0,w,h);
       files.push(new File([await new Promise(r=>c.toBlob(r))],i+'.png',{type:'image/png'}));
     }
-    await importImageFolder(files);const project=PROJECTS.list.at(-1);switchProject(project.id);await startImageTasks([project]);switchTab(1);
+    document.getElementById('coverAspect').value='source';await importImageFolder(files);const project=PROJECTS.list.at(-1);switchProject(project.id);await startImageTasks([project]);switchTab(1);
     const b=S.batches.find(b=>b.assetKind==='cover');b.cells=[0,1,2,3];b.crops={2:{scale:1.25,ox:0,oy:0}};
     await generateBatch(b.id,true);return b.id;
   });
@@ -149,7 +149,7 @@ try{
     const c=document.createElement('canvas');c.width=4032;c.height=1728;const x=c.getContext('2d');
     x.fillStyle='#194ea6';x.fillRect(0,0,c.width,c.height);x.fillStyle='#dc1e28';x.fillRect(0,0,576,c.height);
     x.fillStyle='#208942';x.fillRect(3456,0,576,c.height);
-    await importImageFolder([new File([await new Promise(r=>c.toBlob(r))],'21比9_4032x1728.png',{type:'image/png'})]);
+    document.getElementById('coverAspect').value='source';await importImageFolder([new File([await new Promise(r=>c.toBlob(r))],'21比9_4032x1728.png',{type:'image/png'})]);
     const p=PROJECTS.list.at(-1);switchProject(p.id);await startImageTasks([p]);switchTab(1);
     return S.batches.find(b=>b.assetKind==='cover').id;
   });
