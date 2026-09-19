@@ -73,7 +73,7 @@ function updateSalesPrimaryState() {
   const list = globalThis.__vfpProjects?.list || [];
   const button = document.getElementById('salesKitBtn');
   const busy = !!taskQueue?.active || generationStarting;
-  if (button) { button.disabled = !list.length || busy; button.title = list.length ? '生成封面与详情图片' : '先添加素材'; }
+  if (button) { button.disabled = !list.length || busy; button.title = list.length ? (document.getElementById('includeDetail')?.checked?'生成封面与详情图片':'生成封面图片') : '先添加素材'; }
   const current = document.getElementById('salesCurrentBtn');
   if (current) { current.hidden = list.length < 2; current.disabled = busy; }
   const cap = document.getElementById('capBtn');
@@ -311,12 +311,34 @@ function renderImageSource(p) {
   warningBox.querySelector('p').textContent = warnings.join('\n');
   document.getElementById('imageFolderFiles').textContent = p.imageSources.slice(0, 8).map(f => f.name).join('\n') + (p.imageSources.length > 8 ? '\n…其余 ' + (p.imageSources.length - 8) + ' 张' : '');
 }
+function updateCoverOutputSettings(modeChanged=false) {
+  const mode=document.getElementById('coverMode');if(!mode)return;
+  const collage=mode.value==='collage',detail=document.getElementById('includeDetail'),aspect=document.getElementById('coverAspect');
+  if(modeChanged){detail.checked=!collage;aspect.value=collage?'27:32':'source';}
+  document.getElementById('coverGridSettings').hidden=!collage;
+  document.getElementById('coverCustomRatio').hidden=aspect.value!=='custom';
+  const count=document.getElementById('coverCount'),cols=document.getElementById('coverCols');
+  const spec=FrameStudio.coverSpec({coverMode:mode.value,coverCount:count.value,coverCols:cols.value});
+  cols.max=String(Math.min(6,spec.count));if(Number(cols.value)>Number(cols.max))cols.value=cols.max;
+  document.getElementById('coverOutputHint').textContent=collage?spec.count+' 张 · '+spec.cols+' 列 × '+spec.rows+' 行。27:32 适合 3×2 的六张 9:16 竖图；末行不足时自动铺满。':'整体比例决定成图形状，每一格都可以独立调整裁剪。';
+  document.getElementById('detailOutputSummary').textContent=detail.checked?'已开启 · 同时生成详情长图':'已关闭 · 本次只生成封面';
+}
+function coverOutputConfig() {
+  const value=id=>document.getElementById(id).value;
+  const collage=value('coverMode')==='collage';
+  for(const id of (collage?['coverCount','coverCols']:[]).concat(value('coverAspect')==='custom'?['coverRatioW','coverRatioH']:[])){
+    const el=document.getElementById(id);if(!el.value||!el.checkValidity())throw new Error('请填写有效的拼图张数、列数或比例');
+  }
+  const aspect=value('coverAspect')==='custom'?value('coverRatioW')+':'+value('coverRatioH'):value('coverAspect');
+  if(aspect!=='source'&&!FrameStudio.parseCoverAspect(aspect))throw new Error('自定义比例宽高须为 1–100 的整数，整体比例在 1:6 到 6:1 之间');
+  return {coverMode:value('coverMode'),coverCount:Number(value('coverCount')),coverCols:Number(value('coverCols')),coverAspect:aspect,includeDetail:document.getElementById('includeDetail').checked};
+}
 function taskConfig(project, extra = {}) {
   const value = id => document.getElementById(id)?.value;
   return {
     apiKey: value('selectionMode') === 'ai' ? value('aiApiKey')?.trim() : '', mode: value('selectionMode'),
     model: value('aiModel'), hint: value('aiPromptHint') || '', variants: Number(value('variantCount')) || 3,
-    badge: !!document.getElementById('coverBadge')?.checked,
+    badge: !!document.getElementById('coverBadge')?.checked, ...coverOutputConfig(),
     captureMode: S.captureMode, interval: Math.max(.1, Number(value('itvl')) || 1), start: Math.max(0, Number(value('stt')) || 0),
     end: value('edt') ? Number(value('edt')) : null, maxFrames: Math.max(1, Math.min(600, Number(value('mxf')) || 120)),
     sceneThreshold: Math.max(.03, .18 - (Number(value('sceneSens')) - 10) / 50 * .15),
@@ -326,6 +348,7 @@ function taskConfig(project, extra = {}) {
 async function startImageTasks(projects, extra = {}) {
   if (typeof appUpdateInstalling !== 'undefined' && appUpdateInstalling) return;
   if (!projects.length || taskQueue?.active || generationStarting) return;
+  try{coverOutputConfig();}catch(error){toast(error.message,'err');return;}
   generationStarting = true; updateSalesPrimaryState();
   try {
     saveActiveProject();
@@ -364,9 +387,11 @@ function updateListingChecklist() {
   if (typeof S === 'undefined') return;
   const covers = S.batches.filter(b => b.assetKind === 'cover' && b.canvas), details = S.batches.filter(b => b.assetKind === 'detail' && b.canvas);
   const ready = !!(covers.length || details.length) && !S.batches.some(b => b.rendering || b.needsRender);
-  const final = covers.some(b => b.id === S.finalCoverId) && details.some(b => b.id === S.finalDetailId);
+  const heading=document.getElementById('resultAssetTitle');if(heading)heading.textContent=covers.length&&!details.length?'封面候选':'封面候选 · 详情展示图';
+  const final = covers.some(b => b.id === S.finalCoverId) && (!details.length || details.some(b => b.id === S.finalDetailId));
   setListingCheck('checkCover', !!covers.length, covers.length + ' 版封面');
-  setListingCheck('checkDetail', !!details.length, details.length + ' 版详情');
+  setListingCheck('checkDetail', !!details.length, details.length ? details.length + ' 版详情' : covers.length ? '本次未生成' : '待生成');
+  const detailCheck=document.getElementById('checkDetail');if(detailCheck)detailCheck.hidden=!!covers.length&&!details.length;
   setListingCheck('checkFinal', final, final ? '主版本已选，可随时更换' : '可下载单图或导出已有图片');
   const summary = document.getElementById('listingSummary'); if (summary) summary.textContent = ready ? '默认选择 A 版，点击其他版本可更换。导出包含全部图片。' : '完成一个任务后即可查看、编辑和导出。';
   const button = document.getElementById('unifiedDownloadBtn'); if (button) { button.disabled = !ready; button.title = ready ? '打包当前任务的全部图片' : '等待图片生成'; }

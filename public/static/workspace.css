@@ -203,3 +203,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 [data-xbid][data-xkey] { touch-action:none; user-select:none; }
 #pmCellOverlay .pm-cell-long[data-xbid] { cursor:grab; }
 #pmCellOverlay .pm-cell-long.xdragover { background:#6651cc55; box-shadow:inset 0 0 0 3px #6651cc; }
+
+/* Configurable cover layouts: settings and canvas overlays share geometry. */
+.cover-layout-controls { flex-wrap:wrap; }
+.cover-layout-controls select,.cover-layout-controls input { min-width:0; border:1px solid #e4d7f1; border-radius:6px; padding:5px 6px; color:#69438d; background:#fff; font:inherit; }
+.cover-layout-controls select:focus-visible,.cover-layout-controls input:focus-visible { outline:2px solid #a089c5; outline-offset:2px; }
+.cover-aspect-label { display:flex; align-items:center; gap:6px; flex:1; min-width:150px; }
+.cover-aspect-label select { flex:1; width:90px; }
+.cover-grid-controls { gap:10px; }.cover-grid-controls small { margin-left:auto; color:#88778f; font-size:10px; }
+.custom-cover-ratio input { width:60px; }.custom-cover-ratio>span { margin-right:0; }
+.cover-output-hint { font-size:11px; color:#776b83; line-height:1.6; margin:0; }
+.studio-settings-row[hidden],.cover-layout-controls[hidden] { display:none; }
+.asset-cover .collage-grid { display:block; }.asset-cover .collage-grid .cell { transition:none; border:0; }

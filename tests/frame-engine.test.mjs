@@ -150,3 +150,36 @@ test('detail render geometry covers every pixel and slot for mixed dimensions an
     assert.ok(g.height<=14000);
   }
 });
+
+test('six portrait covers are 3 by 2, keep six unique pictures per variant and omit detail by default',()=>{
+  const source=frames(6).map(f=>({...f,w:1080,h:1920}));
+  const assets=makeAssets(source.map(f=>f.idx),source,{variants:3,coverMode:'collage'},0);
+  assert.equal(assets.length,3);
+  for(const asset of assets){
+    assert.equal(asset.assetKind,'cover');assert.equal(asset.cols,3);assert.equal(asset.rows,2);assert.equal(asset.cells.length,6);assert.equal(new Set(asset.cells).size,6);
+    const g=FrameStudio.assetGeometry(asset,source);assert.equal(g.width,1620);assert.equal(g.height,1920);
+    assert.ok(g.slots.every(s=>s.w*16===s.h*9));
+  }
+  assert.equal(makeAssets([0,1],source,{variants:1,coverMode:'collage',includeDetail:true},0).length,2);
+  assert.equal(makeAssets([0,1],source,{variants:1,includeDetail:false},0).length,1);
+});
+test('all 1–12 picture layouts and 1–6 columns cover every pixel at the requested overall ratio',()=>{
+  const source=frames(12);
+  for(let count=1;count<=12;count++)for(let cols=1;cols<=6;cols++)for(const aspect of ['3:4','27:32','16:9','2:3','source']){
+    const b=makeAssets(source.map(f=>f.idx),source,{variants:1,coverMode:'collage',coverCount:count,coverCols:cols,coverAspect:aspect},0)[0];
+    const g=FrameStudio.assetGeometry(b,source),ratio=FrameStudio.parseCoverAspect(aspect);
+    assert.equal(g.slots.length,count);assert.equal(new Set(b.cells).size,count);
+    assert.equal(g.slots.reduce((sum,s)=>sum+s.w*s.h,0),g.width*g.height);
+    assert.ok(Math.max(g.width,g.height)<=3840);
+    for(const slot of g.slots)assert.ok(slot.x>=0&&slot.y>=0&&slot.x+slot.w<=g.width&&slot.y+slot.h<=g.height);
+    if(ratio)assert.equal(g.width*ratio.h,g.height*ratio.w);
+  }
+});
+test('cover settings normalize bounded counts and custom ratios while legacy assets remain supported',()=>{
+  assert.deepEqual(FrameStudio.parseCoverAspect('6:8'),{w:3,h:4,value:'3:4'});
+  for(const value of ['0:4','100:1','1:100','101:100','1.5:2','invalid'])assert.equal(FrameStudio.parseCoverAspect(value),null);
+  assert.equal(FrameStudio.coverSpec({coverMode:'collage',coverCount:100,coverCols:20}).count,12);
+  assert.equal(FrameStudio.coverSpec({coverMode:'collage',coverCount:2,coverCols:6}).cols,2);
+  assert.equal(FrameStudio.coverMode({cols:1,rows:1}),'single');assert.equal(FrameStudio.coverMode({cols:2,rows:2}),'grid');
+  assert.equal(FrameStudio.coverMode({cols:3,rows:2}),'collage');
+});

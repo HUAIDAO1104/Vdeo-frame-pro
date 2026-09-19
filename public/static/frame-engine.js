@@ -239,15 +239,57 @@
     }
     return groups;
   }
+  function coverMode(asset) {
+    return asset.coverMode || (asset.cols === 1 && asset.rows === 1 ? 'single' : asset.cols === 2 && asset.rows === 2 ? 'grid' : 'collage');
+  }
+  function parseCoverAspect(value) {
+    const match = /^(\d{1,3}):(\d{1,3})$/.exec(String(value));
+    if (!match) return null;
+    let w = Number(match[1]), h = Number(match[2]);
+    if (w < 1 || h < 1 || w > 100 || h > 100 || w / h < 1 / 6 || w / h > 6) return null;
+    let a = w, b = h; while (b) { const next = a % b; a = b; b = next; }
+    return { w: w / a, h: h / a, value: (w / a) + ':' + (h / a) };
+  }
+  function coverSpec(config = {}) {
+    const mode = ['single', 'collage'].includes(config.coverMode) ? config.coverMode : 'grid';
+    const count = mode === 'single' ? 1 : mode === 'grid' ? 4 : Math.max(1, Math.min(12, Math.round(Number(config.coverCount) || 6)));
+    const cols = mode === 'single' ? 1 : mode === 'grid' ? 2 : Math.max(1, Math.min(count, 6, Math.round(Number(config.coverCols) || 3)));
+    const aspect = parseCoverAspect(config.coverAspect)?.value || (config.coverAspect === 'source' ? 'source' : mode === 'collage' ? '27:32' : 'source');
+    return { mode, count, cols, rows: Math.ceil(count / cols), aspect };
+  }
+  function coverGeometry(asset, frames) {
+    const count = asset.cells.length, cols = Math.max(1, asset.cols), rows = Math.max(1, Math.ceil(count / cols));
+    const single = count === 1, first = (single && frames[asset.cells[0]]) || frames.find(f => f?.w && f?.h);
+    const sourceAspect = first ? first.w / first.h : 16 / 9;
+    const fixed = parseCoverAspect(asset.coverAspect), aspect = fixed ? fixed.w / fixed.h : sourceAspect * cols / rows;
+    let width = single && first ? Math.min(first.w, first.h * aspect) : coverMode(asset) === 'collage' ? 540 * cols : 540 * rows * aspect;
+    width *= Math.min(1, 3840 / Math.max(width, width / aspect));
+    const unit = fixed ? Math.max(1, Math.floor(width / fixed.w)) : 0;
+    const w = fixed ? unit * fixed.w : Math.max(1, Math.round(width));
+    const h = fixed ? unit * fixed.h : Math.max(1, Math.round(w / aspect));
+    const slots = [];
+    for (let row = 0, index = 0; row < rows; row++) {
+      const rowCols = Math.min(cols, count - index), y = Math.round(h * row / rows), nextY = Math.round(h * (row + 1) / rows);
+      // Incomplete final rows fill the canvas, with no extra/repeated image slots.
+      for (let col = 0; col < rowCols; col++, index++) {
+        const x = Math.round(w * col / rowCols);
+        slots.push({ key: 'cell:' + index, fi: asset.cells[index], index, x, y, w: Math.round(w * (col + 1) / rowCols) - x, h: nextY - y });
+      }
+    }
+    return { width: w, height: h, slots };
+  }
   function makeAssets(order, frames, config, baseId) {
     const fill = (indices, n) => Array.from({ length: n }, (_, i) => indices[i % indices.length]);
-    const covers = [], details = [], count = config.variants;
+    const covers = [], details = [], count = config.variants, spec = coverSpec(config);
     const buckets = Array.from({ length: count }, (_, offset) => order.filter((_, i) => i % count === offset));
     for (let i = 0; i < count; i++) {
       const picks = buckets[i].length ? buckets[i] : order;
-      covers.push({ id: ++baseId, cols: 2, rows: 2, cells: fill(picks, 4), crops: {}, hasBadge: config.badge,
-        assetKind: 'cover', title: '封面 ' + String.fromCharCode(65 + i), note: '四宫格 · 点击画面替换', canvas: null });
+      const pool = [...picks, ...order.filter(id => !picks.includes(id))];
+      covers.push({ id: ++baseId, cols: spec.cols, rows: spec.rows, cells: fill(pool, spec.count), crops: {}, hasBadge: config.badge,
+        coverMode: spec.mode, coverAspect: spec.aspect,
+        assetKind: 'cover', title: '封面 ' + String.fromCharCode(65 + i), note: (spec.mode === 'single' ? '单图' : spec.mode === 'grid' ? '四宫格' : spec.count + ' 张 · ' + spec.cols + ' 列') + ' · 点击画面替换', canvas: null });
     }
+    if (config.includeDetail === false || (config.includeDetail == null && spec.mode === 'collage')) return covers;
     const used = new Set(covers.flatMap(x => x.cells));
     const detailOrder = [...order.filter(x => !used.has(x)), ...order.filter(x => used.has(x))];
     // Short/static clips get a compact 3x3; longer clips add intentional 1/3/2 rows.
@@ -264,17 +306,14 @@
   }
   // Rendering and pointer hit areas share these exact rounded pixel rectangles.
   function assetGeometry(asset, frames) {
+    if (asset.assetKind === 'cover') return coverGeometry(asset, frames);
     const isLong = asset.isDetailLong;
     const rows = isLong ? [0, 1, 2].map(i => ({ cols: 3, frames: asset.detailLayout.gridFrames.slice(i * 3, i * 3 + 3) })).concat(asset.detailLayout.rows) :
       Array.from({ length: asset.rows }, (_, i) => ({ cols: asset.cols, frames: asset.cells.slice(i * asset.cols, (i + 1) * asset.cols) }));
-    const single = asset.assetKind === 'cover' && asset.cols === 1 && asset.rows === 1;
-    const first = (single && frames[asset.cells[0]]) || frames.find(f => f?.w && f?.h);
-    const fixed = asset.assetKind === 'cover' && asset.coverAspect === '16:9';
-    const ar = fixed ? 16 / 9 : first ? first.w / first.h : 16 / 9;
-    let width = single && first ? Math.min(first.w, first.h * ar) : isLong ? 1620 : Math.round(540 * ar * asset.cols);
-    if (single && first) width *= Math.min(1, 3840 / Math.max(width, width / ar));
-    else if (!isLong) width *= Math.min(1, 3840 / Math.max(width, 540 * asset.rows));
-    width = fixed ? Math.max(16, Math.floor(width / 16) * 16) : Math.round(width);
+    const first = frames.find(f => f?.w && f?.h), ar = first ? first.w / first.h : 16 / 9;
+    let width = isLong ? 1620 : Math.round(540 * ar * asset.cols);
+    if (!isLong) width *= Math.min(1, 3840 / Math.max(width, 540 * asset.rows));
+    width = Math.round(width);
     const heights = rows.map(row => Math.round(width / row.cols / ar));
     const total = heights.reduce((a, b) => a + b, 0), ratio = Math.min(1, 14000 / total, Math.sqrt(22000000 / (width * total)));
     const w = Math.max(1, Math.round(width * ratio)), h = Math.max(1, Math.round(total * ratio));
@@ -416,13 +455,13 @@
         const selectionSummary = { candidates: frames.length, representatives: representatives.length,
           merged: frames.length - representatives.length, scored: config.apiKey ? representatives.length : 0 };
         return { frames, batches: assets, selected: order, aiScores: items.map(({ pixels, colors, ...x }) => x), selectionSummary,
-          batchIdCnt: assets.at(-1).id, finalCoverId: assets[0].id, finalDetailId: assets.find(x => x.assetKind === 'detail').id,
+          batchIdCnt: assets.at(-1).id, finalCoverId: assets[0].id, finalDetailId: assets.find(x => x.assetKind === 'detail')?.id ?? null,
           salesPlan: null, localFrameCache: !!(project.desktopPath || project.imageCacheId), lastPick: { engine: config.apiKey ? 'vision' : 'local', model: config.model, ok: true, count: order.length },
           generationNote: (project.sourceKind === 'images' ? '读取 ' : '提取 ') + frames.length + ' 张候选 · 合并 ' + selectionSummary.merged + (project.sourceKind === 'images' ? ' 张相似图片 · ' : ' 张相邻相似画面 · ') + representatives.length + ' 张代表画面' +
             (project.imageWarnings?.length ? '（跳过 ' + project.imageWarnings.length + ' 张无法读取的图片，可在素材页查看）' : '') +
-            (config.apiKey ? '均已 AI 评分。' : '用于本地选图。') + (representatives.length < 9 ? '代表画面较少，部分格子复用；全部候选仍可手动替换。' : '全部候选仍可手动替换。') };
+            (config.apiKey ? '均已 AI 评分。' : '用于本地选图。') + (representatives.length < Math.max(coverSpec(config).count, assets.some(b => b.isDetailLong) ? 9 : 0) ? '代表画面较少，部分格子复用；全部候选仍可手动替换。' : '全部候选仍可手动替换。') };
       }
     };
   }
-  root.FrameStudio = { create, renderAsset, assetGeometry, cropPlacement, loadFrame, diverse, makeAssets, sceneRepresentatives, imageRepresentatives, similarFrames };
+  root.FrameStudio = { create, renderAsset, assetGeometry, coverMode, coverSpec, parseCoverAspect, cropPlacement, loadFrame, diverse, makeAssets, sceneRepresentatives, imageRepresentatives, similarFrames };
 })(globalThis);

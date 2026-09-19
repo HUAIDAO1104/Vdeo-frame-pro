@@ -169,9 +169,14 @@
       <div class="tab-pane active" id="tabPane0">
 
         <!-- 图片输出设置 -->
-        <div class="card sales-kit-card"><div class="sales-kit-head"><div><div class="sales-eyebrow">OUTPUT</div><div class="sales-title">生成什么样的图片</div><div class="sales-sub">封面与详情图一起生成，之后仍可逐格调整。</div></div></div>
- <div class="sales-form"><div class="output-summary"><div><span class="output-grid-icon">▦</span><strong>封面图片</strong><small>单图或四宫格，生成后可切换</small></div><div><span class="output-grid-icon">▤</span><strong>详情展示图</strong><small>九宫格与长图，展示更多画面</small></div></div>
+        <div class="card sales-kit-card"><div class="sales-kit-head"><div><div class="sales-eyebrow">OUTPUT</div><div class="sales-title">生成什么样的图片</div><div class="sales-sub">先选封面版式，生成后仍可调整选图与裁剪。</div></div></div>
+ <div class="sales-form"><div class="output-summary"><div><span class="output-grid-icon">▦</span><strong>封面图片</strong><small>单图、四宫格或自由拼图</small></div><div><span class="output-grid-icon">▤</span><strong>详情展示图</strong><small id="detailOutputSummary">可选生成，展示更多画面</small></div></div>
  <div class="studio-settings-row"><label class="sales-field"><span>候选版本</span><select id="variantCount"><option value="1">1 组 · 快速生成</option><option value="3" selected="">3 组 · 对比挑选</option></select></label><label class="sales-field"><span>选图方式</span><select id="selectionMode"><option value="local" selected="">本地选图</option><option value="ai">AI 选图</option></select></label></div>
+ <div class="studio-settings-row"><label class="sales-field"><span>封面版式</span><select id="coverMode" onchange="updateCoverOutputSettings(true)"><option value="grid">四宫格</option><option value="single">单图</option><option value="collage">竖屏拼图 · 张数可调</option></select></label><label class="sales-field"><span>整体比例</span><select id="coverAspect" onchange="updateCoverOutputSettings()"><option value="source">按原图拼接</option><option value="27:32">27:32 · 六张竖图</option><option value="3:4">3:4</option><option value="8:9">8:9</option><option value="1:1">1:1</option><option value="4:3">4:3</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="custom">自定义</option></select></label></div>
+ <div class="studio-settings-row" id="coverGridSettings" hidden><label class="sales-field"><span>图片张数 · 1–12</span><input type="number" id="coverCount" min="1" max="12" step="1" value="6" onchange="updateCoverOutputSettings()"></label><label class="sales-field"><span>每行列数 · 1–6</span><input type="number" id="coverCols" min="1" max="6" step="1" value="3" onchange="updateCoverOutputSettings()"></label></div>
+ <div class="studio-settings-row" id="coverCustomRatio" hidden><label class="sales-field"><span>比例宽</span><input type="number" id="coverRatioW" min="1" max="100" step="1" value="3"></label><label class="sales-field"><span>比例高</span><input type="number" id="coverRatioH" min="1" max="100" step="1" value="4"></label></div>
+ <p class="cover-output-hint" id="coverOutputHint"></p>
+ <label class="studio-checkbox"><input type="checkbox" id="includeDetail" checked onchange="updateCoverOutputSettings()"><span>同时生成详情长图 <small>竖屏拼图默认关闭，需要时可开启</small></span></label>
  <label class="studio-checkbox"><input type="checkbox" id="coverBadge"><span>封面添加 4K 角标 <small>自由开关，视频和图片均可使用</small></span></label>
  <div class="ai-connection-bar" id="aiConnectionBar"><div class="ai-connection-state"><span class="ai-connection-dot"></span><div><strong id="aiConnectionTitle">本地选图</strong><small id="aiConnectionMeta">无需配置即可开始</small></div></div><button class="text-action" onclick="openSettingsDrawer()">设置</button></div>
  <div class="sales-actions"><button class="btn-p sales-primary" id="salesKitBtn" disabled=""><span id="salesKitBtnLabel">开始生成</span><span aria-hidden="true">↗</span></button><button class="batch-current-btn" id="salesCurrentBtn" hidden="">仅生成当前任务</button></div>
@@ -532,7 +537,7 @@
       <div class="view-head">
         <div class="vh-l">
           <span class="view-eyebrow">Step 03 · Assets</span>
-          <h2 class="view-title">封面候选 · 详情展示图</h2>
+          <h2 class="view-title" id="resultAssetTitle">封面候选 · 详情展示图</h2>
           <p class="view-sub">对比封面版本，替换画面，导出封面和详情图片</p>
         </div>
         <div class="vh-r">
@@ -2625,7 +2630,7 @@ function snapshotCells(){
   return {
     batches:S.batches.map(b => ({
       id:b.id,
-      cols:b.cols, rows:b.rows, note:b.note,
+      cols:b.cols, rows:b.rows, note:b.note, coverMode:FrameStudio.coverMode(b),
       coverAspect:b.coverAspect||'source', aspectCrops:JSON.parse(JSON.stringify(b.aspectCrops||{})),
       coverLayouts:b.coverLayouts?JSON.parse(JSON.stringify(b.coverLayouts)):null,
       cells:(b.cells||[]).slice(),
@@ -2653,8 +2658,9 @@ function applySnapshot(snap){
   items.forEach(s => {
     const b = S.batches.find(x => x.id === s.id);
     if(b && ((b.cells||[]).length === (s.cells||[]).length || (b.assetKind==='cover' && s.cols && s.rows))){
-      const layoutChanged=b.cols!==s.cols||b.rows!==s.rows||(b.coverAspect||'source')!==(s.coverAspect||'source');
+      const layoutChanged=b.cols!==s.cols||b.rows!==s.rows||b.cells.length!==s.cells.length||FrameStudio.coverMode(b)!==s.coverMode||(b.coverAspect||'source')!==(s.coverAspect||'source');
       if(s.cols&&s.rows){ b.cols=s.cols; b.rows=s.rows; }
+      if(s.coverMode) b.coverMode=s.coverMode;
       if('coverAspect' in s) b.coverAspect=s.coverAspect;
       if('aspectCrops' in s) b.aspectCrops=JSON.parse(JSON.stringify(s.aspectCrops));
       if('coverLayouts' in s) b.coverLayouts=s.coverLayouts?JSON.parse(JSON.stringify(s.coverLayouts)):null;
@@ -3791,35 +3797,89 @@ function refreshCoverCard(b){
   b.cells.forEach((_,i)=>renderCell(b,i));
   updateFinalAssetUI();
 }
+function coverDraftKey(b){
+  const mode=FrameStudio.coverMode(b);return mode==='collage'?'collage:'+b.cells.length+':'+b.cols:mode;
+}
+function saveCoverLayoutDraft(b){
+  saveCoverAspectDraft(b);b.coverLayouts=b.coverLayouts||{};
+  const draft={cols:b.cols,rows:b.rows,cells:b.cells.slice(),crops:structuredClone(b.crops||{}),aspectCrops:structuredClone(b.aspectCrops),coverAspect:b.coverAspect||'source'};
+  b.coverLayouts[coverDraftKey(b)]=draft;
+  if(FrameStudio.coverMode(b)==='collage')b.coverLayouts.collage=draft;
+}
+function fillCoverCells(b,count){
+  const pool=[...new Set([...b.cells.filter(fi=>fi!=null),...S.selected,...S.frames.map((_,i)=>i)])];
+  const cells=b.cells.slice(0,count),unused=pool.filter(fi=>!cells.includes(fi));
+  while(cells.length<count)cells.push(unused.length?unused.shift():(pool[cells.length%pool.length]??null));
+  return cells;
+}
+function updateCoverNote(b){
+  const mode=FrameStudio.coverMode(b);
+  b.note=(mode==='single'?'单图':mode==='grid'?'四宫格':b.cells.length+' 张 · '+b.cols+' 列')+' · 点击画面替换';
+}
 async function setCoverLayout(id, mode){
   const b=S.batches.find(x=>x.id===id);
-  if(!b||b.assetKind!=='cover'||!['single','grid'].includes(mode)) return;
-  const current=b.cols===1&&b.rows===1?'single':'grid';
-  if(current===mode) return;
-  pushHistory();
-  b.coverLayouts=b.coverLayouts||{};
-  saveCoverAspectDraft(b);
-  b.coverLayouts[current]={cells:b.cells.slice(),crops:JSON.parse(JSON.stringify(b.crops||{})),aspectCrops:JSON.parse(JSON.stringify(b.aspectCrops))};
-  const saved=b.coverLayouts[mode],first=b.cells.find(fi=>fi!=null)??null;
-  b.cols=b.rows=mode==='single'?1:2;
-  b.cells=saved?saved.cells.slice():Array(b.cols*b.rows).fill(first);
-  b.aspectCrops=saved?JSON.parse(JSON.stringify(saved.aspectCrops||{source:saved.crops||{}})):{};
-  b.crops=JSON.parse(JSON.stringify(b.aspectCrops[b.coverAspect||'source']||{}));
-  b.note=(mode==='single'?'单图':'四宫格')+' · 点击画面替换';
-  refreshCoverCard(b); refreshUsageTags();
+  if(!b||b.assetKind!=='cover'||!['single','grid','collage'].includes(mode))return;
+  const current=FrameStudio.coverMode(b);if(current===mode)return;
+  pushHistory();saveCoverLayoutDraft(b);
+  const saved=b.coverLayouts[mode],spec=FrameStudio.coverSpec({coverMode:mode});
+  const cells=saved?saved.cells.slice():mode==='single'?[b.cells.find(fi=>fi!=null)??S.selected[0]??null]:fillCoverCells(b,spec.count);
+  b.cols=saved?.cols||spec.cols;b.rows=Math.ceil(cells.length/b.cols);b.cells=cells;b.coverMode=mode;
+  if(mode==='collage'||current==='collage')b.coverAspect=saved?.coverAspect||spec.aspect;
+  b.aspectCrops=saved?structuredClone(saved.aspectCrops||{source:saved.crops||{}}):{};
+  b.crops=structuredClone(b.aspectCrops[b.coverAspect||'source']||{});
+  updateCoverNote(b);refreshCoverCard(b);refreshUsageTags();
   document.querySelector('#batch-'+id+' [data-cover-layout="'+mode+'"]')?.focus();
   await generateBatch(id,true);
 }
+async function setCoverGrid(id,count,cols){
+  const b=S.batches.find(x=>x.id===id);if(!b||FrameStudio.coverMode(b)!=='collage')return;
+  const spec=FrameStudio.coverSpec({coverMode:'collage',coverCount:count,coverCols:cols});
+  if(spec.count===b.cells.length&&spec.cols===b.cols)return;
+  pushHistory();saveCoverLayoutDraft(b);
+  const saved=b.coverLayouts['collage:'+spec.count+':'+spec.cols];
+  b.cells=saved?saved.cells.slice():fillCoverCells(b,spec.count);b.cols=spec.cols;b.rows=spec.rows;
+  b.aspectCrops=saved?structuredClone(saved.aspectCrops||{}):{};
+  b.crops=structuredClone(b.aspectCrops[b.coverAspect||'source']||{});
+  updateCoverNote(b);refreshCoverCard(b);refreshUsageTags();await generateBatch(id,true);
+}
 function saveCoverAspectDraft(b){
   b.aspectCrops=b.aspectCrops||{};
-  b.aspectCrops[b.coverAspect||'source']=JSON.parse(JSON.stringify(b.crops||{}));
+  b.aspectCrops[b.coverAspect||'source']=structuredClone(b.crops||{});
 }
 async function setCoverAspect(id, aspect){
-  const b=S.batches.find(x=>x.id===id);
-  if(!b||b.assetKind!=='cover'||!['source','16:9'].includes(aspect)||(b.coverAspect||'source')===aspect)return;
+  const b=S.batches.find(x=>x.id===id),parsed=FrameStudio.parseCoverAspect(aspect);
+  if(!b||b.assetKind!=='cover'||(aspect!=='source'&&!parsed))return;
+  aspect=parsed?.value||'source';if((b.coverAspect||'source')===aspect)return;
   pushHistory();saveCoverAspectDraft(b);b.coverAspect=aspect;
-  b.crops=JSON.parse(JSON.stringify(b.aspectCrops[aspect]||{}));
+  b.crops=structuredClone(b.aspectCrops[aspect]||{});
   refreshCoverCard(b);await generateBatch(id,true);
+}
+const COVER_ASPECTS=[['source','按原图拼接'],['27:32','27:32 · 六张竖图'],['3:4','3:4'],['8:9','8:9'],['1:1','1:1'],['4:3','4:3'],['16:9','16:9'],['9:16','9:16']];
+function coverAspectOptions(aspect){
+  const options=[...COVER_ASPECTS];
+  if(!options.some(([value])=>value===aspect)&&FrameStudio.parseCoverAspect(aspect))options.push([aspect,aspect+' · 自定义']);
+  return [...options,['custom','自定义…']].map(([value,label])=>'<option value="'+value+'" '+(aspect===value?'selected':'')+'>'+label+'</option>').join('');
+}
+function chooseCoverAspect(id,value){
+  document.getElementById('custom-ratio-'+id).hidden=value!=='custom';
+  if(value==='custom')return;
+  setCoverAspect(id,value).catch(console.warn);
+}
+function applyCustomCoverAspect(id){
+  const w=document.getElementById('ratio-w-'+id),h=document.getElementById('ratio-h-'+id);
+  if(!w.reportValidity()||!h.reportValidity())return;
+  const aspect=FrameStudio.parseCoverAspect(w.value+':'+h.value);
+  if(!aspect){toast('宽高请填 1–100 的整数，整体比例在 1:6 到 6:1 之间','err');return;}
+  setCoverAspect(id,aspect.value).catch(console.warn);
+}
+function coverControlsHTML(b){
+  if(b.assetKind!=='cover')return '';
+  const mode=FrameStudio.coverMode(b),aspect=b.coverAspect||'source',ratio=FrameStudio.parseCoverAspect(aspect)||{w:3,h:4};
+  const options=(n,value)=>Array.from({length:n},(_,i)=>'<option value="'+(i+1)+'" '+(i+1===value?'selected':'')+'>'+(i+1)+'</option>').join('');
+  return '<div class="cover-layout-controls" role="group" aria-label="封面版式"><span>封面版式</span>'+[['single','单图'],['grid','四宫格'],['collage','自由拼图']].map(([value,label])=>'<button type="button" data-cover-layout="'+value+'" aria-pressed="'+(mode===value)+'" onclick="setCoverLayout('+b.id+',\''+value+'\').catch(console.warn)">'+label+'</button>').join('')+'</div>'+
+    (mode==='collage'?'<div class="cover-layout-controls cover-grid-controls"><label>张数 <select aria-label="拼图张数" data-cover-count onchange="setCoverGrid('+b.id+',this.value,'+b.cols+').catch(console.warn)">'+options(12,b.cells.length)+'</select></label><label>每行 <select aria-label="每行列数" data-cover-cols onchange="setCoverGrid('+b.id+','+b.cells.length+',this.value).catch(console.warn)">'+options(Math.min(6,b.cells.length),b.cols)+'</select> 列</label><small>'+b.rows+' 行 · 末行自动铺满</small></div>':'')+
+    '<div class="cover-layout-controls"><label class="cover-aspect-label">整体比例 <select data-cover-aspect-select aria-label="封面整体比例" onchange="chooseCoverAspect('+b.id+',this.value)">'+coverAspectOptions(aspect)+'</select></label><button type="button" data-cover-crop onclick="openCoverCrop('+b.id+')">调整裁剪</button></div>'+
+    '<div class="cover-layout-controls custom-cover-ratio" id="custom-ratio-'+b.id+'" hidden><input aria-label="自定义比例宽" type="number" id="ratio-w-'+b.id+'" min="1" max="100" step="1" required value="'+ratio.w+'"><span>:</span><input aria-label="自定义比例高" type="number" id="ratio-h-'+b.id+'" min="1" max="100" step="1" required value="'+ratio.h+'"><button onclick="applyCustomCoverAspect('+b.id+')">应用比例</button></div>';
 }
 function openCoverCrop(id){
   const b=S.batches.find(x=>x.id===id);if(!b)return;
@@ -3861,13 +3921,11 @@ function batchHTML(b){
     '    <button class="btn-del" onclick="removeBatch('+b.id+')">删除</button>'+
     '  </div>'+
     '</div>'+
-    (b.assetKind==='cover'?'<div class="cover-layout-controls" role="group" aria-label="封面版式">'+
-      '<span>封面版式</span>'+['single','grid'].map(mode=>'<button type="button" data-cover-layout="'+mode+'" aria-pressed="'+((b.cols===1&&b.rows===1)===(mode==='single'))+'" onclick="setCoverLayout('+b.id+',\''+mode+'\').catch(console.warn)">'+(mode==='single'?'单图':'四宫格')+'</button>').join('')+'</div>':'')+
-    (b.assetKind==='cover'?'<div class="cover-layout-controls" role="group" aria-label="封面输出比例"><span>输出比例</span>'+['source','16:9'].map(aspect=>'<button type="button" data-cover-aspect="'+aspect+'" aria-pressed="'+((b.coverAspect||'source')===aspect)+'" onclick="setCoverAspect('+b.id+',\''+aspect+'\').catch(console.warn)">'+(aspect==='source'?'原比例':'16:9')+'</button>').join('')+'<button type="button" data-cover-crop onclick="openCoverCrop('+b.id+')">调整裁剪</button></div>':'')+
+    coverControlsHTML(b)+
     // ── 拼图格子（全宽） ──
     '<div class="collage-grid" id="cgrid-'+b.id+'"'+
     '     style="grid-template-columns:repeat('+b.cols+',1fr);grid-template-rows:repeat('+b.rows+',1fr);">'+
-    '  '+Array.from({length:b.cols*b.rows},(_,i)=>cellHTML(b,i)).join('')+
+    '  '+b.cells.map((_,i)=>cellHTML(b,i)).join('')+
     (b.assetKind==='cover'?'<img class="cover-badge-overlay" id="cover-overlay-'+b.id+'" src="/static/badge_4k.png" alt="" aria-hidden="true" '+(b.hasBadge?'':'hidden')+'>':'')+
     '</div>'+
     // ── 预览图（生成后显示，全宽大图） ──
@@ -3898,7 +3956,7 @@ function batchHTML(b){
 }
 
 function cellHTML(b,i){
-  const hasImg = b.cells[i]!==null;
+  const hasImg = b.cells[i]!=null&&!!S.frames[b.cells[i]];
   const f = hasImg ? S.frames[b.cells[i]] : null;
   return '<div class="cell '+(hasImg?'has-img':'')+'" id="cell-'+b.id+'-'+i+'" data-bid="'+b.id+'" data-ci="'+i+'">'+
     (hasImg
@@ -3912,9 +3970,16 @@ function cellHTML(b,i){
   '</div>';
 }
 
+function applyCoverCellLayout(cell,b,ci,geometry=FrameStudio.assetGeometry(b,S.frames)){
+  const grid=document.getElementById('cgrid-'+b.id);if(!grid)return;
+  grid.style.aspectRatio=geometry.width+'/'+geometry.height;
+  const slot=geometry.slots[ci];if(slot)Object.assign(cell.style,{position:'absolute',left:slot.x/geometry.width*100+'%',top:slot.y/geometry.height*100+'%',width:slot.w/geometry.width*100+'%',height:slot.h/geometry.height*100+'%'});
+}
 function initBatchEvents(el, b){
+  const geometry=b.assetKind==='cover'?FrameStudio.assetGeometry(b,S.frames):null;
   el.querySelectorAll('.cell').forEach(cell=>{
     const ci=parseInt(cell.dataset.ci);
+    if(geometry)applyCoverCellLayout(cell,b,ci,geometry);
     // ALL cells (empty + has-img) trigger picker on click
     cell.onclick = async e=>{
       if(e.target.closest('.cell-remove')) return;
@@ -3997,7 +4062,7 @@ async function refreshBatchAfterSwap(b){
   if(b.isDetailLong){ await regenDetailLong(b); }
   else {
     // 交换后立即更新成图，保持编辑与导出一致。
-    for(let i=0;i<b.cols*b.rows;i++) renderCell(b,i);
+    b.cells.forEach((_,i)=>renderCell(b,i));
     await generateBatch(b.id, true);
   }
 }
@@ -4335,12 +4400,9 @@ function closeCropEditor(){
 
 function renderCell(b, ci){
   const cellEl=document.getElementById('cell-'+b.id+'-'+ci); if(!cellEl) return;
-  const hasImg=b.cells[ci]!==null;
+  const hasImg=b.cells[ci]!=null&&!!S.frames[b.cells[ci]];
   const f=hasImg?S.frames[b.cells[ci]]:null;
-  if(b.assetKind==='cover'){
-    const geometry=FrameStudio.assetGeometry(b,S.frames);
-    document.getElementById('cgrid-'+b.id).style.aspectRatio=geometry.width+'/'+geometry.height;
-  }
+  if(b.assetKind==='cover')applyCoverCellLayout(cellEl,b,ci);
   cellEl.className='cell '+(hasImg?'has-img':'');
   cellEl.innerHTML=hasImg
     ? '<img src="'+f.dataUrl+'"/>'+
@@ -4385,7 +4447,7 @@ function resizeBatch(bid){
   const grid=document.getElementById('cgrid-'+bid);
   grid.style.gridTemplateColumns='repeat('+b.cols+',1fr)';
   grid.style.gridTemplateRows='repeat('+b.rows+',1fr)';
-  grid.innerHTML=Array.from({length:b.cols*b.rows},(_,i)=>cellHTML(b,i)).join('');
+  grid.innerHTML=b.cells.map((_,i)=>cellHTML(b,i)).join('');
   // rebind
   grid.querySelectorAll('.cell').forEach(cell=>{
     const ci=parseInt(cell.dataset.ci);
@@ -4432,6 +4494,7 @@ const SYSTEM_USER_DEFAULTS={
   defaultsVersion:USER_DEFAULTS_SCHEMA_VERSION,
   controls:{
     selectionMode:'local', variantCount:'3', coverBadge:false,
+    coverMode:'grid', coverCount:'6', coverCols:'3', coverAspect:'source', coverRatioW:'3', coverRatioH:'4', includeDetail:true,
     itvl:'1',
     sceneSens:'30',
     sceneMinGap:'0.5',
@@ -4498,6 +4561,7 @@ function collectUserDefaults(){
 function applyUserDefaults(options={}){
   const defaults=options.defaults||readUserDefaults();
   USER_DEFAULT_CONTROL_IDS.forEach(id=>setDefaultControlValue(id,defaults.controls[id]));
+  updateCoverOutputSettings();
   EXPORT.format=defaults.export.format;
   EXPORT.quality=Number(defaults.export.quality)||.95;
   EXPORT.scale=Number(defaults.export.scale)||1;
@@ -5235,14 +5299,16 @@ function openPreviewModal(b){
 function buildPreviewCellOverlay(b){
   const ov=document.getElementById('pmCellOverlay');
   if(!ov) return;
-  ov.style.display='grid';
+  ov.style.display='block';
   ov.style.gridTemplateColumns='repeat('+b.cols+',1fr)';
   ov.style.gridTemplateRows='repeat('+b.rows+',1fr)';
   ov.innerHTML='';
-  for(let i=0;i<b.cols*b.rows;i++){
+  const geometry=FrameStudio.assetGeometry(b,S.frames);
+  for(let i=0;i<b.cells.length;i++){
     const ci=i;
     const cell=document.createElement('div');
     cell.className='pm-cell';
+    const slot=geometry.slots[i];Object.assign(cell.style,{position:'absolute',left:slot.x/geometry.width*100+'%',top:slot.y/geometry.height*100+'%',width:slot.w/geometry.width*100+'%',height:slot.h/geometry.height*100+'%'});
     const filled=b.cells[ci]!==null;
     cell.innerHTML=
       '<div class="pm-cell-actions">'+

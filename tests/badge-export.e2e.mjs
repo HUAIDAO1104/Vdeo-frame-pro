@@ -155,7 +155,7 @@ try{
   });
   const wide=page.locator('#batch-'+wideId),waitWide=()=>page.waitForFunction(id=>{const b=S.batches.find(b=>b.id===id);return !b.rendering&&!b.needsRender;},wideId);
   const initialWide=await inspect(await download(wideId));assert.ok(initialWide.width/initialWide.height>2.3);
-  await wide.locator('[data-cover-aspect="16:9"]').click();await waitWide();
+  await wide.locator('[data-cover-aspect-select]').selectOption('16:9');await waitWide();
   pixels=await inspect(await download(wideId));assert.equal(pixels.width,1920);assert.equal(pixels.height,1080);
   await wide.locator('[data-cover-crop]').click();
   assert.equal(await page.evaluate(()=>_cropCtx.scale),1);
@@ -176,10 +176,10 @@ try{
   assert.ok(sample.centered[2]>120&&sample.centered[0]<70,'other cells keep their own framing');
   await wide.locator('[data-cover-layout="single"]').click();await waitWide();
   pixels=await inspect(await download(wideId));assert.equal(pixels.width,3072);assert.equal(pixels.height,1728);
-  await wide.locator('[data-cover-aspect="source"]').click();await waitWide();
+  await wide.locator('[data-cover-aspect-select]').selectOption('source');await waitWide();
   assert.ok((await inspect(await download(wideId))).width/(await inspect(await download(wideId))).height>2.3);
   await page.evaluate(()=>undo());await page.waitForFunction(()=>S.batches.every(b=>!b.rendering));
-  assert.equal(await wide.locator('[data-cover-aspect="16:9"]').getAttribute('aria-pressed'),'true');
+  assert.equal(await wide.locator('[data-cover-aspect-select]').inputValue(),'16:9');
   await wide.locator('[data-cover-layout="grid"]').click();await waitWide();
   assert.ok(await page.evaluate(id=>S.batches.find(b=>b.id===id).crops[0].ox>.2,wideId));
   await wide.locator('label.tog').click();await waitWide();

@@ -45,6 +45,7 @@ jobs:
         run: |
           npx playwright install chromium
           node tests/badge-export.e2e.mjs
+          node tests/collage-export.e2e.mjs
       - name: Test native runtime
         run: |
           npm run desktop:frontend
