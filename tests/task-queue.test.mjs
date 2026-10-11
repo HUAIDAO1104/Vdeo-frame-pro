@@ -73,3 +73,48 @@ test('operation deadline fails the task with a stage-specific error',async()=>{
   const p=task(1),queue=new Queue({process:async(p,ctx)=>ctx.step('AI 选图',abortable,10)});
   await queue.start([p]);assert.equal(p.generationStatus,'failed');assert.match(p.generationError.message,/AI 选图超时/);
 });
+
+test('failed tasks can be retried together or appended while another retry is running without duplicates',async()=>{
+  const a=task(1),b=task(2),c=task(3),calls=[];
+  const queue=new Queue({process:async p=>{calls.push(p.id);if(p!==c)throw Error('provider unavailable');return {value:'keep'};}});
+  await queue.start([a,b,c]);
+  const gate=deferred(),started=deferred();
+  queue.process=async p=>{calls.push(p.id);if(p===a){started.resolve();await gate.promise;}return {value:'retried'};};
+  const retry=queue.enqueue([a]);await started.promise;
+  assert.equal(queue.enqueue([a,b,b]),retry);
+  assert.deepEqual(queue.pending.map(p=>p.id),[2]);
+  gate.resolve();await retry;
+  assert.deepEqual(calls,[1,2,3,1,2]);assert.equal(c.value,'keep');
+  assert.ok([a,b,c].every(p=>p.generationStatus==='complete'));
+  queue.process=async()=>{throw Error('failed again');};await queue.enqueue([a,b]);
+  queue.process=async()=>({value:'recovered'});await queue.enqueue([a,b].filter(p=>p.generationStatus==='failed'));
+  assert.equal(a.value,'recovered');assert.equal(b.value,'recovered');
+});
+
+test('live batch, task and stage clocks exclude pauses and accumulate across attempts',async()=>{
+  let now=0,calls=0;
+  const started=deferred(),p=task(1);
+  const queue=new Queue({now:()=>now,process:async(p,ctx)=>ctx.step('AI scoring',async signal=>{
+    if(++calls===1){started.resolve();return abortable(signal);}now+=1000;ctx.progress(70,'AI scoring 8 / 16');return {};
+  },20000)});
+  const run=queue.start([p]);await started.promise;now=5000;
+  assert.equal(queue.elapsed(p),5000);assert.equal(queue.stageElapsed(),5000);
+  queue.pause();await tick();now+=60000;
+  assert.equal(queue.elapsed(p),5000);assert.equal(queue.batchElapsed(),5000);assert.equal(queue.stageElapsed(),5000);
+  queue.resume();await run;
+  assert.equal(p.generationTiming.elapsedMs,6000);assert.equal(p.generationTiming.lastAttemptMs,6000);
+  assert.equal(queue.batchElapsed(),6000);assert.equal(p.generationTiming.lastStageMs,1000);
+  now+=90000;queue.process=async()=>{now+=2000;return {};};await queue.start([p]);
+  assert.equal(queue.elapsed(p),8000);assert.equal(queue.batchElapsed(),2000);
+  assert.equal(p.generationTiming.lastAttemptMs,2000);assert.equal(p.generationTiming.attempts,2);
+});
+
+test('stopping an active queue preserves completed tasks and restarting all unfinished tasks is repeatable',async()=>{
+  const a=task(1),b=task(2),c=task(3),started=deferred(),calls=[];
+  const queue=new Queue({process:async(p,ctx)=>{calls.push(p.id);if(p===b)return ctx.step('work',signal=>{started.resolve();return abortable(signal);});return {value:p.id};}});
+  queue.start([a,b,c]);await started.promise;await queue.stop();
+  assert.equal(a.generationStatus,'complete');assert.equal(b.generationStatus,'stopped');assert.equal(c.generationStatus,'stopped');
+  queue.process=async p=>{calls.push(p.id);return {value:p.id};};
+  await queue.enqueue([a,b,c].filter(p=>p.generationStatus!=='complete'));
+  assert.deepEqual(calls,[1,2,2,3]);assert.ok([a,b,c].every(p=>p.generationStatus==='complete'));
+});

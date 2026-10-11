@@ -175,9 +175,10 @@ try{
   await page.locator('#coverMode').selectOption('collage');await page.locator('#includeDetail').check();await page.locator('#variantCount').selectOption('1');
   await page.evaluate(()=>startImageTasks([PROJECTS.list[0]]));
   assert.equal(await page.evaluate(()=>S.batches.filter(b=>b.isDetailLong).length),1);
+  await page.evaluate(()=>switchTab(0));
   await page.locator('#coverMode').selectOption('grid');assert.equal(await page.locator('#includeDetail').isChecked(),true);
   assert.deepEqual(errors,[]);
   console.log('PASS configurable portrait collage: 6 unique pictures, 8:9 output, gutters, extracted gradient, unified shadow controls/pixels/history, 1–12 count, columns, crop, pointer swap, fullscreen replacement, drafts, undo/redo, history, badge, cover-only ZIP, detail opt-in, mobile');
   console.log('Collage evidence:',output);
 }catch(error){await page.screenshot({path:join(output,'failure.png')});console.log('Collage evidence:',output);throw error;}
-finally{await browser.close();await new Promise(r=>server.close(r));}
+finally{await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));}

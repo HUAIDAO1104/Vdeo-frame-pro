@@ -42,10 +42,13 @@ jobs:
       - name: Test web runtime
         run: npm test
       - name: Verify downloaded badge images
+        env:
+          FFMPEG_PATH: ${{ github.workspace }}/src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe
         run: |
           npx playwright install chromium
           node tests/badge-export.e2e.mjs
           node tests/collage-export.e2e.mjs
+          node tests/recovery.e2e.mjs
       - name: Test native runtime
         run: |
           npm run desktop:frontend

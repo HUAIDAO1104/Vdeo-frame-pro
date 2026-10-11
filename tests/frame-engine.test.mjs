@@ -4,6 +4,36 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import '../public/static/frame-engine.js';
 const {makeAssets,diverse}=globalThis.FrameStudio;
+test('native extraction reports only matching request progress and unsubscribes after completion',async()=>{
+  let handler,unsubscribed=false;const updates=[];
+  const native={enabled:true,fileUrl:path=>path,listen:async(event,fn)=>{
+    assert.equal(event,'frame-extraction-progress');handler=fn;return ()=>{unsubscribed=true;};
+  },invoke:async(command,{request})=>{
+    assert.equal(command,'extract_video_frames');
+    handler({payload:{requestId:'other-request',count:100,total:100,hardware:true}});
+    handler({payload:{requestId:request.requestId,count:12,total:24,hardware:false}});
+    return [{path:'frame.jpg',time:1,width:640,height:360}];
+  }};
+  const engine=FrameStudio.create({native});
+  const output=await engine.generate({id:1,desktopPath:'video.mp4',runConfig:{captureOnly:true}},{step:async(label,fn)=>fn(new AbortController().signal),progress:(...args)=>updates.push(args)});
+  assert.equal(output.frames.length,1);assert.equal(unsubscribed,true);
+  assert.equal(updates.length,1);assert.equal(updates[0][0],25);assert.match(updates[0][1],/CPU 解码.*12 张.*24 张/);
+});
+test('manual title styling tolerates legacy history and bounds user controls',()=>{
+  assert.equal(FrameStudio.titleStyle(null).autoHeight,true);
+  assert.equal(FrameStudio.titleStyle({bandHeight:1000}).bandHeight,30);
+  assert.equal(FrameStudio.titleStyle({fontSize:-20}).fontSize,1.5);
+});
+test('manual title layout fits long Chinese and English titles into the selected strip without stretching',()=>{
+  const cx={font:'',measureText(text){return {width:Array.from(text).length*Number(this.font.match(/([\d.]+)px/)[1])};}};
+  for(const width of [320,1920,3840])for(const fit of ['single','wrap'])for(const height of [3,12,30])for(const title of ['城市科技','标题'.repeat(40),'W'.repeat(80)]){
+    const layout=FrameStudio.layoutManualTitle(cx,title,width,5000,{autoHeight:false,bandHeight:height,fontSize:8,fit});
+    assert.equal(layout.bandHeight,width*height/100);
+    assert.ok(layout.lines.length<=(fit==='single'?1:2));
+    assert.ok(layout.lines.every(line=>cx.measureText(line).width<=layout.maxWidth));
+    assert.ok(layout.lineHeight*layout.lines.length<=layout.bandHeight*.8);
+  }
+});
 test('enabled badge fails explicitly when the overlay is missing or undecoded',async()=>{
   for(const badge of [null,{naturalWidth:0,naturalHeight:0}]){
     await assert.rejects(globalThis.FrameStudio.renderAsset({hasBadge:true},[],null,null,badge),/4K 角标未加载/);

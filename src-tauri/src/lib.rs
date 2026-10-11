@@ -17,7 +17,7 @@ use std::{
     thread,
     time::{Duration, Instant, UNIX_EPOCH},
 };
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 mod ai_http;
 mod image_folders;
 mod updates;
@@ -115,10 +115,20 @@ fn background_command<S: AsRef<OsStr>>(program: S) -> Command {
     }
 }
 
+#[cfg(test)]
 fn run_command_with_timeout(
+    command: Command,
+    timeout: Duration,
+    cancelled: &AtomicBool,
+) -> Result<TimedProcessOutput, String> {
+    run_command_with_progress(command, timeout, cancelled, || {})
+}
+
+fn run_command_with_progress(
     mut command: Command,
     timeout: Duration,
     cancelled: &AtomicBool,
+    mut progress: impl FnMut(),
 ) -> Result<TimedProcessOutput, String> {
     if cancelled.load(Ordering::SeqCst) {
         return Err("任务已停止".to_string());
@@ -134,6 +144,7 @@ fn run_command_with_timeout(
         output
     });
     let started = Instant::now();
+    let mut last_progress = None;
 
     loop {
         if cancelled.load(Ordering::SeqCst) {
@@ -141,6 +152,10 @@ fn run_command_with_timeout(
             let _ = child.wait();
             let _ = stderr_reader.join();
             return Err("任务已停止".to_string());
+        }
+        if last_progress.is_none_or(|last: Instant| last.elapsed() >= Duration::from_secs(1)) {
+            progress();
+            last_progress = Some(Instant::now());
         }
         match child
             .try_wait()
@@ -616,31 +631,51 @@ fn extract_video_frames_blocking(
         format!("fps=1/{interval:.6},{scale}")
     };
     let output_pattern = cache_dir.join("frame-%06d.jpg");
-    let run_capture =
-        |use_hardware: bool, timeout: Duration| -> Result<TimedProcessOutput, String> {
-            let mut command = background_command(&ffmpeg);
-            command.args(["-hide_banner", "-loglevel", "info"]);
-            if use_hardware {
-                command.args(["-hwaccel", "auto"]);
-            }
-            command
-                .arg("-ss")
-                .arg(format!("{start_time:.6}"))
-                .arg("-i")
-                .arg(&video_path);
-            if end_time > start_time {
-                command.args(["-t", &format!("{:.6}", end_time - start_time)]);
-            }
-            command
-                .args(["-vf", &filter, "-frames:v"])
-                .arg(max_frames.to_string())
-                .args(["-q:v", "2", "-threads", "0"]);
-            if mode == "scene" {
-                command.args(["-fps_mode", "vfr"]);
-            }
-            command.arg("-y").arg(&output_pattern);
-            run_command_with_timeout(command, timeout, &cancelled)
-        };
+    let run_capture = |use_hardware: bool,
+                       timeout: Duration|
+     -> Result<TimedProcessOutput, String> {
+        let mut command = background_command(&ffmpeg);
+        command.args(["-hide_banner", "-loglevel", "info"]);
+        if use_hardware {
+            command.args(["-hwaccel", "auto"]);
+        }
+        command
+            .arg("-ss")
+            .arg(format!("{start_time:.6}"))
+            .arg("-i")
+            .arg(&video_path);
+        if end_time > start_time {
+            command.args(["-t", &format!("{:.6}", end_time - start_time)]);
+        }
+        command
+            .args(["-vf", &filter, "-frames:v"])
+            .arg(max_frames.to_string())
+            .args(["-q:v", "2", "-threads", "0"]);
+        if mode == "scene" {
+            command.args(["-fps_mode", "vfr"]);
+        }
+        command.arg("-y").arg(&output_pattern);
+        run_command_with_progress(command, timeout, &cancelled, || {
+            let count = fs::read_dir(&cache_dir)
+                .map(|entries| {
+                    entries
+                        .filter_map(Result::ok)
+                        .filter(|entry| {
+                            entry.path().extension().and_then(|ext| ext.to_str()) == Some("jpg")
+                        })
+                        .count()
+                })
+                .unwrap_or(0);
+            let total = if mode == "interval" {
+                Some((segment_duration / interval).ceil().min(max_frames as f64) as usize)
+            } else {
+                None
+            };
+            let _ = app.emit("frame-extraction-progress", json!({
+                    "requestId": request.request_id, "count": count, "total": total, "hardware": use_hardware
+                }));
+        })
+    };
     let prefer_hardware = cfg!(target_os = "windows") && request.prefer_hardware.unwrap_or(true);
     let hardware_timeout_secs =
         (45.0 + segment_duration * 0.16 + max_frames as f64 * 0.12).clamp(75.0, 150.0);

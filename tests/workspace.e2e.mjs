@@ -73,13 +73,14 @@ try {
   assert.equal(await page.evaluate(()=>__vfpProjects.list.length),1);
   assert.equal(await page.evaluate(()=>__vfpProjects.list[0].batches.length),6);
   passed('delete queued and paused current videos without losing completed output');
+  await page.locator('#railBtn0').click();
   await page.locator('#vInput').setInputFiles(pattern);
   await page.locator('#salesKitBtn').click();
   await page.waitForFunction(()=>__vfpQueue.current?.id===4);
   await page.locator('#taskPauseBtn').click();
   await page.locator('#taskStopBtn').click();await idle();
   assert.equal(await page.evaluate(()=>__vfpProjects.list[1].generationStatus),'stopped');
-  await page.locator('#salesKitBtn').click();
+  await page.locator('#taskResumeAllBtn').click();
   await page.waitForFunction(()=>__vfpQueue.active);
   await page.locator('#taskResultsBtn').click();
   const viewed=await page.evaluate(()=>__vfpProjects.activeId);

@@ -4,6 +4,7 @@ let frameEngine = null;
 let taskRenderKey = '';
 let assetViewRevision = 0;
 let generationStarting = false;
+let taskClockTimer = null;
 const taskStatusLabels = { pending: '待生成', queued: '排队中', running: '生成中', paused: '已暂停', stopping: '停止中', stopped: '已停止', complete: '已完成', failed: '失败' };
 
 function initializeTaskWorkspace() {
@@ -13,7 +14,10 @@ function initializeTaskWorkspace() {
     scoreBatch: (frames, key, model, hint, signal) => visionScoreBatch(frames, key, model, hint, [], [], null, 75000, signal)
   });
   taskQueue = new VideoTaskQueue({
-    process: (project, ctx) => frameEngine.generate(project, ctx),
+    process: (project, ctx) => {
+      project.runConfig.detailTitleStyle=FrameStudio.titleStyle(readUserDefaults().detailTitleStyle);
+      return frameEngine.generate(project, ctx);
+    },
     onChange: () => {
       updateQueueControls();
       const signature = PROJECTS.list.map(p => p.id + ':' + p.generationStatus).join('|');
@@ -32,6 +36,8 @@ function initializeTaskWorkspace() {
   document.getElementById('taskPauseBtn').onclick = () => taskQueue.state === 'paused' ? taskQueue.resume() : taskQueue.pause();
   document.getElementById('taskStopBtn').onclick = () => taskQueue.stop();
   document.getElementById('taskResultsBtn').onclick = openCompletedResults;
+  document.getElementById('taskRetryFailedBtn').onclick = () => startImageTasks(PROJECTS.list.filter(p => p.generationStatus === 'failed'));
+  document.getElementById('taskResumeAllBtn').onclick = () => startImageTasks(PROJECTS.list.filter(p => !isProjectGenerationComplete(p)));
   document.getElementById('selectionMode').addEventListener('change', updateAiConnectionUI);
   document.getElementById('salesKitBtn').addEventListener('click', runPrimarySalesAction);
   document.getElementById('salesCurrentBtn').addEventListener('click', () => runSalesKit());
@@ -42,7 +48,7 @@ function hasResultContent() {
   return typeof S !== 'undefined' && S.batches.some(b => b.canvas || b.wasGenerated);
 }
 function hasProjectOutcome() {
-  return (globalThis.__vfpProjects?.list || []).some(p => p.batches?.some(b => b.canvas || b.wasGenerated));
+  return (globalThis.__vfpProjects?.list || []).some(p => p.generationStatus === 'failed' || p.batches?.some(b => b.canvas || b.wasGenerated));
 }
 function updateResultNavigationState() {
   const list = globalThis.__vfpProjects?.list || [];
@@ -89,16 +95,49 @@ function updateQueueControls() {
   document.getElementById('taskControlBar').hidden = !PROJECTS.list.length;
   document.getElementById('taskControlBar').classList.toggle('is-idle', !active);
   document.getElementById('taskQueueTitle').textContent = stopping ? '正在停止任务' : paused ? '队列已暂停' : active ? '正在生成图片' : done ? '结果已就绪' : '素材已就绪';
-  document.getElementById('taskQueueSummary').textContent = done + ' / ' + PROJECTS.list.length + ' 个完成' + (failed ? ' · ' + failed + ' 个失败，可重试' : '') + (current && !current.deleted ? ' · ' + current.name + '：' + (current.generationStage || '准备中') : '');
-  document.getElementById('taskQueueHint').textContent = paused ? '进度已保留。继续后会重试被中断的步骤。' : stopping ? '正在结束当前处理，已完成图片会保留。' : active ? '可以查看已完成结果，也可以移除不需要的任务。' : '每完成一个任务，结果立即可用。';
+  setTaskText('taskQueueSummary',done + ' / ' + PROJECTS.list.length + ' 个完成' + (failed ? ' · ' + failed + ' 个失败' : '') + (active ? ' · 排队 ' + taskQueue.pending.length + ' 个' : ''));
+  setTaskText('taskQueueStep',current && !current.deleted ? current.name + ' · ' + (current.generationStage || '准备中') : failed ? '可重试全部失败，已完成结果会保留。' : '');
   const pause = document.getElementById('taskPauseBtn'); pause.hidden = !active; pause.disabled = stopping; pause.textContent = paused ? '继续生成' : '暂停';
   const stop = document.getElementById('taskStopBtn'); stop.hidden = !active; stop.disabled = stopping;
+  const retry = document.getElementById('taskRetryFailedBtn'); retry.hidden = !failed; retry.disabled = generationStarting || stopping; retry.textContent = '重试全部失败（' + failed + '）';
+  const remaining = PROJECTS.list.filter(p => !isProjectGenerationComplete(p)).length;
+  const resume = document.getElementById('taskResumeAllBtn'); resume.hidden = active || !remaining; resume.disabled = generationStarting; resume.textContent = '继续全部未完成（' + remaining + '）';
   document.getElementById('taskResultsBtn').disabled = !hasProjectOutcome();
   document.getElementById('taskResultsBtn').textContent = '查看结果' + (done ? ' · ' + done : '');
   const progress = active ? (done + Number(current?.generationProgress || 0) / 100) / Math.max(1, PROJECTS.list.length) * 100 : done / Math.max(1, PROJECTS.list.length) * 100;
   document.getElementById('taskQueueFill').style.width = Math.min(100, progress) + '%';
   document.getElementById('taskQueueTrack').setAttribute('aria-valuenow', String(Math.round(progress)));
+  document.querySelectorAll('[data-project-stage]').forEach(el => {
+    const project=PROJECTS.list.find(p=>p.id===Number(el.dataset.projectStage));
+    const text=project?.generationStage||'';
+    if(el.textContent!==text) el.textContent=text;
+  });
+  updateTaskClocks();
+  if(active&&!taskClockTimer) taskClockTimer=setInterval(updateTaskClocks,500);
+  if(!active&&taskClockTimer){clearInterval(taskClockTimer);taskClockTimer=null;}
   updateSalesPrimaryState();
+}
+function formatTaskTime(ms) {
+  const s=Math.max(0,Math.floor((Number(ms)||0)/1000)),m=String(Math.floor(s/60)%60).padStart(2,'0'),seconds=String(s%60).padStart(2,'0');
+  return (s>=3600?Math.floor(s/3600)+':':'')+m+':'+seconds;
+}
+function setTaskText(id,text){const el=document.getElementById(id);if(el&&el.textContent!==text)el.textContent=text;}
+function updateTaskClocks(){
+  if(!taskQueue)return;
+  const current=taskQueue.current;
+  const selected=current||PROJECTS.list.find(p=>p.id===PROJECTS.activeId);
+  const extra=current&&taskQueue.activeSince!=null?Math.max(0,taskQueue.now()-taskQueue.activeSince):0;
+  setTaskText('taskBatchTime',formatTaskTime(taskQueue.batchElapsed()));
+  setTaskText('taskTotalTime',formatTaskTime(PROJECTS.list.reduce((sum,p)=>sum+taskQueue.elapsed(p),0)));
+  setTaskText('taskCurrentTime',formatTaskTime((selected?.generationTiming?.lastAttemptMs||0)+extra));
+  setTaskText('taskStageTime',formatTaskTime(current?taskQueue.stageElapsed():selected?.generationTiming?.lastStageMs));
+  const paused=taskQueue.state==='paused',stopping=taskQueue.state==='stopping';
+  setTaskText('taskQueueHint',paused?'已暂停，计时冻结；继续后重试中断步骤。':stopping?'正在结束当前处理，已完成图片会保留。':current?
+    '当前步骤最长 '+formatTaskTime(taskQueue.stepTimeoutMs)+' · 距离最近进度更新 '+formatTaskTime(taskQueue.now()-(taskQueue.lastProgressAt??taskQueue.now()))+'，超时会显示原因。':'计时不包含暂停及两次运行之间的等待时间。');
+  document.querySelectorAll('[data-project-time]').forEach(el=>{
+    const p=PROJECTS.list.find(item=>item.id===Number(el.dataset.projectTime));
+    const text='累计 '+formatTaskTime(taskQueue.elapsed(p));if(el.textContent!==text)el.textContent=text;
+  });
 }
 function updateAiConnectionUI() {
   const mode = document.getElementById('selectionMode')?.value || 'local';
@@ -145,8 +184,9 @@ function switchResultProject(id) {
 function openCompletedResults() {
   const current = PROJECTS.list.find(p => p.id === PROJECTS.activeId);
   const target = current?.batches?.length ? current : PROJECTS.list.find(p => p.batches?.some(b => b.canvas || b.wasGenerated));
-  if (!target) return;
-  switchProject(target.id); switchTab(1);
+  const outcome=target||PROJECTS.list.find(p=>p.generationStatus==='failed');
+  if (!outcome) return;
+  switchProject(outcome.id); switchTab(1);
 }
 async function deleteProject(id) {
   const p = PROJECTS.list.find(x => x.id === id); if (!p) return;
@@ -200,7 +240,7 @@ function renderProjectTabs() {
   tabs.innerHTML = list.map((p, i) => '<div class="proj-tab' + (p.id === PROJECTS.activeId ? ' active' : '') + (p.generationStatus === 'complete' ? ' is-complete' : '') + (p.generationStatus === 'failed' ? ' is-failed' : '') + '">' +
     '<button type="button" class="project-select" onclick="switchProject(' + p.id + ')" aria-current="' + (p.id === PROJECTS.activeId) + '">' +
     '<span class="proj-index">' + String(i + 1).padStart(2, '0') + '</span><span class="proj-tab-main"><strong class="proj-tab-name" title="' + escapeHtml(p.fileName || p.name) + '">' + escapeHtml(p.name) + '</strong>' +
-    '<span class="proj-tab-meta"><span class="proj-state">' + (taskStatusLabels[p.generationStatus] || '待生成') + '</span><span>' + escapeHtml(projectGenerationError(p)?.message || (p.sourceKind === 'images' ? '图片文件夹 · ' : '视频 · ') + (p.fileSize || '')) + '</span></span></span></button>' +
+    '<span class="proj-tab-meta"><span class="proj-state">' + (taskStatusLabels[p.generationStatus] || '待生成') + '</span><span>' + escapeHtml(projectGenerationError(p)?.message || (p.sourceKind === 'images' ? '图片文件夹 · ' : '视频 · ') + (p.fileSize || '')) + '</span></span><span class="project-step" data-project-stage="'+p.id+'">'+escapeHtml(p.generationStage||'')+'</span><b class="project-time" data-project-time="'+p.id+'">累计 '+formatTaskTime(taskQueue?.elapsed(p))+'</b></span></button>' +
     (p.batches?.length ? '<button class="btn-sm project-result" onclick="switchProject(' + p.id + ');switchTab(1)">查看结果</button>' : '') +
     (p.generationStatus === 'failed' ? '<button class="btn-sm" onclick="retryProject(' + p.id + ')">重试</button>' : '') +
     '<button class="project-rename" onclick="renameProject(' + p.id + ')" aria-label="重命名 ' + escapeHtml(p.name) + '">···</button>' +
@@ -211,7 +251,7 @@ function renderResultProjectSwitcher() {
   const wrap = document.getElementById('resultProjectSwitcher'), tabs = document.getElementById('resultProjectTabs'); if (!wrap || !tabs) return;
   wrap.style.display = PROJECTS.list.length ? '' : 'none';
   document.getElementById('resultProjectSummary').textContent = PROJECTS.list.filter(p => p.batches?.length).length + ' 个任务已有图片';
-  tabs.innerHTML = PROJECTS.list.map(p => '<button class="result-project-tab' + (p.id === PROJECTS.activeId ? ' is-active' : '') + '" onclick="switchResultProject(' + p.id + ')"><span class="result-project-copy"><strong>' + escapeHtml(p.name) + '</strong><small>' + (taskStatusLabels[p.generationStatus] || '待生成') + '</small></span></button>').join('');
+  tabs.innerHTML = PROJECTS.list.map(p => '<button class="result-project-tab' + (p.id === PROJECTS.activeId ? ' is-active' : '') + '" onclick="switchResultProject(' + p.id + ')"><span class="result-project-copy"><strong>' + escapeHtml(p.name) + '</strong><small>' + (taskStatusLabels[p.generationStatus] || '待生成') + '</small><b class="project-time" data-project-time="'+p.id+'">累计 '+formatTaskTime(taskQueue?.elapsed(p))+'</b></span></button>').join('');
   const p = PROJECTS.list.find(x => x.id === PROJECTS.activeId);
   document.getElementById('resultVideoName').textContent = p?.name || '图片结果';
   const error = projectGenerationError(p), box = document.getElementById('resultProjectFailure');
@@ -225,7 +265,6 @@ function renderResultProjectSwitcher() {
   document.getElementById('generationNote').textContent = replacing ? '正在生成新版本，完成后会替换这些图片；此时可以导出现有图片，停止后可继续编辑。' : p?.generationNote || '';
 }
 async function retryProject(id) {
-  if (taskQueue?.active) { toast('请在本次队列结束后重试，或先停止队列', 'warn'); return; }
   return startImageTasks(PROJECTS.list.filter(p => p.id === id));
 }
 async function retryCurrentFailedProject() { return retryProject(PROJECTS.activeId); }
@@ -343,6 +382,7 @@ function taskConfig(project, extra = {}) {
     apiKey: value('selectionMode') === 'ai' ? value('aiApiKey')?.trim() : '', mode: value('selectionMode'),
     model: value('aiModel'), hint: value('aiPromptHint') || '', variants: Number(value('variantCount')) || 3,
     badge: !!document.getElementById('coverBadge')?.checked, ...coverOutputConfig(),
+    detailTitleStyle:FrameStudio.titleStyle(readUserDefaults().detailTitleStyle),
     captureMode: S.captureMode, interval: Math.max(.1, Number(value('itvl')) || 1), start: Math.max(0, Number(value('stt')) || 0),
     end: value('edt') ? Number(value('edt')) : null, maxFrames: Math.max(1, Math.min(600, Number(value('mxf')) || 120)),
     sceneThreshold: Math.max(.03, .18 - (Number(value('sceneSens')) - 10) / 50 * .15),
@@ -351,7 +391,10 @@ function taskConfig(project, extra = {}) {
 }
 async function startImageTasks(projects, extra = {}) {
   if (typeof appUpdateInstalling !== 'undefined' && appUpdateInstalling) return;
-  if (!projects.length || taskQueue?.active || generationStarting) return;
+  if (!projects.length || taskQueue?.state==='stopping' || generationStarting) return;
+  const queuedIds=new Set([taskQueue?.current,...(taskQueue?.pending||[])].filter(Boolean).map(p=>p.id));
+  projects=projects.filter(p=>!queuedIds.has(p.id)&&!p.deleted);
+  if(!projects.length){toast('这些任务已在队列中');return;}
   try{coverOutputConfig();}catch(error){toast(error.message,'err');return;}
   generationStarting = true; updateSalesPrimaryState();
   try {
@@ -363,11 +406,17 @@ async function startImageTasks(projects, extra = {}) {
     projects = projects.filter(p => PROJECTS.list.includes(p) && !p.deleted);
     projects.forEach(p => { p.runConfig = taskConfig(p, extra); p.generationProgress = 0; });
     if(projects.some(p=>p.runConfig.badge)) await S.badgeReady;
-    await taskQueue.start(projects);
+    const running=taskQueue.enqueue(projects);
+    generationStarting=false; updateQueueControls();
+    await running;
     // Credentials are kept in memory only for the running batch, never in history.
     projects.forEach(p => { if (p.runConfig) delete p.runConfig.apiKey; });
     scheduleWorkspaceSave(600);
-  } finally { generationStarting = false; updateSalesPrimaryState(); }
+    if(document.getElementById('view0')?.classList.contains('active')&&hasProjectOutcome()) openCompletedResults();
+  } finally {
+    projects.forEach(p=>{if(p.runConfig)delete p.runConfig.apiKey;});
+    generationStarting = false; updateQueueControls();
+  }
 }
 async function runPrimarySalesAction() {
   const pending = PROJECTS.list.filter(p => !isProjectGenerationComplete(p));
@@ -499,7 +548,8 @@ async function exportListingPackage() {
 function serializeProjectDraft(p) {
   const { runConfig, imgCache, storyDoc, manualStoryDoc, salesFeedback, salesPlan, deleted, ...rest } = p;
   return { ...rest, videoUrl: '', videoBlob: p.desktopPath ? null : p.videoBlob, imgCache: null,
-    generationStatus: ['running', 'queued', 'paused'].includes(p.generationStatus) ? 'stopped' : p.generationStatus,
+    generationStatus: ['running', 'queued', 'paused', 'stopping'].includes(p.generationStatus) ? 'stopped' : p.generationStatus,
+    generationTiming:p.generationTiming?{...p.generationTiming,elapsedMs:taskQueue?.elapsed(p)??p.generationTiming.elapsedMs}:undefined,
     batches: (p.batches || []).map(serializeBatchDraft), salesPlan: null };
 }
 
@@ -507,13 +557,50 @@ function frameLabel(frame) { return frame?.sourceName || ((frame?.time || 0).toF
 
 const manualTitleTimers = new Map();
 function manualTitleControlsHTML(b) {
+  const style=FrameStudio.titleStyle(b.heroStyle);
   return '<div class="manual-title-controls"><label class="manual-title-field" for="herotitle-'+b.id+'">手动标题<input id="herotitle-'+b.id+'" maxlength="80" value="'+escapeHtmlSafe(b.heroTitle||'')+'" placeholder="填写这张长图的标题；留空不显示" oninput="setManualTitle('+b.id+',this.value)" onblur="this.dataset.editing=\'\'"></label>'+
     '<div class="manual-title-options"><label><input type="checkbox" id="hero-visible-'+b.id+'" '+(b.heroShowText!==false?'checked':'')+' onchange="setManualTitleVisible('+b.id+',this.checked)">显示标题</label>'+
-    '<label><input type="checkbox" id="badge-'+b.id+'" '+(b.hasBadge?'checked':'')+' onchange="setBatchBadge('+b.id+',this.checked)">4K 角标</label><small>仅手动填写，自动保存到图片</small></div></div>';
+    '<label><input type="checkbox" id="badge-'+b.id+'" '+(b.hasBadge?'checked':'')+' onchange="setBatchBadge('+b.id+',this.checked)">4K 角标</label><small>仅手动填写，自动保存到图片</small></div>'+
+    '<details class="title-style-panel"><summary>标题条样式</summary><div class="title-style-fields">'+
+    '<label>高度 <output id="hero-height-value-'+b.id+'">'+style.bandHeight+'%</output><input aria-label="标题条高度" id="hero-height-'+b.id+'" type="range" min="3" max="30" step="1" value="'+style.bandHeight+'" oninput="setManualTitleStyle('+b.id+',\'bandHeight\',this.value)"></label>'+
+    '<label>字号 <output id="hero-size-value-'+b.id+'">'+style.fontSize+'%</output><input aria-label="标题字号" id="hero-size-'+b.id+'" type="range" min="1.5" max="8" step="0.1" value="'+style.fontSize+'" oninput="setManualTitleStyle('+b.id+',\'fontSize\',this.value)"></label>'+
+    '<label>文字适配<select aria-label="标题文字适配" id="hero-fit-'+b.id+'" onchange="setManualTitleStyle('+b.id+',\'fit\',this.value)"><option value="single"'+(style.fit==='single'?' selected':'')+'>单行自动缩小</option><option value="wrap"'+(style.fit==='wrap'?' selected':'')+'>最多两行</option></select></label>'+
+    '<label>对齐<select aria-label="标题对齐" id="hero-align-'+b.id+'" onchange="setManualTitleStyle('+b.id+',\'align\',this.value)">'+['left','center','right'].map((align,i)=>'<option value="'+align+'"'+(style.align===align?' selected':'')+'>'+['左对齐','居中','右对齐'][i]+'</option>').join('')+'</select></label></div>'+
+    '<label class="title-auto-height"><input type="checkbox" id="hero-auto-'+b.id+'" '+(style.autoHeight?'checked':'')+' onchange="setManualTitleStyle('+b.id+',\'autoHeight\',this.checked)">高度随文字自适应</label>'+
+    '<div class="title-style-actions"><button type="button" class="btn-sm" onclick="saveTitleStyleDefault('+b.id+')">保存为默认</button><button type="button" class="btn-sm" onclick="applyTitleStyleToProject('+b.id+')">应用到本项目全部详情</button></div></details></div>';
+}
+function saveTitleStyleDefault(id){
+  const b=S.batches.find(item=>item.id===id);if(!b)return;
+  try{
+    const defaults={...collectUserDefaults(),detailTitleStyle:FrameStudio.titleStyle(b.heroStyle)};
+    localStorage.setItem(USER_DEFAULTS_STORAGE,JSON.stringify(defaults));
+    toast('标题样式已保存，之后所有新任务自动应用，重启仍保留');
+  }catch(error){toast('默认样式保存失败：'+error.message,'err');}
+}
+function applyTitleStyleToProject(id){
+  const b=S.batches.find(item=>item.id===id);if(!b)return;
+  const style=FrameStudio.titleStyle(b.heroStyle);
+  pushHistory();
+  const details=S.batches.filter(item=>item.isDetailLong);
+  details.forEach(item=>{item.heroStyle={...style};syncManualTitleControls(item);scheduleManualTitleRender(item);});
+  toast('已应用到本项目 '+details.length+' 张详情，标题内容保持不变');
 }
 function syncManualTitleControls(b) {
   const input=document.getElementById('herotitle-'+b.id); if(input) { input.value=b.heroTitle||''; input.dataset.editing=''; }
   const visible=document.getElementById('hero-visible-'+b.id); if(visible) visible.checked=b.heroShowText!==false;
+  const style=FrameStudio.titleStyle(b.heroStyle);
+  for(const [key,name] of [['bandHeight','height'],['fontSize','size'],['fit','fit'],['align','align']]){
+    const el=document.getElementById('hero-'+name+'-'+b.id);if(el)el.value=style[key];
+    const output=document.getElementById('hero-'+name+'-value-'+b.id);if(output)output.value=style[key]+'%';
+  }
+  const auto=document.getElementById('hero-auto-'+b.id);if(auto)auto.checked=style.autoHeight;
+}
+function setManualTitleStyle(id,key,value){
+  const b=S.batches.find(item=>item.id===id);if(!b)return;
+  if(!manualTitleTimers.has(b))pushHistory();
+  b.heroStyle=FrameStudio.titleStyle({...FrameStudio.titleStyle(b.heroStyle),[key]:value,...(key==='bandHeight'?{autoHeight:false}:{})});
+  syncManualTitleControls(b);
+  scheduleManualTitleRender(b);
 }
 function setManualTitle(id, value) {
   const b=S.batches.find(x=>x.id===id); if(!b) return;

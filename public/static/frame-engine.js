@@ -88,9 +88,17 @@
       return ctx.step('本机提取画面', async signal => {
         const requestId = 'extract-' + Date.now() + '-' + Math.random().toString(36).slice(2);
         let cancellation;
+        let unlisten;
         const cancel = () => { cancellation = native.invoke('cancel_frame_extraction', { requestId }); cancellation.catch(() => {}); };
         signal.addEventListener('abort', cancel, { once: true });
         try {
+          check(signal);
+          if (native.listen) unlisten = await native.listen('frame-extraction-progress', event => {
+            const progress = event.payload;
+            if (signal.aborted || progress.requestId !== requestId) return;
+            ctx.progress(progress.total ? 5 + 40 * Math.min(1, progress.count / progress.total) : undefined,
+              '本机提取画面 · ' + (progress.hardware ? '硬件加速' : 'CPU 解码') + ' · 已提取 ' + progress.count + ' 张' + (progress.total ? ' / 约 ' + progress.total + ' 张' : ''));
+          });
           check(signal);
           const result = await native.invoke('extract_video_frames', { request: {
             requestId, videoPath: project.desktopPath, projectId: config.cacheId,
@@ -101,6 +109,7 @@
           check(signal);
           return result.map((f, idx) => ({ dataUrl: native.fileUrl(f.path), filePath: f.path, time: f.time, w: f.width, h: f.height, idx }));
         } finally {
+          unlisten?.();
           signal.removeEventListener('abort', cancel);
           if (cancellation) await cancellation;
         }
@@ -147,7 +156,7 @@
     const probe = canvas(32, 18), cx = probe.getContext('2d', { willReadFrequently: true });
     const items = [];
     for (let i = 0; i < frames.length; i++) {
-      items.push(await ctx.step('分析清晰度与画面差异', async signal => {
+      items.push(await ctx.step('分析清晰度与画面差异 ' + (i + 1) + ' / ' + frames.length, async signal => {
         const image = await loadFrame(frames[i], signal, native);
         cx.fillStyle = '#fff'; cx.fillRect(0, 0, 32, 18);
         cx.drawImage(image, 0, 0, 32, 18);
@@ -319,7 +328,7 @@
       const filled = fill(rotated.length ? rotated : order, 9 + rowPlan.reduce((a, b) => a + b, 0));
       const gridFrames = filled.splice(0, 9);
       details.push({ id: ++baseId, cols: 3, rows: 0, cells: [], crops: {}, hasBadge: false, assetKind: 'detail',
-        isDetail: true, isDetailLong: true, heroShowText: true, heroTitle: '', detailLayout: { gridFrames, rows: rowPlan.map(cols => ({ cols, frames: filled.splice(0, cols) })) },
+        isDetail: true, isDetailLong: true, heroShowText: true, heroTitle: '', heroStyle:titleStyle(config.detailTitleStyle), detailLayout: { gridFrames, rows: rowPlan.map(cols => ({ cols, frames: filled.splice(0, cols) })) },
         title: '详情 ' + String.fromCharCode(65 + i), note: '九宫格' + (rowPlan.length ? ' + ' + rowPlan.length + ' 行' : '') + ' · 可手动添加标题', canvas: null });
     }
     return [...covers, ...details];
@@ -361,28 +370,43 @@
     return { width: sw, height: sh, x: (width - sw) / 2 + ox * sw / 2,
       y: (height - sh) / 2 + oy * sh / 2, ox, oy, scale: zoom };
   }
-  function drawManualTitle(cx, asset, width, height) {
-    const title = String(asset.heroTitle || '').trim();
-    if (!title || asset.heroShowText === false) return;
-    const padding = width * .045, maxWidth = width - padding * 2;
-    let fontSize = width * .047, lines;
-    do {
+  function titleStyle(value = {}) {
+    value = value || {};
+    return { autoHeight:value.autoHeight!==false, bandHeight:Math.max(3,Math.min(30,Number(value.bandHeight)||12)),
+      fontSize:Math.max(1.5,Math.min(8,Number(value.fontSize)||4.7)), fit:value.fit==='single'?'single':'wrap',
+      align:['left','right'].includes(value.align)?value.align:'center' };
+  }
+  function layoutManualTitle(cx, title, width, height, value) {
+    const style=titleStyle(value), padding=width*.045, maxWidth=width-padding*2;
+    let fontSize=width*style.fontSize/100, lines;
+    const fixedHeight=Math.min(height,width*style.bandHeight/100);
+    for (;;) {
       cx.font = '700 ' + fontSize + 'px "Microsoft YaHei", "PingFang SC", sans-serif';
       lines = [''];
       for (const char of Array.from(title)) {
         const last = lines.length - 1;
-        if (cx.measureText(lines[last] + char).width > maxWidth && lines[last]) lines.push(char);
+        if (style.fit==='wrap' && cx.measureText(lines[last] + char).width > maxWidth && lines[last]) lines.push(char);
         else lines[last] += char;
       }
-      if (lines.length <= 2) break;
-      fontSize *= .9;
-    } while (fontSize > width * .012);
-    const bandHeight = Math.min(height, fontSize * 1.4 * lines.length + width * .045);
+      if (fontSize<=2 || (lines.length <= (style.fit==='single'?1:2) && lines.every(line=>cx.measureText(line).width<=maxWidth) &&
+        (style.autoHeight || fontSize*1.4*lines.length<=fixedHeight*.8))) break;
+      fontSize = Math.max(2,fontSize*.94);
+    }
+    const bandHeight=style.autoHeight?Math.min(height,fontSize*1.4*lines.length+width*.045):fixedHeight;
+    return { ...style, padding, maxWidth, fontSize, lines, bandHeight, lineHeight:fontSize*1.4 };
+  }
+  function drawManualTitle(cx, asset, width, height) {
+    const title = String(asset.heroTitle || '').trim();
+    if (!title || asset.heroShowText === false) return;
+    const {padding,maxWidth,lines,bandHeight,lineHeight,align}=layoutManualTitle(cx,title,width,height,asset.heroStyle);
+    cx.save();cx.beginPath();cx.rect(0,0,width,bandHeight);cx.clip();
     const gradient = cx.createLinearGradient(0, 0, width, bandHeight);
     gradient.addColorStop(0, '#a91e36'); gradient.addColorStop(1, '#ee6252');
     cx.fillStyle = gradient; cx.fillRect(0, 0, width, bandHeight);
-    cx.fillStyle = '#fff'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
-    lines.forEach((line, i) => cx.fillText(line, width / 2, bandHeight / 2 + (i - (lines.length - 1) / 2) * fontSize * 1.4, maxWidth));
+    cx.fillStyle = '#fff'; cx.textAlign = align; cx.textBaseline = 'middle';
+    const x=align==='left'?padding:align==='right'?width-padding:width/2;
+    lines.forEach((line, i) => cx.fillText(line, x, bandHeight / 2 + (i - (lines.length - 1) / 2) * lineHeight));
+    cx.restore();
   }
   // Quantized dominant colors from selected pictures only; sampling stays local.
   function paletteFromPixels(samples) {
@@ -521,5 +545,5 @@
       }
     };
   }
-  root.FrameStudio = { create, renderAsset, assetGeometry, coverMode, coverSpec, coverShadow, parseCoverAspect, paletteFromPixels, cropPlacement, loadFrame, diverse, makeAssets, sceneRepresentatives, imageRepresentatives, similarFrames };
+  root.FrameStudio = { create, renderAsset, assetGeometry, titleStyle, layoutManualTitle, coverMode, coverSpec, coverShadow, parseCoverAspect, paletteFromPixels, cropPlacement, loadFrame, diverse, makeAssets, sceneRepresentatives, imageRepresentatives, similarFrames };
 })(globalThis);

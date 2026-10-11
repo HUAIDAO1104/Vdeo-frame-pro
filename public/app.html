@@ -143,7 +143,16 @@
   </aside>
 
   <!-- ===== 主工作区（三个全屏视图） ===== -->
-  <div class="stage"><section id="taskControlBar" class="task-control-bar" hidden=""><div class="task-control-copy"><div class="task-control-heading"><span class="queue-pulse"></span><strong id="taskQueueTitle">素材已就绪</strong><span id="taskQueueSummary" aria-live="polite"></span></div><p id="taskQueueHint"></p><div id="taskQueueTrack" class="task-queue-track" role="progressbar" aria-label="任务队列进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="taskQueueFill"></div></div></div><div class="task-control-actions"><button id="taskPauseBtn" hidden="">暂停</button><button id="taskStopBtn" class="stop-action" hidden="">停止</button><button id="taskResultsBtn" class="results-action" disabled="">查看结果</button></div></section>
+  <div class="stage"><section id="taskControlBar" class="task-control-bar" hidden>
+    <div class="task-control-copy">
+      <div class="task-control-heading"><span class="queue-pulse"></span><strong id="taskQueueTitle">素材已就绪</strong><span id="taskQueueSummary" aria-live="polite"></span></div>
+      <p id="taskQueueStep" role="status" aria-live="polite"></p>
+      <div class="task-times" aria-live="off"><span>本轮用时 <b id="taskBatchTime">00:00</b></span><span>累计总用时 <b id="taskTotalTime">00:00</b></span><span>当前任务 <b id="taskCurrentTime">00:00</b></span><span>当前步骤 <b id="taskStageTime">00:00</b></span></div>
+      <p id="taskQueueHint"></p>
+      <div id="taskQueueTrack" class="task-queue-track" role="progressbar" aria-label="任务队列进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="taskQueueFill"></div></div>
+    </div>
+    <div class="task-control-actions"><button id="taskRetryFailedBtn" hidden>重试全部失败</button><button id="taskResumeAllBtn" hidden>继续全部未完成</button><button id="taskPauseBtn" hidden>暂停</button><button id="taskStopBtn" class="stop-action" hidden>停止全部</button><button id="taskResultsBtn" class="results-action" disabled>查看结果</button></div>
+  </section>
 
     <!-- ════════ 视图 0：导入 & 截帧 ════════ -->
     <section class="view active" id="view0">
@@ -893,6 +902,9 @@ const DESKTOP_NATIVE = {
   invoke(command,args={}) {
     if(!this.enabled) return Promise.reject(new Error('当前不是桌面运行环境'));
     return window.__TAURI__.core.invoke(command,args);
+  },
+  listen(event, handler) {
+    return window.__TAURI__.event.listen(event, handler);
   },
   fileUrl(path) {
     if(!path) return '';
@@ -2638,6 +2650,7 @@ function snapshotCells(){
       crops:JSON.parse(JSON.stringify(b.crops||{})),
       detailLayout:b.detailLayout?JSON.parse(JSON.stringify(b.detailLayout)):null,
       heroTitle:b.heroTitle||'', heroShowText:b.heroShowText, hasBadge:b.hasBadge,
+      heroStyle:b.heroStyle?{...b.heroStyle}:null,
     })),
     finalCoverId:S.finalCoverId,
     finalDetailId:S.finalDetailId
@@ -2671,6 +2684,7 @@ function applySnapshot(snap){
       b.crops = s.crops ? JSON.parse(JSON.stringify(s.crops)) : {};
       if(s.detailLayout) b.detailLayout=JSON.parse(JSON.stringify(s.detailLayout));
       for(const key of ['heroTitle','heroShowText','hasBadge']) if(key in s) b[key]=s[key];
+      b.heroStyle=s.heroStyle?{...s.heroStyle}:null;
       syncManualTitleControls(b);
       const badge=document.getElementById('badge-'+b.id); if(badge) badge.checked=!!b.hasBadge;
       if(b.isDetailLong){ regenDetailLong(b).catch(console.warn); }
@@ -4519,6 +4533,7 @@ const SYSTEM_USER_DEFAULTS={
     aiModel:'qwen3-vl-flash-2026-01-22',
   },
   captureMode:'interval',
+  detailTitleStyle:FrameStudio.titleStyle(),
   export:{format:'jpeg',quality:.95,scale:1},
   thumbSize:130,
   savedAt:0
@@ -4568,6 +4583,7 @@ function collectUserDefaults(){
     controls,
     captureMode:S.captureMode||'interval',
     export:{format:EXPORT.format,quality:EXPORT.quality,scale:EXPORT.scale},
+    detailTitleStyle:FrameStudio.titleStyle(readUserDefaults().detailTitleStyle),
     thumbSize:Number(document.getElementById('thumbSizeSlider')?.value)||130,
     savedAt:Date.now()
   };

@@ -220,4 +220,4 @@ try{
   console.log('PASS packaged frontend: actual PNG/JPEG/WebP downloads at 0.5x/1x/2x, cover/detail/ZIP top-right badge pixels, toggle off, load failure and retry');
   console.log('Exported images:',output);
 }catch(error){console.log('Export evidence:',output);throw error;}
-finally{await browser.close();await new Promise(r=>server.close(r));}
+finally{await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));}
