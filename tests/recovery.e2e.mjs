@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve, extname } from 'node:path';
+import { join, resolve, extname, sep } from 'node:path';
 import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
@@ -13,7 +13,7 @@ execFileSync(process.env.FFMPEG_PATH||'ffmpeg',['-hide_banner','-loglevel','erro
 const mime={'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml'};
 const server=createServer(async(req,res)=>{
   const path=resolve(root,'public','.'+new URL(req.url,'http://local').pathname);
-  if(!path.startsWith(join(root,'public')+'/'))return res.writeHead(403).end();
+  if(!path.startsWith(join(root,'public')+sep))return res.writeHead(403).end();
   try{res.setHeader('Content-Type',mime[extname(path)]||'application/octet-stream');res.end(await readFile(path));}catch{res.writeHead(404).end();}
 });
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
@@ -22,7 +22,8 @@ const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];
 page.on('pageerror',e=>errors.push(e.message));
 const idle=()=>page.waitForFunction(()=>!__vfpQueue.active&&!generationStarting);
 try{
-  await page.goto('http://127.0.0.1:'+server.address().port+'/app.html');
+  const response=await page.goto('http://127.0.0.1:'+server.address().port+'/app.html');
+  assert.equal(response.status(),200,'test server must serve the app on this platform');
   await page.locator('#vInput').setInputFiles(video);
   await page.waitForFunction(()=>PROJECTS.list.length===1);
   await page.evaluate(()=>{
